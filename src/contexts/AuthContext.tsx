@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -103,7 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
       
       toast.success('Registration successful! Please verify your email.');
-      navigate('/verify-email');
+      navigate('/verify-email', { state: { email } });
     } catch (err) {
       console.error('Registration error:', err);
       setError('Registration failed. This email may already be in use.');
@@ -135,10 +134,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
       
       toast.success('Password reset link sent to your email!');
+      return Promise.resolve();
     } catch (err) {
       console.error('Forgot password error:', err);
       setError('Failed to send reset link. Please try again.');
       toast.error('Failed to send reset link. Please try again.');
+      return Promise.reject(err);
     } finally {
       setLoading(false);
     }
@@ -150,19 +151,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     
     try {
-      // Simulate API call
+      // Simulate API call - validate token and update password
       await simulateApiCall(
         { success: true },
-        1000,
-        false // Set to true to simulate failure
+        1500,
+        token === 'invalid-token' // Simulate failure for invalid tokens
       );
       
       toast.success('Password has been reset successfully!');
-      navigate('/login');
+      return Promise.resolve();
     } catch (err) {
       console.error('Reset password error:', err);
       setError('Failed to reset password. The link may have expired.');
       toast.error('Failed to reset password. Please try again.');
+      return Promise.reject(err);
     } finally {
       setLoading(false);
     }
@@ -174,19 +176,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     
     try {
-      // Simulate API call
+      // Simulate API call - validate verification token
       await simulateApiCall(
         { success: true },
-        1000,
-        false // Set to true to simulate failure
+        1500,
+        token === 'invalid-token' // Simulate failure for invalid tokens
       );
       
       toast.success('Email verified successfully!');
-      navigate('/login');
+      return Promise.resolve();
     } catch (err) {
       console.error('Verify email error:', err);
       setError('Failed to verify email. The link may have expired.');
       toast.error('Failed to verify email. Please try again.');
+      return Promise.reject(err);
     } finally {
       setLoading(false);
     }
