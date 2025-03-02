@@ -2,11 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { Moon, Sun } from 'lucide-react';
+import { useTheme } from '../contexts/ThemeContext';
 
 const Navbar: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
+  const { theme, setTheme } = useTheme();
   
   useEffect(() => {
     const handleScroll = () => {
@@ -26,11 +29,15 @@ const Navbar: React.FC = () => {
     setIsMenuOpen(!isMenuOpen);
   };
 
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
+
   return (
     <header 
       className={cn(
         "fixed top-0 left-0 right-0 z-50 transition-all duration-300 w-full py-4",
-        scrolled ? "bg-white/80 backdrop-blur-lg shadow-sm" : "bg-transparent"
+        scrolled ? "bg-card/80 backdrop-blur-lg shadow-sm" : "bg-transparent"
       )}
     >
       <div className="container mx-auto px-4">
@@ -47,29 +54,54 @@ const Navbar: React.FC = () => {
             <NavLink href="/#features" active={false}>Features</NavLink>
             <NavLink href="/login" active={location.pathname === "/login"}>Login</NavLink>
             <NavLink href="/register" active={location.pathname === "/register"}>Register</NavLink>
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-full hover:bg-muted"
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? (
+                <Sun className="h-5 w-5" />
+              ) : (
+                <Moon className="h-5 w-5" />
+              )}
+            </button>
           </nav>
           
           {/* Mobile menu button */}
-          <button
-            className="md:hidden flex items-center"
-            onClick={toggleMenu}
-            aria-label={isMenuOpen ? "Close menu" : "Open menu"}
-          >
-            <div className="space-y-2">
-              <span className={cn(
-                "block w-8 h-0.5 bg-foreground transition-all duration-300",
-                isMenuOpen && "translate-y-2.5 rotate-45"
-              )}></span>
-              <span className={cn(
-                "block w-8 h-0.5 bg-foreground transition-all duration-300",
-                isMenuOpen && "opacity-0"
-              )}></span>
-              <span className={cn(
-                "block w-8 h-0.5 bg-foreground transition-all duration-300",
-                isMenuOpen && "-translate-y-2.5 -rotate-45"
-              )}></span>
-            </div>
-          </button>
+          <div className="md:hidden flex items-center space-x-4">
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-full hover:bg-muted"
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? (
+                <Sun className="h-5 w-5" />
+              ) : (
+                <Moon className="h-5 w-5" />
+              )}
+            </button>
+            
+            <button
+              className="flex items-center"
+              onClick={toggleMenu}
+              aria-label={isMenuOpen ? "Close menu" : "Open menu"}
+            >
+              <div className="space-y-2">
+                <span className={cn(
+                  "block w-8 h-0.5 bg-foreground transition-all duration-300",
+                  isMenuOpen && "translate-y-2.5 rotate-45"
+                )}></span>
+                <span className={cn(
+                  "block w-8 h-0.5 bg-foreground transition-all duration-300",
+                  isMenuOpen && "opacity-0"
+                )}></span>
+                <span className={cn(
+                  "block w-8 h-0.5 bg-foreground transition-all duration-300",
+                  isMenuOpen && "-translate-y-2.5 -rotate-45"
+                )}></span>
+              </div>
+            </button>
+          </div>
         </div>
         
         {/* Mobile navigation */}
