@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { Heart, Paw, List, FileText, Clock, Activity } from 'lucide-react';
+import { Heart, Dog, List, FileText, Clock, Activity } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Hero from '@/components/Hero';
@@ -32,7 +31,7 @@ const Index = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             <FeatureCard 
-              icon={Paw} 
+              icon={Dog} 
               title="Track Animals" 
               description="Keep detailed records of all your animals, including photos, medical history, and important milestones."
               className="animate-fade-in animation-delay-100"
