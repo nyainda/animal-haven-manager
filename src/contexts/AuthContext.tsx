@@ -1,10 +1,9 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 // API URLs
-const API_BASE_URL = 'https://api.example.com'; // Replace with your actual API URL
+const API_BASE_URL = 'http://127.0.0.1:8000'; // Updated to localhost testing URL
 
 // Define the user type based on API response
 interface User {
