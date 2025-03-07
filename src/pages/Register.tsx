@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { User, Lock, Mail, UserPlus, Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react';
@@ -8,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 const Register = () => {
   const { register, loading, error } = useAuth();
