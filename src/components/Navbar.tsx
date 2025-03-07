@@ -103,7 +103,7 @@ const Navbar: React.FC = () => {
           </div>
         </div>
         
-        {/* Mobile navigation - improved with animation */}
+        {/* Improved mobile navigation with better animation and styling */}
         <AnimatePresence>
           {isMenuOpen && (
             <motion.div
@@ -111,13 +111,15 @@ const Navbar: React.FC = () => {
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.3 }}
-              className="md:hidden bg-card/90 backdrop-blur-lg rounded-lg mt-4 shadow-lg overflow-hidden"
+              className="md:hidden fixed inset-x-0 top-24 z-50 mx-4 overflow-hidden rounded-xl"
             >
-              <div className="py-3 px-4">
-                <MobileNavLink href="/" active={location.pathname === "/"}>Home</MobileNavLink>
-                <MobileNavLink href="/#features" active={false}>Features</MobileNavLink>
-                <MobileNavLink href="/login" active={location.pathname === "/login"}>Login</MobileNavLink>
-                <MobileNavLink href="/register" active={location.pathname === "/register"}>Register</MobileNavLink>
+              <div className="bg-card/95 backdrop-blur-lg border border-border shadow-lg rounded-xl overflow-hidden">
+                <div className="py-4 px-2">
+                  <MobileNavLink href="/" active={location.pathname === "/"}>Home</MobileNavLink>
+                  <MobileNavLink href="/#features" active={false}>Features</MobileNavLink>
+                  <MobileNavLink href="/login" active={location.pathname === "/login"}>Login</MobileNavLink>
+                  <MobileNavLink href="/register" active={location.pathname === "/register"}>Register</MobileNavLink>
+                </div>
               </div>
             </motion.div>
           )}
@@ -144,23 +146,28 @@ const NavLink: React.FC<{ href: string; active: boolean; children: React.ReactNo
   );
 };
 
-// Mobile NavLink component - improved with better styling
+// Improved Mobile NavLink component with better styling and animations
 const MobileNavLink: React.FC<{ href: string; active: boolean; children: React.ReactNode }> = ({ 
   href, active, children 
 }) => {
   return (
-    <Link 
-      to={href}
-      className={cn(
-        "flex items-center justify-between py-3 px-2 my-1 rounded-md text-base font-medium transition-all",
-        active 
-          ? "bg-primary/10 text-primary" 
-          : "text-foreground/80 hover:text-foreground hover:bg-muted"
-      )}
+    <motion.div
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
     >
-      <span>{children}</span>
-      <ChevronRight className="h-4 w-4 opacity-70" />
-    </Link>
+      <Link 
+        to={href}
+        className={cn(
+          "flex items-center justify-between py-3 px-4 my-1 rounded-lg text-base font-medium transition-all",
+          active 
+            ? "bg-primary/10 text-primary" 
+            : "text-foreground/80 hover:text-foreground hover:bg-muted"
+        )}
+      >
+        <span>{children}</span>
+        <ChevronRight className="h-4 w-4 opacity-70" />
+      </Link>
+    </motion.div>
   );
 };
 

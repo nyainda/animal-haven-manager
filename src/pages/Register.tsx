@@ -1,16 +1,9 @@
+
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { User, Lock, Mail, UserPlus, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { User, Lock, Mail, UserPlus, Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
-import { 
-  Card, 
-  CardContent, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle,
-  CardDescription 
-} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -62,49 +55,53 @@ const Register = () => {
     e.preventDefault();
     
     if (validate()) {
-      // Updated to match new API structure
       register(name, email, password, confirmPassword);
     }
   };
+
+  // Password strength checker
+  const getPasswordStrength = () => {
+    if (!password) return 0;
+    let strength = 0;
+    if (password.length >= 8) strength += 25;
+    if (/[A-Z]/.test(password)) strength += 25;
+    if (/\d/.test(password)) strength += 25;
+    if (/[!@#$%^&*]/.test(password)) strength += 25;
+    return strength;
+  };
+  
+  const passwordStrength = getPasswordStrength();
   
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
       
       <div className="min-h-screen pt-20 pb-10 flex items-center justify-center relative">
-        {/* Background effects */}
-        <div className="absolute inset-0 z-0 overflow-hidden">
+        {/* Background elements */}
+        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-20 -right-20 w-96 h-96 bg-primary/5 rounded-full filter blur-3xl"></div>
           <div className="absolute top-1/3 left-0 w-72 h-72 bg-primary/10 rounded-full filter blur-3xl"></div>
           <div className="absolute bottom-0 right-1/3 w-80 h-80 bg-secondary/20 rounded-full filter blur-3xl"></div>
-          
-          {/* Animal silhouettes */}
-          <div className="absolute top-20 left-20 w-48 h-48 opacity-5">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512" fill="currentColor">
-              <path d="M320 192h17.1c22.1 38.3 63.5 64 110.9 64c11 0 21.8-1.4 32-4v4 32V480c0 17.7-14.3 32-32 32s-32-14.3-32-32V339.2L280 448h56c17.7 0 32 14.3 32 32s-14.3 32-32 32H192c-53 0-96-43-96-96V192.5c0-16.1-12-29.8-28-31.8l-7.9-1c-17.5-2.2-30-18.2-27.8-35.7s18.2-30 35.7-27.8l7.9 1c48 6 84.1 46.8 84.1 95.3v85.3c34.4-51.7 93.2-85.8 160-85.8z" />
-            </svg>
-          </div>
         </div>
         
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
+          className="w-full max-w-md mx-4 z-10"
         >
-          <Card className="w-full max-w-md mx-4 shadow-xl border-t-4 border-t-primary">
-            <CardHeader className="space-y-2 text-center">
-              <motion.div 
-                className="mx-auto bg-primary/10 p-3 rounded-full w-16 h-16 flex items-center justify-center mb-2"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <UserPlus className="h-8 w-8 text-primary" />
-              </motion.div>
-              <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-              <CardDescription>Sign up to get started with Animal Manager</CardDescription>
-            </CardHeader>
+          <div className="bg-card border border-border shadow-xl rounded-2xl overflow-hidden">
+            {/* Header with gradient background */}
+            <div className="bg-gradient-to-r from-primary/20 to-primary/5 p-6 text-center">
+              <div className="mx-auto bg-card/80 backdrop-blur-sm rounded-full p-4 w-20 h-20 flex items-center justify-center mb-4 shadow-lg border border-border">
+                <UserPlus className="h-10 w-10 text-primary" />
+              </div>
+              <h1 className="text-2xl font-bold">Create Account</h1>
+              <p className="text-foreground/70 mt-1">Sign up to get started</p>
+            </div>
             
-            <CardContent>
+            {/* Form body */}
+            <div className="p-6">
               <form onSubmit={handleSubmit} className="space-y-4">
                 {error && (
                   <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm flex items-center">
@@ -113,57 +110,53 @@ const Register = () => {
                   </div>
                 )}
                 
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <User className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <Input 
-                      id="name"
-                      type="text" 
-                      placeholder="John Doe" 
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="pl-10"
-                      required
-                    />
-                  </div>
-                  {formErrors.name && <p className="text-destructive text-sm mt-1">{formErrors.name}</p>}
+                <div className="space-y-1">
+                  <Label htmlFor="name" className="text-sm font-medium flex items-center">
+                    <User className="h-4 w-4 mr-2 text-muted-foreground" />
+                    Full Name
+                  </Label>
+                  <Input 
+                    id="name"
+                    type="text" 
+                    placeholder="John Doe" 
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="bg-background/50"
+                    required
+                  />
+                  {formErrors.name && <p className="text-destructive text-xs mt-1">{formErrors.name}</p>}
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Mail className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <Input 
-                      id="email"
-                      type="email" 
-                      placeholder="you@example.com" 
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10"
-                      required
-                    />
-                  </div>
-                  {formErrors.email && <p className="text-destructive text-sm mt-1">{formErrors.email}</p>}
+                <div className="space-y-1">
+                  <Label htmlFor="email" className="text-sm font-medium flex items-center">
+                    <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
+                    Email Address
+                  </Label>
+                  <Input 
+                    id="email"
+                    type="email" 
+                    placeholder="you@example.com" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="bg-background/50"
+                    required
+                  />
+                  {formErrors.email && <p className="text-destructive text-xs mt-1">{formErrors.email}</p>}
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="password" className="text-sm font-medium flex items-center">
+                    <Lock className="h-4 w-4 mr-2 text-muted-foreground" />
+                    Password
+                  </Label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Lock className="h-5 w-5 text-muted-foreground" />
-                    </div>
                     <Input 
                       id="password"
                       type={showPassword ? "text" : "password"} 
                       placeholder="Min. 8 characters" 
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10 pr-10"
+                      className="pr-10 bg-background/50"
                       required
                     />
                     <button
@@ -172,58 +165,88 @@ const Register = () => {
                       onClick={() => setShowPassword(!showPassword)}
                       tabIndex={-1}
                     >
-                      {showPassword ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
-                  {formErrors.password && <p className="text-destructive text-sm mt-1">{formErrors.password}</p>}
+                  {password && (
+                    <div className="mt-1">
+                      <div className="flex justify-between items-center mb-1">
+                        <div className="text-xs">Password strength:</div>
+                        <div className="text-xs font-medium">
+                          {passwordStrength <= 25 && "Weak"}
+                          {passwordStrength > 25 && passwordStrength <= 75 && "Medium"}
+                          {passwordStrength > 75 && "Strong"}
+                        </div>
+                      </div>
+                      <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+                        <div 
+                          className={cn(
+                            "h-full transition-all duration-300",
+                            passwordStrength <= 25 ? "bg-destructive" : 
+                            passwordStrength <= 75 ? "bg-yellow-500" : "bg-green-500"
+                          )}
+                          style={{ width: `${passwordStrength}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  )}
+                  {formErrors.password && <p className="text-destructive text-xs mt-1">{formErrors.password}</p>}
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Lock className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <Input 
-                      id="confirmPassword"
-                      type={showPassword ? "text" : "password"} 
-                      placeholder="Confirm your password" 
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="pl-10"
-                      required
-                    />
-                  </div>
-                  {formErrors.confirmPassword && <p className="text-destructive text-sm mt-1">{formErrors.confirmPassword}</p>}
+                <div className="space-y-1">
+                  <Label htmlFor="confirmPassword" className="text-sm font-medium flex items-center">
+                    <CheckCircle2 className="h-4 w-4 mr-2 text-muted-foreground" />
+                    Confirm Password
+                  </Label>
+                  <Input 
+                    id="confirmPassword"
+                    type={showPassword ? "text" : "password"} 
+                    placeholder="Confirm your password" 
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="bg-background/50"
+                    required
+                  />
+                  {formErrors.confirmPassword && <p className="text-destructive text-xs mt-1">{formErrors.confirmPassword}</p>}
                 </div>
                 
                 <motion.div 
                   whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.99 }}
+                  className="pt-2 mt-2"
                 >
                   <Button 
                     type="submit" 
-                    className="w-full mt-2"
+                    className="w-full font-semibold"
+                    size="lg"
                     disabled={loading}
                   >
-                    {loading ? 'Creating Account...' : 'Create Account'}
+                    {loading ? 
+                      <span className="flex items-center">
+                        <span className="animate-spin mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
+                        Creating Account...
+                      </span> 
+                      : 
+                      <span className="flex items-center justify-center">
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Create Account
+                      </span>
+                    }
                   </Button>
                 </motion.div>
               </form>
-            </CardContent>
-            
-            <CardFooter className="flex justify-center">
-              <div className="text-center text-sm">
-                <span className="text-muted-foreground">Already have an account? </span>
+              
+              <div className="mt-6 text-center">
+                <span className="text-foreground/70 text-sm">Already have an account? </span>
                 <Link 
                   to="/login"
-                  className="text-primary hover:text-primary/80 transition-colors font-medium"
+                  className="text-primary hover:text-primary/80 transition-colors font-medium text-sm"
                 >
                   Sign in
                 </Link>
               </div>
-            </CardFooter>
-          </Card>
+            </div>
+          </div>
         </motion.div>
       </div>
     </div>
