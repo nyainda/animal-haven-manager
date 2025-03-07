@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, ArrowLeft, Check, AlertCircle } from 'lucide-react';
@@ -186,7 +185,7 @@ const ForgotPassword: React.FC = () => {
         </CardFooter>
       </Card>
       
-      <style jsx>{`
+      <style>{`
         @keyframes fly-off {
           0% { transform: translateY(0) translateX(0); opacity: 1; }
           100% { transform: translateY(-100px) translateX(100px); opacity: 0; }

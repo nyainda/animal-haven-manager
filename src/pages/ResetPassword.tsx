@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, Lock, UnlockIcon, CheckCircle, AlertCircle } from 'lucide-react';
@@ -24,7 +23,6 @@ const ResetPassword: React.FC = () => {
   const location = useLocation();
   const { resetPassword } = useAuth();
   
-  // Get token from URL query params
   const queryParams = new URLSearchParams(location.search);
   const token = queryParams.get('token');
   
@@ -101,13 +99,11 @@ const ResetPassword: React.FC = () => {
       await resetPassword(token, password);
       setIsSuccess(true);
       
-      // Animate the lock icon unlocking
       const lockIcon = document.getElementById('lock-icon');
       if (lockIcon) {
         lockIcon.classList.add('animate-unlock');
       }
       
-      // Redirect to login after 3 seconds
       setTimeout(() => {
         navigate('/login');
       }, 3000);
@@ -256,7 +252,7 @@ const ResetPassword: React.FC = () => {
         </CardFooter>
       </Card>
       
-      <style jsx>{`
+      <style>{`
         @keyframes unlock {
           0% { transform: rotate(0deg); }
           15% { transform: rotate(-20deg); }
