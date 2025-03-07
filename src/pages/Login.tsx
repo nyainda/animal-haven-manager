@@ -1,15 +1,23 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { User, Lock, Mail, Eye, EyeOff } from 'lucide-react';
-import AuthForm from '@/components/AuthForm';
+import { User, Lock, Mail, Eye, EyeOff, LogIn, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { motion } from 'framer-motion';
 
 const Login = () => {
   const { login, loading, error } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   
-  const handleSubmit = (data: any) => {
-    login(data.email, data.password);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    login(email, password);
   };
   
   return (
@@ -31,40 +39,112 @@ const Login = () => {
           </div>
         </div>
         
-        <div className="glass max-w-md w-full mx-4 p-8 md:p-10 z-10 animate-scale-in">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="glass max-w-md w-full mx-4 p-8 md:p-10 z-10 rounded-xl shadow-xl 
+                    bg-background/70 backdrop-blur-lg border border-border"
+        >
           <div className="text-center mb-8">
+            <motion.div
+              className="mx-auto bg-primary/10 p-3 rounded-full w-16 h-16 flex items-center justify-center mb-4"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <LogIn className="h-8 w-8 text-primary" />
+            </motion.div>
             <h1 className="text-3xl font-bold mb-2">Welcome Back</h1>
             <p className="text-foreground/70">Sign in to your account to continue</p>
           </div>
           
-          <AuthForm
-            type="login"
-            onSubmit={handleSubmit}
-            loading={loading}
-            error={error || undefined}
-          >
-            <div className="mt-6 flex flex-col space-y-4 text-sm">
-              <div className="flex justify-between">
-                <Link 
-                  to="/forgot-password"
-                  className="text-primary hover:text-primary/80 transition-colors"
-                >
-                  Forgot your password?
-                </Link>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {error && (
+              <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm flex items-center">
+                <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
+                <span>{error}</span>
               </div>
-              
-              <div className="text-center">
-                <span className="text-foreground/70">Don't have an account? </span>
-                <Link 
-                  to="/register"
-                  className="text-primary hover:text-primary/80 transition-colors"
-                >
-                  Register
-                </Link>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="email">Email Address</Label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Mail className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <Input 
+                  id="email"
+                  type="email" 
+                  placeholder="you@example.com" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="pl-10"
+                  required
+                />
               </div>
             </div>
-          </AuthForm>
-        </div>
+            
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Label htmlFor="password">Password</Label>
+              </div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <Input 
+                  id="password"
+                  type={showPassword ? "text" : "password"} 
+                  placeholder="Your password" 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-10 pr-10"
+                  required
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowPassword(!showPassword)}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex justify-end">
+              <Link 
+                to="/forgot-password"
+                className="text-primary hover:text-primary/80 transition-colors text-sm"
+              >
+                Forgot your password?
+              </Link>
+            </div>
+            
+            <motion.div 
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+            >
+              <Button 
+                type="submit" 
+                className="w-full"
+                disabled={loading}
+              >
+                {loading ? 'Signing in...' : 'Sign In'}
+              </Button>
+            </motion.div>
+            
+            <div className="mt-6 text-center">
+              <span className="text-foreground/70">Don't have an account? </span>
+              <Link 
+                to="/register"
+                className="text-primary hover:text-primary/80 transition-colors font-medium"
+              >
+                Register
+              </Link>
+            </div>
+          </form>
+        </motion.div>
       </div>
     </div>
   );

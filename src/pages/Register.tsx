@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { User, Lock, Mail, UserPlus, Eye, EyeOff, AlertCircle } from 'lucide-react';
@@ -15,6 +14,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { motion } from 'framer-motion';
 
 const Register = () => {
   const { register, loading, error } = useAuth();
@@ -62,7 +62,8 @@ const Register = () => {
     e.preventDefault();
     
     if (validate()) {
-      register(name, email, password);
+      // Updated to match new API structure
+      register(name, email, password, confirmPassword);
     }
   };
   
@@ -85,130 +86,145 @@ const Register = () => {
           </div>
         </div>
         
-        <Card className="w-full max-w-md mx-4 shadow-xl border-t-4 border-t-primary animate-scale-in">
-          <CardHeader className="space-y-2 text-center">
-            <div className="mx-auto bg-primary/10 p-3 rounded-full w-16 h-16 flex items-center justify-center mb-2">
-              <UserPlus className="h-8 w-8 text-primary" />
-            </div>
-            <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-            <CardDescription>Sign up to get started with Animal Manager</CardDescription>
-          </CardHeader>
-          
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm flex items-center">
-                  <AlertCircle className="h-4 w-4 mr-2" />
-                  {error}
-                </div>
-              )}
-              
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-5 w-5 text-muted-foreground" />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <Card className="w-full max-w-md mx-4 shadow-xl border-t-4 border-t-primary">
+            <CardHeader className="space-y-2 text-center">
+              <motion.div 
+                className="mx-auto bg-primary/10 p-3 rounded-full w-16 h-16 flex items-center justify-center mb-2"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <UserPlus className="h-8 w-8 text-primary" />
+              </motion.div>
+              <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
+              <CardDescription>Sign up to get started with Animal Manager</CardDescription>
+            </CardHeader>
+            
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {error && (
+                  <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm flex items-center">
+                    <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <span>{error}</span>
                   </div>
-                  <Input 
-                    id="name"
-                    type="text" 
-                    placeholder="John Doe" 
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="pl-10"
-                    required
-                  />
-                </div>
-                {formErrors.name && <p className="text-destructive text-sm mt-1">{formErrors.name}</p>}
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Mail className="h-5 w-5 text-muted-foreground" />
+                )}
+                
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name</Label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <User className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <Input 
+                      id="name"
+                      type="text" 
+                      placeholder="John Doe" 
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="pl-10"
+                      required
+                    />
                   </div>
-                  <Input 
-                    id="email"
-                    type="email" 
-                    placeholder="you@example.com" 
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10"
-                    required
-                  />
+                  {formErrors.name && <p className="text-destructive text-sm mt-1">{formErrors.name}</p>}
                 </div>
-                {formErrors.email && <p className="text-destructive text-sm mt-1">{formErrors.email}</p>}
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Lock className="h-5 w-5 text-muted-foreground" />
+                
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Mail className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <Input 
+                      id="email"
+                      type="email" 
+                      placeholder="you@example.com" 
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="pl-10"
+                      required
+                    />
                   </div>
-                  <Input 
-                    id="password"
-                    type={showPassword ? "text" : "password"} 
-                    placeholder="Min. 8 characters" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10"
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
-                    onClick={() => setShowPassword(!showPassword)}
-                    tabIndex={-1}
+                  {formErrors.email && <p className="text-destructive text-sm mt-1">{formErrors.email}</p>}
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Lock className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <Input 
+                      id="password"
+                      type={showPassword ? "text" : "password"} 
+                      placeholder="Min. 8 characters" 
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-10 pr-10"
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowPassword(!showPassword)}
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
+                    </button>
+                  </div>
+                  {formErrors.password && <p className="text-destructive text-sm mt-1">{formErrors.password}</p>}
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Lock className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <Input 
+                      id="confirmPassword"
+                      type={showPassword ? "text" : "password"} 
+                      placeholder="Confirm your password" 
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                  {formErrors.confirmPassword && <p className="text-destructive text-sm mt-1">{formErrors.confirmPassword}</p>}
+                </div>
+                
+                <motion.div 
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                >
+                  <Button 
+                    type="submit" 
+                    className="w-full mt-2"
+                    disabled={loading}
                   >
-                    {showPassword ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
-                  </button>
-                </div>
-                {formErrors.password && <p className="text-destructive text-sm mt-1">{formErrors.password}</p>}
+                    {loading ? 'Creating Account...' : 'Create Account'}
+                  </Button>
+                </motion.div>
+              </form>
+            </CardContent>
+            
+            <CardFooter className="flex justify-center">
+              <div className="text-center text-sm">
+                <span className="text-muted-foreground">Already have an account? </span>
+                <Link 
+                  to="/login"
+                  className="text-primary hover:text-primary/80 transition-colors font-medium"
+                >
+                  Sign in
+                </Link>
               </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Lock className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <Input 
-                    id="confirmPassword"
-                    type={showPassword ? "text" : "password"} 
-                    placeholder="Confirm your password" 
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="pl-10"
-                    required
-                  />
-                </div>
-                {formErrors.confirmPassword && <p className="text-destructive text-sm mt-1">{formErrors.confirmPassword}</p>}
-              </div>
-              
-              <Button 
-                type="submit" 
-                className="w-full mt-2"
-                disabled={loading}
-              >
-                {loading ? 'Creating Account...' : 'Create Account'}
-              </Button>
-            </form>
-          </CardContent>
-          
-          <CardFooter className="flex justify-center">
-            <div className="text-center text-sm">
-              <span className="text-muted-foreground">Already have an account? </span>
-              <Link 
-                to="/login"
-                className="text-primary hover:text-primary/80 transition-colors font-medium"
-              >
-                Sign in
-              </Link>
-            </div>
-          </CardFooter>
-        </Card>
+            </CardFooter>
+          </Card>
+        </motion.div>
       </div>
     </div>
   );

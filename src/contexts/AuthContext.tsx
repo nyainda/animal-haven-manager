@@ -1,12 +1,17 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
-// Define the user type
+// API URLs
+const API_BASE_URL = 'https://api.example.com'; // Replace with your actual API URL
+
+// Define the user type based on API response
 interface User {
+  id: string;
   name: string;
   email: string;
-  token: string;
+  avatar: string | null;
 }
 
 // Define the auth context type
@@ -16,7 +21,7 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string, password_confirmation: string) => Promise<void>;
   logout: () => void;
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (token: string, password: string) => Promise<void>;
@@ -35,30 +40,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Check if user is authenticated on load
   useEffect(() => {
+    const token = localStorage.getItem('auth_token');
     const storedUser = localStorage.getItem('user');
-    if (storedUser) {
+    
+    if (token && storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
       } catch (err) {
         console.error('Error parsing user data:', err);
         localStorage.removeItem('user');
+        localStorage.removeItem('auth_token');
       }
     }
     setLoading(false);
   }, []);
 
-  // Helper to simulate API call
-  const simulateApiCall = <T,>(data: T, delay = 1000, shouldFail = false): Promise<T> => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (shouldFail) {
-          reject(new Error('API call failed'));
-        } else {
-          resolve(data);
-        }
-      }, delay);
-    });
+  // Helper to make API requests
+  const apiRequest = async <T,>(
+    endpoint: string, 
+    method: string = 'GET', 
+    data?: any, 
+    requiresAuth: boolean = false
+  ): Promise<T> => {
+    try {
+      const url = `${API_BASE_URL}${endpoint}`;
+      const token = localStorage.getItem('auth_token');
+      
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (requiresAuth && token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(url, {
+        method,
+        headers,
+        body: data ? JSON.stringify(data) : undefined,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'An error occurred');
+      }
+      
+      return await response.json();
+    } catch (err: any) {
+      console.error(`API request error (${endpoint}):`, err);
+      throw err;
+    }
   };
 
   // Login function
@@ -67,21 +99,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     
     try {
-      // Simulate API call
-      const userData = await simulateApiCall<User>(
-        { name: 'John Doe', email, token: 'mock-token-123' },
-        1000,
-        false // Set to true to simulate failure
-      );
+      // Use the API structure provided
+      const responseData = await apiRequest<{
+        message: string;
+        data: {
+          user: User;
+          token: string;
+          token_type: string;
+        }
+      }>('/login', 'POST', { email, password });
+      
+      const userData = responseData.data.user;
+      const token = responseData.data.token;
+      
+      // Save user and token to localStorage
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('auth_token', token);
       
       setUser(userData);
-      localStorage.setItem('user', JSON.stringify(userData));
-      
       toast.success('Successfully logged in!');
       navigate('/dashboard');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Login error:', err);
-      setError('Invalid email or password. Please try again.');
+      setError(err.message || 'Invalid email or password. Please try again.');
       toast.error('Login failed. Please try again.');
     } finally {
       setLoading(false);
@@ -89,23 +129,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Register function
-  const register = async (name: string, email: string, password: string) => {
+  const register = async (name: string, email: string, password: string, password_confirmation: string) => {
     setLoading(true);
     setError(null);
     
     try {
-      // Simulate API call
-      await simulateApiCall(
-        { success: true },
-        1000,
-        false // Set to true to simulate failure
-      );
+      // Use the API structure provided
+      const responseData = await apiRequest<{
+        message: string;
+        data: User;
+      }>('/register', 'POST', { 
+        name, 
+        email, 
+        password,
+        password_confirmation
+      });
       
       toast.success('Registration successful! Please verify your email.');
       navigate('/verify-email', { state: { email } });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Registration error:', err);
-      setError('Registration failed. This email may already be in use.');
+      setError(err.message || 'Registration failed. This email may already be in use.');
       toast.error('Registration failed. Please try again.');
     } finally {
       setLoading(false);
@@ -116,6 +160,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user');
+    localStorage.removeItem('auth_token');
     toast.success('Successfully logged out');
     navigate('/login');
   };
@@ -126,18 +171,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     
     try {
-      // Simulate API call
-      await simulateApiCall(
-        { success: true },
-        1000,
-        false // Set to true to simulate failure
+      await apiRequest<{ message: string }>(
+        '/forgot-password', 
+        'POST', 
+        { email }
       );
       
       toast.success('Password reset link sent to your email!');
       return Promise.resolve();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Forgot password error:', err);
-      setError('Failed to send reset link. Please try again.');
+      setError(err.message || 'Failed to send reset link. Please try again.');
       toast.error('Failed to send reset link. Please try again.');
       return Promise.reject(err);
     } finally {
@@ -151,18 +195,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     
     try {
-      // Simulate API call - validate token and update password
-      await simulateApiCall(
-        { success: true },
-        1500,
-        token === 'invalid-token' // Simulate failure for invalid tokens
+      await apiRequest<{ message: string }>(
+        '/reset-password', 
+        'POST', 
+        { token, password, password_confirmation: password }
       );
       
       toast.success('Password has been reset successfully!');
+      navigate('/login');
       return Promise.resolve();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Reset password error:', err);
-      setError('Failed to reset password. The link may have expired.');
+      setError(err.message || 'Failed to reset password. The link may have expired.');
       toast.error('Failed to reset password. Please try again.');
       return Promise.reject(err);
     } finally {
@@ -176,18 +220,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     
     try {
-      // Simulate API call - validate verification token
-      await simulateApiCall(
-        { success: true },
-        1500,
-        token === 'invalid-token' // Simulate failure for invalid tokens
+      await apiRequest<{ message: string }>(
+        '/verify-email', 
+        'POST', 
+        { token }
       );
       
       toast.success('Email verified successfully!');
+      navigate('/login');
       return Promise.resolve();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Verify email error:', err);
-      setError('Failed to verify email. The link may have expired.');
+      setError(err.message || 'Failed to verify email. The link may have expired.');
       toast.error('Failed to verify email. Please try again.');
       return Promise.reject(err);
     } finally {
