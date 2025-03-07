@@ -1,6 +1,6 @@
-
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
+import { User, Lock, Mail, Eye, EyeOff } from 'lucide-react';
 import AuthForm from '@/components/AuthForm';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
