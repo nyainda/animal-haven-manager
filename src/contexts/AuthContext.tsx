@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 // API URLs
-const API_BASE_URL = 'http://127.0.0.1:8000'; // Updated to localhost testing URL
+const API_BASE_URL = 'http://127.0.0.1:8000/api'; // Updated to include /api/ in the path
 
 // Define the user type based on API response
 interface User {
