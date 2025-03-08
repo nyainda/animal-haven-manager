@@ -4,7 +4,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { 
   ArrowLeft, Calendar, Edit, Clipboard, Heart, Printer, 
-  Activity, Weight, Tag, AlertCircle
+  Activity, Weight, Tag, AlertCircle, FileText, BarChart3
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -218,6 +218,53 @@ const AnimalDetails: React.FC = () => {
         </Card>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <Button 
+          variant="outline" 
+          className="h-auto py-4 flex flex-col items-center justify-center gap-2"
+          onClick={() => navigate(`/animals/${animal.id}/activities`)}
+        >
+          <FileText className="h-6 w-6" />
+          <span>Activities</span>
+        </Button>
+        
+        <Button 
+          variant="outline" 
+          className="h-auto py-4 flex flex-col items-center justify-center gap-2"
+          onClick={() => navigate(`/animals/${animal.id}/health`)}
+        >
+          <Activity className="h-6 w-6" />
+          <span>Health Records</span>
+        </Button>
+        
+        <Button 
+          variant="outline" 
+          className="h-auto py-4 flex flex-col items-center justify-center gap-2"
+          onClick={() => navigate(`/animals/${animal.id}/breedings`)}
+        >
+          <Heart className="h-6 w-6" />
+          <span>Breeding Records</span>
+        </Button>
+        
+        <Button 
+          variant="outline" 
+          className="h-auto py-4 flex flex-col items-center justify-center gap-2"
+          onClick={() => navigate(`/animals/${animal.id}/notes`)}
+        >
+          <FileText className="h-6 w-6" />
+          <span>Notes</span>
+        </Button>
+        
+        <Button 
+          variant="outline" 
+          className="h-auto py-4 flex flex-col items-center justify-center gap-2"
+          onClick={() => navigate(`/animals/${animal.id}/production`)}
+        >
+          <BarChart3 className="h-6 w-6" />
+          <span>Production Records</span>
+        </Button>
+      </div>
+
       <Tabs defaultValue="details" className="w-full">
         <TabsList className="w-full mb-4 justify-start">
           <TabsTrigger value="details">Details</TabsTrigger>
@@ -321,11 +368,16 @@ const AnimalDetails: React.FC = () => {
         
         <TabsContent value="health">
           <Card>
-            <CardHeader>
-              <CardTitle>Health Information</CardTitle>
-              <CardDescription>
-                Health records and medical history
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Health Information</CardTitle>
+                <CardDescription>
+                  Health records and medical history
+                </CardDescription>
+              </div>
+              <Button onClick={() => navigate(`/animals/${animal.id}/health`)}>
+                View All Health Records
+              </Button>
             </CardHeader>
             <CardContent>
               <div className="rounded-lg border border-dashed p-8 text-center">
@@ -334,7 +386,7 @@ const AnimalDetails: React.FC = () => {
                 <p className="text-muted-foreground mb-4">
                   No health records have been added for this animal yet.
                 </p>
-                <Button onClick={() => toast.info('Health record feature coming soon')}>
+                <Button onClick={() => navigate(`/animals/${animal.id}/health/new`)}>
                   Add Health Record
                 </Button>
               </div>
@@ -344,11 +396,16 @@ const AnimalDetails: React.FC = () => {
         
         <TabsContent value="breeding">
           <Card>
-            <CardHeader>
-              <CardTitle>Breeding Information</CardTitle>
-              <CardDescription>
-                Breeding records and genealogy
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Breeding Information</CardTitle>
+                <CardDescription>
+                  Breeding records and genealogy
+                </CardDescription>
+              </div>
+              <Button onClick={() => navigate(`/animals/${animal.id}/breedings`)}>
+                View All Breeding Records
+              </Button>
             </CardHeader>
             <CardContent>
               <div className="rounded-lg border border-dashed p-8 text-center">
@@ -357,7 +414,7 @@ const AnimalDetails: React.FC = () => {
                 <p className="text-muted-foreground mb-4">
                   No breeding records have been added for this animal yet.
                 </p>
-                <Button onClick={() => toast.info('Breeding record feature coming soon')}>
+                <Button onClick={() => navigate(`/animals/${animal.id}/breedings/new`)}>
                   Add Breeding Record
                 </Button>
               </div>

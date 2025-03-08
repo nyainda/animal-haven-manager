@@ -18,6 +18,11 @@ import AnimalForm from "./components/AnimalForm";
 import AnimalDetails from "./pages/AnimalDetails";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import AnimalActivities from "./pages/animal/AnimalActivities";
+import AnimalBreedings from "./pages/animal/AnimalBreedings";
+import AnimalHealth from "./pages/animal/AnimalHealth";
+import AnimalNotes from "./pages/animal/AnimalNotes";
+import AnimalProduction from "./pages/animal/AnimalProduction";
 
 const queryClient = new QueryClient();
 
@@ -38,10 +43,41 @@ const App = () => (
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/verify-email" element={<VerifyEmail />} />
+              
+              {/* Animal Routes */}
               <Route path="/animals" element={<Animals />} />
               <Route path="/animals/new" element={<AnimalForm />} />
               <Route path="/animals/:id" element={<AnimalDetails />} />
               <Route path="/animals/:id/edit" element={<AnimalForm />} />
+              
+              {/* Animal Activities */}
+              <Route path="/animals/:id/activities" element={<AnimalActivities />} />
+              <Route path="/animals/:id/activities/new" element={<AnimalActivities />} />
+              
+              {/* Animal Breedings */}
+              <Route path="/animals/:id/breedings" element={<AnimalBreedings />} />
+              <Route path="/animals/:id/breedings/new" element={<AnimalBreedings />} />
+              <Route path="/animals/:id/breedings/:breedingId" element={<AnimalBreedings />} />
+              <Route path="/animals/:id/breedings/:breedingId/edit" element={<AnimalBreedings />} />
+              
+              {/* Animal Health */}
+              <Route path="/animals/:id/health" element={<AnimalHealth />} />
+              <Route path="/animals/:id/health/new" element={<AnimalHealth />} />
+              <Route path="/animals/:id/health/:healthId" element={<AnimalHealth />} />
+              <Route path="/animals/:id/health/:healthId/edit" element={<AnimalHealth />} />
+              
+              {/* Animal Notes */}
+              <Route path="/animals/:id/notes" element={<AnimalNotes />} />
+              <Route path="/animals/:id/notes/new" element={<AnimalNotes />} />
+              <Route path="/animals/:id/notes/:noteId" element={<AnimalNotes />} />
+              <Route path="/animals/:id/notes/:noteId/edit" element={<AnimalNotes />} />
+              
+              {/* Animal Production */}
+              <Route path="/animals/:id/production" element={<AnimalProduction />} />
+              <Route path="/animals/:id/production/new" element={<AnimalProduction />} />
+              <Route path="/animals/:id/production/:productionId" element={<AnimalProduction />} />
+              <Route path="/animals/:id/production/:productionId/edit" element={<AnimalProduction />} />
+              
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

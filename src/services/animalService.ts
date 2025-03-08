@@ -1,5 +1,6 @@
 
 import { Animal, AnimalFormData } from "../types/AnimalTypes";
+import { toast } from "sonner";
 
 // Base API URL
 const API_URL = "http://127.0.0.1:8000/api/animals";
@@ -160,21 +161,20 @@ export const createAnimal = async (animalData: AnimalFormData): Promise<Animal> 
     });
     
     if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
+      const errorData = await response.json().catch(() => null);
+      const errorMessage = errorData?.message || `API error: ${response.status} ${response.statusText}`;
+      throw new Error(errorMessage);
     }
     
     const newAnimal = await response.json();
-    
-    // Show a success notification
-    console.log(`Animal ${newAnimal.name} created successfully`);
-    
+    toast.success(`Animal ${newAnimal.name} created successfully`);
     return newAnimal;
   } catch (error) {
     console.error('Error creating animal:', error);
+    toast.error(`Failed to create animal: ${error instanceof Error ? error.message : 'Unknown error'}`);
     console.warn('Falling back to mock implementation due to API error');
     
     // Fallback to mock implementation
-    // Create a new animal with mock data
     const newAnimal: Animal = {
       id: `${Date.now()}`,
       internal_id: `${animalData.type.toUpperCase()}/${new Date().getFullYear().toString().slice(-2)}/${String(MOCK_ANIMALS.length + 1).padStart(4, '0')}`,
@@ -210,9 +210,7 @@ export const createAnimal = async (animalData: AnimalFormData): Promise<Animal> 
     
     // For demo purposes, we'll just add it to our mock data
     MOCK_ANIMALS.push(newAnimal);
-    
-    // Show a success notification
-    console.log(`Animal ${newAnimal.name} created successfully`);
+    toast.success(`Animal ${newAnimal.name} created successfully`);
     
     return newAnimal;
   }
@@ -230,13 +228,17 @@ export const updateAnimal = async (id: string, animalData: Partial<AnimalFormDat
     });
     
     if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
+      const errorData = await response.json().catch(() => null);
+      const errorMessage = errorData?.message || `API error: ${response.status} ${response.statusText}`;
+      throw new Error(errorMessage);
     }
     
     const updatedAnimal = await response.json();
+    toast.success(`Animal ${updatedAnimal.name} updated successfully`);
     return updatedAnimal;
   } catch (error) {
     console.error(`Error updating animal ${id}:`, error);
+    toast.error(`Failed to update animal: ${error instanceof Error ? error.message : 'Unknown error'}`);
     console.warn('Falling back to mock implementation due to API error');
     
     // Fallback to mock implementation
@@ -252,6 +254,7 @@ export const updateAnimal = async (id: string, animalData: Partial<AnimalFormDat
     };
     
     MOCK_ANIMALS[animalIndex] = updatedAnimal;
+    toast.success(`Animal ${updatedAnimal.name} updated successfully`);
     
     return updatedAnimal;
   }
@@ -265,10 +268,15 @@ export const deleteAnimal = async (id: string): Promise<void> => {
     });
     
     if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
+      const errorData = await response.json().catch(() => null);
+      const errorMessage = errorData?.message || `API error: ${response.status} ${response.statusText}`;
+      throw new Error(errorMessage);
     }
+    
+    toast.success("Animal deleted successfully");
   } catch (error) {
     console.error(`Error deleting animal ${id}:`, error);
+    toast.error(`Failed to delete animal: ${error instanceof Error ? error.message : 'Unknown error'}`);
     console.warn('Falling back to mock implementation due to API error');
     
     // Fallback to mock implementation
@@ -278,5 +286,66 @@ export const deleteAnimal = async (id: string): Promise<void> => {
     }
     
     MOCK_ANIMALS.splice(animalIndex, 1);
+    toast.success("Animal deleted successfully");
+  }
+};
+
+// Added function to export animals to CSV
+export const exportAnimalsToCSV = (): void => {
+  try {
+    // Get the data
+    const animals = [...MOCK_ANIMALS];
+    
+    // Define the fields to include in the CSV
+    const fields = [
+      'id', 'internal_id', 'animal_id', 'name', 'type', 'breed', 'gender', 
+      'birth_date', 'birth_time', 'tag_number', 'status', 'is_breeding_stock',
+      'age', 'is_deceased', 'birth_weight', 'weight_unit', 'birth_status',
+      'health_at_birth', 'multiple_birth', 'raised_purchased'
+    ];
+    
+    // Create CSV header
+    const header = fields.join(',');
+    
+    // Create CSV rows
+    const rows = animals.map(animal => {
+      return fields.map(field => {
+        // Handle special cases
+        if (field === 'is_breeding_stock' || field === 'is_deceased' || field === 'multiple_birth') {
+          return animal[field] ? 'Yes' : 'No';
+        }
+        
+        // Get the value, replace commas with spaces to avoid CSV issues
+        const value = animal[field] !== null && animal[field] !== undefined 
+          ? String(animal[field]).replace(/,/g, ' ') 
+          : '';
+          
+        // Wrap in quotes if it contains spaces
+        return value.includes(' ') ? `"${value}"` : value;
+      }).join(',');
+    });
+    
+    // Combine header and rows
+    const csv = [header, ...rows].join('\n');
+    
+    // Create a Blob with the CSV content
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    
+    // Create a link element to download the file
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `animal_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success('Animals exported to CSV successfully');
+  } catch (error) {
+    console.error('Error exporting animals to CSV:', error);
+    toast.error(`Failed to export animals: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 };
