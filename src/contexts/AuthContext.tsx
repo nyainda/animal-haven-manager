@@ -1,9 +1,7 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-
-// API URLs
-const API_BASE_URL = 'http://127.0.0.1:8000/api'; // Updated to include /api/ in the path
 
 // Define the user type based on API response
 interface User {
@@ -27,13 +25,21 @@ interface AuthContextType {
   verifyEmail: (token: string) => Promise<void>;
 }
 
+// Mock user data
+const MOCK_USER: User = {
+  id: '1',
+  name: 'Demo User',
+  email: 'demo@example.com',
+  avatar: null
+};
+
 // Create the auth context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Create the auth provider
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -55,67 +61,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(false);
   }, []);
 
-  // Helper to make API requests
-  const apiRequest = async <T,>(
-    endpoint: string, 
-    method: string = 'GET', 
-    data?: any, 
-    requiresAuth: boolean = false
-  ): Promise<T> => {
-    try {
-      const url = `${API_BASE_URL}${endpoint}`;
-      const token = localStorage.getItem('auth_token');
-      
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
-      
-      if (requiresAuth && token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
-      const response = await fetch(url, {
-        method,
-        headers,
-        body: data ? JSON.stringify(data) : undefined,
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'An error occurred');
-      }
-      
-      return await response.json();
-    } catch (err: any) {
-      console.error(`API request error (${endpoint}):`, err);
-      throw err;
-    }
-  };
-
-  // Login function
+  // Login function using mock data
   const login = async (email: string, password: string) => {
     setLoading(true);
     setError(null);
     
     try {
-      // Use the API structure provided
-      const responseData = await apiRequest<{
-        message: string;
-        data: {
-          user: User;
-          token: string;
-          token_type: string;
-        }
-      }>('/login', 'POST', { email, password });
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 800));
       
-      const userData = responseData.data.user;
-      const token = responseData.data.token;
+      // Simple validation (in a real app, this would be server-side)
+      if (email.trim() === '' || password.trim() === '') {
+        throw new Error('Email and password are required');
+      }
+      
+      // In a real app, we would validate credentials server-side
+      // For demo purposes, any non-empty credentials will work
+      
+      // Generate a mock token
+      const token = `mock-token-${Date.now()}`;
       
       // Save user and token to localStorage
-      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('user', JSON.stringify(MOCK_USER));
       localStorage.setItem('auth_token', token);
       
-      setUser(userData);
+      setUser(MOCK_USER);
       toast.success('Successfully logged in!');
       navigate('/dashboard');
     } catch (err: any) {
@@ -127,25 +97,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Register function
+  // Register function using mock data
   const register = async (name: string, email: string, password: string, password_confirmation: string) => {
     setLoading(true);
     setError(null);
     
     try {
-      // Use the API structure provided
-      const responseData = await apiRequest<{
-        message: string;
-        data: User;
-      }>('/register', 'POST', { 
-        name, 
-        email, 
-        password,
-        password_confirmation
-      });
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 800));
       
-      toast.success('Registration successful! Please verify your email.');
-      navigate('/verify-email', { state: { email } });
+      // Simple validation (in a real app, this would be server-side)
+      if (name.trim() === '' || email.trim() === '' || password.trim() === '') {
+        throw new Error('All fields are required');
+      }
+      
+      if (password !== password_confirmation) {
+        throw new Error('Passwords do not match');
+      }
+      
+      // In a real app, we would create a user server-side
+      // For demo purposes, we'll just show a success message
+      
+      toast.success('Registration successful! Please log in.');
+      navigate('/login');
     } catch (err: any) {
       console.error('Registration error:', err);
       setError(err.message || 'Registration failed. This email may already be in use.');
@@ -164,19 +138,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     navigate('/login');
   };
 
-  // Forgot password function
+  // Forgot password function (mock implementation)
   const forgotPassword = async (email: string) => {
     setLoading(true);
     setError(null);
     
     try {
-      await apiRequest<{ message: string }>(
-        '/forgot-password', 
-        'POST', 
-        { email }
-      );
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 800));
       
-      toast.success('Password reset link sent to your email!');
+      if (email.trim() === '') {
+        throw new Error('Email is required');
+      }
+      
+      toast.success('Password reset link sent to your email! (demo mode)');
       return Promise.resolve();
     } catch (err: any) {
       console.error('Forgot password error:', err);
@@ -188,19 +163,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Reset password function
+  // Reset password function (mock implementation)
   const resetPassword = async (token: string, password: string) => {
     setLoading(true);
     setError(null);
     
     try {
-      await apiRequest<{ message: string }>(
-        '/reset-password', 
-        'POST', 
-        { token, password, password_confirmation: password }
-      );
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 800));
       
-      toast.success('Password has been reset successfully!');
+      if (password.trim() === '') {
+        throw new Error('Password is required');
+      }
+      
+      toast.success('Password has been reset successfully! (demo mode)');
       navigate('/login');
       return Promise.resolve();
     } catch (err: any) {
@@ -213,19 +189,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Verify email function
+  // Verify email function (mock implementation)
   const verifyEmail = async (token: string) => {
     setLoading(true);
     setError(null);
     
     try {
-      await apiRequest<{ message: string }>(
-        '/verify-email', 
-        'POST', 
-        { token }
-      );
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 800));
       
-      toast.success('Email verified successfully!');
+      toast.success('Email verified successfully! (demo mode)');
       navigate('/login');
       return Promise.resolve();
     } catch (err: any) {
