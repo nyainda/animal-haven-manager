@@ -13,6 +13,9 @@ import Profile from "./pages/Profile";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import VerifyEmail from "./pages/VerifyEmail";
+import Animals from "./pages/Animals";
+import AnimalForm from "./components/AnimalForm";
+import AnimalDetails from "./pages/AnimalDetails";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 
@@ -35,6 +38,10 @@ const App = () => (
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/verify-email" element={<VerifyEmail />} />
+              <Route path="/animals" element={<Animals />} />
+              <Route path="/animals/new" element={<AnimalForm />} />
+              <Route path="/animals/:id" element={<AnimalDetails />} />
+              <Route path="/animals/:id/edit" element={<AnimalForm />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

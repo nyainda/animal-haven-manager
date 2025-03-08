@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -21,40 +20,6 @@ const Dashboard: React.FC = () => {
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [calendarEvents, setCalendarEvents] = useState([
-    { id: 1, date: new Date(2023, new Date().getMonth(), 5), title: 'Veterinary checkups', type: 'appointment' },
-    { id: 2, date: new Date(2023, new Date().getMonth(), 12), title: 'Adoption day', type: 'event' },
-    { id: 3, date: new Date(2023, new Date().getMonth(), 18), title: 'Staff meeting', type: 'meeting' },
-    { id: 4, date: new Date(2023, new Date().getMonth(), 25), title: 'Vaccination day', type: 'appointment' },
-  ]);
-  
-  const [notifications, setNotifications] = useState([
-    { id: 1, content: 'Luna needs a checkup next week', time: '2 hours ago', read: false },
-    { id: 2, content: 'New adoption application received', time: '1 day ago', read: true },
-    { id: 3, content: 'Staff meeting tomorrow at 10 AM', time: '2 days ago', read: true },
-    { id: 4, content: 'Inventory running low on dog food', time: '3 days ago', read: false },
-  ]);
-  
-  const [activities, setActivities] = useState([
-    { id: 1, type: 'add', content: 'Added new cat: Whiskers', time: '1 hour ago', user: 'John Doe' },
-    { id: 2, type: 'update', content: 'Updated dog vaccination records', time: '3 hours ago', user: 'Jane Smith' },
-    { id: 3, type: 'adoption', content: 'Processed adoption for Max', time: '1 day ago', user: 'Sarah Johnson' },
-    { id: 4, type: 'medical', content: 'Scheduled vet appointment for Luna', time: '2 days ago', user: 'Alex Brown' },
-    { id: 5, type: 'add', content: 'Added new bird: Tweetie', time: '3 days ago', user: 'Lisa Chen' },
-  ]);
-  
-  // Settings states
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [mobileNotifications, setMobileNotifications] = useState(true);
-  const [darkModeSystem, setDarkModeSystem] = useState(false);
-  
-  React.useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-    }
-  }, [isAuthenticated, navigate]);
 
   const animalData = [
     { name: 'Dogs', value: 5, color: '#10B981' },
@@ -79,22 +44,18 @@ const Dashboard: React.FC = () => {
     logout();
     navigate('/login');
   };
-  
+
   const renderCalendar = () => {
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(currentMonth);
     const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
     
-    // Get day names
     const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     
-    // Get first day of month and start of week for that month
     const startWeek = startOfWeek(monthStart);
     
-    // Generate calendar cells
     const calendarCells = [];
     
-    // Add days from previous month to fill the first row
     for (let i = 0; i < getDay(monthStart); i++) {
       const prevMonthDay = addDays(startWeek, i);
       calendarCells.push(
@@ -104,7 +65,6 @@ const Dashboard: React.FC = () => {
       );
     }
     
-    // Add days of current month
     days.forEach(day => {
       const eventsForDay = calendarEvents.filter(event => 
         isSameDay(event.date, day)
@@ -152,7 +112,6 @@ const Dashboard: React.FC = () => {
       );
     });
     
-    // Fill in remaining cells from next month
     const totalCells = 7 * Math.ceil(days.length / 7);
     const remainingCells = totalCells - calendarCells.length;
     
@@ -225,7 +184,6 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      {/* Sidebar */}
       <aside className="w-64 bg-sidebar text-sidebar-foreground shadow-md max-h-full overflow-auto hidden md:block">
         <div className="p-6">
           <h2 className="text-2xl font-bold text-primary">Animal Haven</h2>
@@ -237,10 +195,10 @@ const Dashboard: React.FC = () => {
               <span className={`mx-4 font-medium ${activeTab === 'overview' && 'text-primary'}`}>Dashboard</span>
             </div>
           </div>
-          <div className={`px-4 py-2 hover:bg-sidebar-accent cursor-pointer ${activeTab === 'animals' && 'bg-sidebar-accent border-l-4 border-primary'}`} onClick={() => setActiveTab('animals')}>
+          <div className="px-4 py-2 hover:bg-sidebar-accent cursor-pointer" onClick={() => navigate('/animals')}>
             <div className="flex items-center">
-              <Dog className={`h-5 w-5 ${activeTab === 'animals' ? 'text-primary' : 'text-sidebar-foreground'}`} />
-              <span className={`mx-4 font-medium ${activeTab === 'animals' && 'text-primary'}`}>Animals</span>
+              <Dog className="h-5 w-5 text-sidebar-foreground" />
+              <span className="mx-4 font-medium">Animals</span>
             </div>
           </div>
           <div className={`px-4 py-2 hover:bg-sidebar-accent cursor-pointer ${activeTab === 'activity' && 'bg-sidebar-accent border-l-4 border-primary'}`} onClick={() => setActiveTab('activity')}>
@@ -276,12 +234,9 @@ const Dashboard: React.FC = () => {
         </nav>
       </aside>
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
         <header className="bg-card shadow-sm">
           <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-            {/* Mobile menu button */}
             <div className="flex md:hidden">
               <Button variant="ghost" size="sm" className="mr-2" onClick={() => toast.info('This would open the mobile menu')}>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -331,7 +286,6 @@ const Dashboard: React.FC = () => {
           </div>
         </header>
 
-        {/* Dashboard Content */}
         <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6">
           <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="mb-4 md:hidden">
@@ -343,7 +297,6 @@ const Dashboard: React.FC = () => {
             </TabsList>
             
             <TabsContent value="overview">
-              {/* Summary Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6">
                 <Card className="p-6 hover:shadow-md transition-all duration-200">
                   <h3 className="font-medium text-muted-foreground">Total Animals</h3>
@@ -366,7 +319,6 @@ const Dashboard: React.FC = () => {
                 </Card>
               </div>
 
-              {/* Charts and Tables */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card className="p-6">
                   <h2 className="text-xl font-semibold mb-4">Species Breakdown</h2>
@@ -396,7 +348,7 @@ const Dashboard: React.FC = () => {
                 <Card className="p-6">
                   <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-semibold">Recent Animals</h2>
-                    <Button variant="outline" size="sm">View All</Button>
+                    <Button variant="outline" size="sm" onClick={() => navigate('/animals')}>View All</Button>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="min-w-full">
@@ -444,6 +396,12 @@ const Dashboard: React.FC = () => {
                         </tr>
                       </tbody>
                     </table>
+                  </div>
+                  <div className="mt-4 flex justify-center">
+                    <Button onClick={() => navigate('/animals/new')}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add New Animal
+                    </Button>
                   </div>
                 </Card>
               </div>
@@ -624,9 +582,11 @@ const Dashboard: React.FC = () => {
             <TabsContent value="animals">
               <div className="text-center p-12">
                 <h2 className="text-xl font-medium mb-2">Animals Management</h2>
-                <p className="text-muted-foreground mb-6">This section will be implemented soon.</p>
-                <Button onClick={() => toast.info('This feature is coming soon')}>
-                  View Animals
+                <p className="text-muted-foreground mb-6">
+                  Manage your animals and livestock in one place.
+                </p>
+                <Button onClick={() => navigate('/animals')}>
+                  Go to Animals Dashboard
                 </Button>
               </div>
             </TabsContent>
