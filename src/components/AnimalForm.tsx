@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
@@ -162,10 +161,10 @@ const AnimalForm: React.FC = () => {
 
     try {
       if (isEditing && id) {
-        await updateAnimal(id, formData);
+        const updated = await updateAnimal(id, formData);
         toast.success('Animal updated successfully');
       } else {
-        await createAnimal(formData);
+        const created = await createAnimal(formData);
         toast.success('Animal created successfully');
       }
       navigate('/animals');

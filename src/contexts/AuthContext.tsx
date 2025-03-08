@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -39,7 +38,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Create the auth provider
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -60,6 +59,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     setLoading(false);
   }, []);
+
+  // Auto-login for demo purposes
+  useEffect(() => {
+    const hasVisited = localStorage.getItem('has_visited');
+    if (!hasVisited && !user) {
+      // Auto-login with mock user for demo
+      const token = `mock-token-${Date.now()}`;
+      localStorage.setItem('user', JSON.stringify(MOCK_USER));
+      localStorage.setItem('auth_token', token);
+      localStorage.setItem('has_visited', 'true');
+      setUser(MOCK_USER);
+    }
+  }, [user]);
 
   // Login function using mock data
   const login = async (email: string, password: string) => {

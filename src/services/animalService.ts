@@ -169,8 +169,11 @@ export const createAnimal = async (animalData: AnimalFormData): Promise<Animal> 
     };
     
     // In a real app, we would send this to the server
-    // For demo purposes, we'll just return the new animal
+    // For demo purposes, we'll just add it to our mock data
     MOCK_ANIMALS.push(newAnimal);
+    
+    // Show a success notification
+    console.log(`Animal ${newAnimal.name} created successfully`);
     
     return newAnimal;
   } catch (error) {
