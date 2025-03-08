@@ -1,7 +1,10 @@
 
 import { Animal, AnimalFormData } from "../types/AnimalTypes";
 
-// Mock animal data
+// Base API URL
+const API_URL = "http://127.0.0.1:8000/api/animals";
+
+// Mock animal data (will be used as fallback if API is unavailable)
 const MOCK_ANIMALS: Animal[] = [
   {
     id: "1",
@@ -103,37 +106,74 @@ const MOCK_ANIMALS: Animal[] = [
 
 export const fetchAnimals = async (): Promise<Animal[]> => {
   try {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-    return [...MOCK_ANIMALS];
+    // Use the real API endpoint
+    const response = await fetch(API_URL);
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data;
   } catch (error) {
     console.error('Error fetching animals:', error);
-    throw error;
+    console.warn('Falling back to mock data due to API error');
+    // Return mock data as fallback
+    return [...MOCK_ANIMALS];
   }
 };
 
 export const fetchAnimal = async (id: string): Promise<Animal> => {
   try {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Use the real API endpoint
+    const response = await fetch(`${API_URL}/${id}`);
     
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const animal = await response.json();
+    return animal;
+  } catch (error) {
+    console.error(`Error fetching animal ${id}:`, error);
+    console.warn('Falling back to mock data due to API error');
+    
+    // Fallback to mock data
     const animal = MOCK_ANIMALS.find(a => a.id === id);
     if (!animal) {
       throw new Error('Animal not found');
     }
     
     return { ...animal };
-  } catch (error) {
-    console.error(`Error fetching animal ${id}:`, error);
-    throw error;
   }
 };
 
 export const createAnimal = async (animalData: AnimalFormData): Promise<Animal> => {
   try {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Use the real API endpoint
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(animalData),
+    });
     
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const newAnimal = await response.json();
+    
+    // Show a success notification
+    console.log(`Animal ${newAnimal.name} created successfully`);
+    
+    return newAnimal;
+  } catch (error) {
+    console.error('Error creating animal:', error);
+    console.warn('Falling back to mock implementation due to API error');
+    
+    // Fallback to mock implementation
     // Create a new animal with mock data
     const newAnimal: Animal = {
       id: `${Date.now()}`,
@@ -168,7 +208,6 @@ export const createAnimal = async (animalData: AnimalFormData): Promise<Animal> 
       keywords: animalData.keywords || []
     };
     
-    // In a real app, we would send this to the server
     // For demo purposes, we'll just add it to our mock data
     MOCK_ANIMALS.push(newAnimal);
     
@@ -176,17 +215,31 @@ export const createAnimal = async (animalData: AnimalFormData): Promise<Animal> 
     console.log(`Animal ${newAnimal.name} created successfully`);
     
     return newAnimal;
-  } catch (error) {
-    console.error('Error creating animal:', error);
-    throw error;
   }
 };
 
 export const updateAnimal = async (id: string, animalData: Partial<AnimalFormData>): Promise<Animal> => {
   try {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 800));
+    // Use the real API endpoint
+    const response = await fetch(`${API_URL}/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(animalData),
+    });
     
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const updatedAnimal = await response.json();
+    return updatedAnimal;
+  } catch (error) {
+    console.error(`Error updating animal ${id}:`, error);
+    console.warn('Falling back to mock implementation due to API error');
+    
+    // Fallback to mock implementation
     const animalIndex = MOCK_ANIMALS.findIndex(a => a.id === id);
     if (animalIndex === -1) {
       throw new Error('Animal not found');
@@ -201,25 +254,29 @@ export const updateAnimal = async (id: string, animalData: Partial<AnimalFormDat
     MOCK_ANIMALS[animalIndex] = updatedAnimal;
     
     return updatedAnimal;
-  } catch (error) {
-    console.error(`Error updating animal ${id}:`, error);
-    throw error;
   }
 };
 
 export const deleteAnimal = async (id: string): Promise<void> => {
   try {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 600));
+    // Use the real API endpoint
+    const response = await fetch(`${API_URL}/${id}`, {
+      method: 'DELETE',
+    });
     
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error(`Error deleting animal ${id}:`, error);
+    console.warn('Falling back to mock implementation due to API error');
+    
+    // Fallback to mock implementation
     const animalIndex = MOCK_ANIMALS.findIndex(a => a.id === id);
     if (animalIndex === -1) {
       throw new Error('Animal not found');
     }
     
     MOCK_ANIMALS.splice(animalIndex, 1);
-  } catch (error) {
-    console.error(`Error deleting animal ${id}:`, error);
-    throw error;
   }
 };
