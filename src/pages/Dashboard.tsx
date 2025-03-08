@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
@@ -15,11 +16,121 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
+interface CalendarEvent {
+  id: string;
+  title: string;
+  date: Date;
+  type: 'appointment' | 'event' | 'meeting';
+}
+
+interface Activity {
+  id: string;
+  type: 'add' | 'update' | 'adoption' | 'medical';
+  content: string;
+  time: string;
+  user: string;
+}
+
+interface Notification {
+  id: string;
+  content: string;
+  time: string;
+  read: boolean;
+}
+
 const Dashboard: React.FC = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
+  
+  // Calendar states
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([
+    {
+      id: '1',
+      title: 'Vet Appointment',
+      date: new Date(2025, 2, 15),
+      type: 'appointment'
+    },
+    {
+      id: '2',
+      title: 'Adoption Event',
+      date: new Date(2025, 2, 20),
+      type: 'event'
+    },
+    {
+      id: '3',
+      title: 'Staff Meeting',
+      date: new Date(2025, 2, 25),
+      type: 'meeting'
+    }
+  ]);
+
+  // Settings states
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [mobileNotifications, setMobileNotifications] = useState(false);
+  const [darkModeSystem, setDarkModeSystem] = useState(false);
+  
+  // Activity and notification data
+  const activities: Activity[] = [
+    {
+      id: '1',
+      type: 'add',
+      content: 'New animal added: Max (Dog)',
+      time: '2 hours ago',
+      user: 'John Doe'
+    },
+    {
+      id: '2',
+      type: 'update',
+      content: 'Updated animal details for Luna (Cat)',
+      time: '4 hours ago',
+      user: 'Jane Smith'
+    },
+    {
+      id: '3',
+      type: 'adoption',
+      content: 'Tweetie (Bird) was adopted',
+      time: 'Yesterday',
+      user: 'Alex Johnson'
+    },
+    {
+      id: '4',
+      type: 'medical',
+      content: 'Scheduled checkup for Max (Dog)',
+      time: '2 days ago',
+      user: 'Sarah Williams'
+    }
+  ];
+  
+  const notifications: Notification[] = [
+    {
+      id: '1',
+      content: 'Max (Dog) is due for vaccination',
+      time: '2 hours ago',
+      read: false
+    },
+    {
+      id: '2',
+      content: 'New adoption application received',
+      time: '4 hours ago',
+      read: false
+    },
+    {
+      id: '3',
+      content: 'Staff meeting tomorrow at 10 AM',
+      time: 'Yesterday',
+      read: true
+    },
+    {
+      id: '4',
+      content: 'Monthly report is ready for review',
+      time: '2 days ago',
+      read: true
+    }
+  ];
 
   const animalData = [
     { name: 'Dogs', value: 5, color: '#10B981' },
