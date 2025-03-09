@@ -31,31 +31,23 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
-  const [mounted, setMounted] = useState(false);
-
-  // Only execute this effect client-side
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     // Update the document class when the theme changes
-    if (!mounted) return;
-    
     const root = window.document.documentElement;
     
-    // Remove both classes and then add the current one
-    root.classList.remove('light', 'dark');
-    root.classList.add(theme);
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
     
     // Save user preference
     localStorage.setItem('theme', theme);
-  }, [theme, mounted]);
+  }, [theme]);
 
   // Listen for system theme changes
   useEffect(() => {
-    if (!mounted) return;
-    
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     
     const handleChange = () => {
@@ -67,18 +59,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
-  }, [mounted]);
+  }, []);
 
-  // Prevent flash of wrong theme while SSR/during hydration
   const value = {
     theme,
     setTheme,
   };
-
-  // Don't render anything until mounted to prevent hydration mismatch
-  if (!mounted) {
-    return <>{children}</>;
-  }
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 };
