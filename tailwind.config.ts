@@ -21,6 +21,7 @@ export default {
 		extend: {
 			fontFamily: {
 				sans: ['Inter', 'sans-serif'],
+				serif: ['Merriweather', 'Georgia', 'serif'],
 				display: ['SF Pro Display', 'Inter', 'sans-serif'],
 			},
 			colors: {

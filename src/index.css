@@ -1,12 +1,12 @@
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@300;400;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 0 0% 98%;
     --foreground: 222.2 84% 4.9%;
 
     --card: 0 0% 100%;
@@ -91,11 +91,11 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-background text-foreground font-serif antialiased;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-display font-medium tracking-tight;
+    @apply font-serif font-medium tracking-tight;
   }
 }
 
@@ -126,6 +126,28 @@
   
   .btn-hover {
     @apply transform transition duration-200 ease-in-out hover:scale-[1.03] active:scale-[0.97];
+  }
+
+  /* Form styling */
+  .form-container {
+    @apply bg-card shadow-sm rounded-lg border border-border p-6;
+  }
+  
+  .form-field {
+    @apply mb-4;
+  }
+  
+  .form-label {
+    @apply block text-sm font-medium mb-1 text-foreground;
+  }
+  
+  .form-input {
+    @apply w-full rounded-md border border-input bg-background px-3 py-2;
+  }
+
+  /* Special dropdown background fix */
+  .dropdown-content {
+    @apply !bg-background border border-border shadow-md rounded-md z-50;
   }
 }
 
@@ -163,4 +185,19 @@
   width: 100%;
   left: 0;
   right: auto;
+}
+
+/* Command menu adjustments for light mode */
+.cmd-dropdown {
+  @apply !bg-card border border-border shadow-md;
+}
+
+/* Fix for popover content background */
+[data-radix-popper-content-wrapper] {
+  @apply !bg-transparent;
+}
+
+[role="dialog"],
+[role="listbox"] {
+  @apply !bg-background;
 }

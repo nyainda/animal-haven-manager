@@ -65,6 +65,18 @@ export const animalTypes = [
   'other'
 ];
 
+export const breedsByType: Record<string, string[]> = {
+  cattle: ['Angus', 'Hereford', 'Holstein', 'Jersey', 'Limousin', 'Simmental', 'Charolais', 'Brahman', 'Other'],
+  sheep: ['Merino', 'Suffolk', 'Dorper', 'Romney', 'Dorset', 'Texel', 'Border Leicester', 'Corriedale', 'Other'],
+  goat: ['Boer', 'Alpine', 'Saanen', 'Nubian', 'LaMancha', 'Toggenburg', 'Angora', 'Nigerian Dwarf', 'Other'],
+  pig: ['Duroc', 'Hampshire', 'Yorkshire', 'Landrace', 'Berkshire', 'Pietrain', 'Spot', 'Tamworth', 'Other'],
+  horse: ['Thoroughbred', 'Arabian', 'Quarter Horse', 'Appaloosa', 'Morgan', 'Clydesdale', 'Percheron', 'Standardbred', 'Other'],
+  chicken: ['Rhode Island Red', 'Leghorn', 'Plymouth Rock', 'Orpington', 'Sussex', 'Wyandotte', 'Brahma', 'Australorp', 'Other'],
+  duck: ['Pekin', 'Muscovy', 'Mallard', 'Indian Runner', 'Call Duck', 'Rouen', 'Cayuga', 'Swedish', 'Other'],
+  rabbit: ['New Zealand', 'Californian', 'Rex', 'Dutch', 'Flemish Giant', 'Mini Lop', 'Angora', 'Netherland Dwarf', 'Other'],
+  other: ['Custom Breed']
+};
+
 export const genderOptions = [
   { value: 'male', label: 'Male' },
   { value: 'female', label: 'Female' },
@@ -95,4 +107,9 @@ export const statusOptions = [
   { value: 'Sold', label: 'Sold' },
   { value: 'Deceased', label: 'Deceased' },
   { value: 'Transferred', label: 'Transferred' }
+];
+
+export const weightUnits = [
+  { value: 'kg', label: 'kg' },
+  { value: 'lb', label: 'lb' }
 ];

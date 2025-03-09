@@ -25,11 +25,13 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { 
   animalTypes, 
+  breedsByType,
   genderOptions, 
   birthStatusOptions, 
   healthAtBirthOptions, 
   raisedPurchasedOptions,
   statusOptions,
+  weightUnits,
   AnimalFormData,
   Animal
 } from '@/types/AnimalTypes';
@@ -66,13 +68,19 @@ const AnimalForm: React.FC = () => {
   const [newKeyword, setNewKeyword] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [birthDate, setBirthDate] = useState<Date>(new Date());
-  const [openTypePopover, setOpenTypePopover] = useState(false);
-  const [openGenderPopover, setOpenGenderPopover] = useState(false);
-  const [openStatusPopover, setOpenStatusPopover] = useState(false);
-  const [openBirthStatusPopover, setOpenBirthStatusPopover] = useState(false);
-  const [openHealthPopover, setOpenHealthPopover] = useState(false);
-  const [openOriginPopover, setOpenOriginPopover] = useState(false);
-  const [openWeightUnitPopover, setOpenWeightUnitPopover] = useState(false);
+  
+  // Dropdown states
+  const [breedOptions, setBreedOptions] = useState<string[]>(breedsByType[formData.type] || []);
+  
+  useEffect(() => {
+    // Update breed options when animal type changes
+    setBreedOptions(breedsByType[formData.type] || []);
+    
+    // If switching type, select the first breed from the new options
+    if (breedsByType[formData.type] && !breedsByType[formData.type].includes(formData.breed)) {
+      setFormData(prev => ({ ...prev, breed: breedsByType[formData.type][0] }));
+    }
+  }, [formData.type]);
 
   useEffect(() => {
     if (isEditing && id) {
@@ -88,6 +96,10 @@ const AnimalForm: React.FC = () => {
           if (animal.birth_date) {
             setBirthDate(parseISO(animal.birth_date));
           }
+          
+          // Update breed options based on the loaded animal type
+          setBreedOptions(breedsByType[animal.type] || []);
+          
         } catch (error) {
           console.error('Error loading animal:', error);
           toast.error('Failed to load animal data');
@@ -187,61 +199,63 @@ const AnimalForm: React.FC = () => {
     return (
       <div className="w-full h-64 flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2 text-lg">Loading animal data...</span>
+        <span className="ml-2 text-lg font-serif">Loading animal data...</span>
       </div>
     );
   }
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
-      <CardHeader>
-        <CardTitle>{isEditing ? 'Edit Animal' : 'Add New Animal'}</CardTitle>
-        <CardDescription>
-          Enter all animal information in one form
+    <Card className="w-full max-w-4xl mx-auto shadow-md border-border">
+      <CardHeader className="bg-card">
+        <CardTitle className="font-serif text-2xl">{isEditing ? 'Edit Animal' : 'Add New Animal'}</CardTitle>
+        <CardDescription className="font-serif">
+          Enter all animal information in this form
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="bg-card pt-6">
         <form onSubmit={handleSubmit} className="space-y-6">          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="name">Name *</Label>
+              <Label htmlFor="name" className="font-serif">Name *</Label>
               <Input
                 id="name"
                 name="name"
                 value={formData.name}
                 onChange={handleInputChange}
                 placeholder="Enter animal name"
+                className="font-serif bg-background"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="type">Animal Type *</Label>
-              <Popover open={openTypePopover} onOpenChange={setOpenTypePopover}>
+              <Label htmlFor="type" className="font-serif">Animal Type *</Label>
+              <Popover>
                 <PopoverTrigger asChild>
                   <Button
+                    id="type"
                     variant="outline"
                     role="combobox"
-                    aria-expanded={openTypePopover}
-                    className="w-full justify-between"
+                    aria-expanded={true}
+                    className="w-full justify-between font-serif bg-background"
                   >
-                    {formData.type ? formData.type : "Select type..."}
+                    {formData.type || "Select type..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-full p-0">
-                  <Command>
-                    <CommandInput placeholder="Search animal type..." />
-                    <CommandEmpty>No type found.</CommandEmpty>
-                    <CommandGroup>
+                <PopoverContent className="w-full p-0 bg-background border border-border shadow-md">
+                  <Command className="bg-background">
+                    <CommandInput placeholder="Search animal type..." className="font-serif" />
+                    <CommandEmpty className="font-serif">No type found.</CommandEmpty>
+                    <CommandGroup className="bg-background max-h-[200px] overflow-y-auto">
                       {animalTypes.map((type) => (
                         <CommandItem
                           key={type}
                           value={type}
                           onSelect={() => {
                             handleSelectChange('type', type);
-                            setOpenTypePopover(false);
                           }}
+                          className="font-serif"
                         >
                           <Check
                             className={cn(
@@ -259,44 +273,71 @@ const AnimalForm: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="breed">Breed *</Label>
-              <Input
-                id="breed"
-                name="breed"
-                value={formData.breed}
-                onChange={handleInputChange}
-                placeholder="Enter breed"
-                required
-              />
+              <Label htmlFor="breed" className="font-serif">Breed *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="breed"
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between font-serif bg-background"
+                  >
+                    {formData.breed || "Select breed..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0 bg-background border border-border shadow-md">
+                  <Command className="bg-background">
+                    <CommandInput placeholder="Search breed..." className="font-serif" />
+                    <CommandEmpty className="font-serif">No breed found.</CommandEmpty>
+                    <CommandGroup className="bg-background max-h-[200px] overflow-y-auto">
+                      {breedOptions.map((breed) => (
+                        <CommandItem
+                          key={breed}
+                          value={breed}
+                          onSelect={() => handleSelectChange('breed', breed)}
+                          className="font-serif"
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              formData.breed === breed ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {breed}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="gender">Gender *</Label>
-              <Popover open={openGenderPopover} onOpenChange={setOpenGenderPopover}>
+              <Label htmlFor="gender" className="font-serif">Gender *</Label>
+              <Popover>
                 <PopoverTrigger asChild>
                   <Button
+                    id="gender"
                     variant="outline"
                     role="combobox"
-                    aria-expanded={openGenderPopover}
-                    className="w-full justify-between"
+                    className="w-full justify-between font-serif bg-background"
                   >
                     {genderOptions.find(option => option.value === formData.gender)?.label || "Select gender..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-full p-0">
-                  <Command>
-                    <CommandInput placeholder="Search gender..." />
-                    <CommandEmpty>No gender found.</CommandEmpty>
-                    <CommandGroup>
+                <PopoverContent className="w-full p-0 bg-background border border-border shadow-md">
+                  <Command className="bg-background">
+                    <CommandInput placeholder="Search gender..." className="font-serif" />
+                    <CommandEmpty className="font-serif">No gender found.</CommandEmpty>
+                    <CommandGroup className="bg-background">
                       {genderOptions.map((option) => (
                         <CommandItem
                           key={option.value}
                           value={option.value}
-                          onSelect={() => {
-                            handleSelectChange('gender', option.value);
-                            setOpenGenderPopover(false);
-                          }}
+                          onSelect={() => handleSelectChange('gender', option.value)}
+                          className="font-serif"
                         >
                           <Check
                             className={cn(
@@ -314,13 +355,14 @@ const AnimalForm: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="birth_date">Birth Date *</Label>
+              <Label htmlFor="birth_date" className="font-serif">Birth Date *</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
-                    variant={"outline"}
+                    id="birth_date"
+                    variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal",
+                      "w-full justify-start text-left font-normal font-serif bg-background",
                       !formData.birth_date && "text-muted-foreground"
                     )}
                   >
@@ -328,56 +370,55 @@ const AnimalForm: React.FC = () => {
                     {formData.birth_date ? format(new Date(formData.birth_date), 'PPP') : <span>Pick a date</span>}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className="w-auto p-0 bg-card border border-border shadow-md" align="start">
                   <Calendar
                     mode="single"
                     selected={birthDate}
                     onSelect={handleDateChange}
                     initialFocus
-                    className="bg-background"
+                    className="bg-card"
                   />
                 </PopoverContent>
               </Popover>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="tag_number">Tag Number</Label>
+              <Label htmlFor="tag_number" className="font-serif">Tag Number</Label>
               <Input
                 id="tag_number"
                 name="tag_number"
                 value={formData.tag_number || ''}
                 onChange={handleInputChange}
                 placeholder="Enter tag number"
+                className="font-serif bg-background"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Popover open={openStatusPopover} onOpenChange={setOpenStatusPopover}>
+              <Label htmlFor="status" className="font-serif">Status</Label>
+              <Popover>
                 <PopoverTrigger asChild>
                   <Button
+                    id="status"
                     variant="outline"
                     role="combobox"
-                    aria-expanded={openStatusPopover}
-                    className="w-full justify-between"
+                    className="w-full justify-between font-serif bg-background"
                   >
                     {statusOptions.find(option => option.value === formData.status)?.label || "Select status..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-full p-0 bg-background">
-                  <Command>
-                    <CommandInput placeholder="Search status..." />
-                    <CommandEmpty>No status found.</CommandEmpty>
-                    <CommandGroup>
+                <PopoverContent className="w-full p-0 bg-background border border-border shadow-md">
+                  <Command className="bg-background">
+                    <CommandInput placeholder="Search status..." className="font-serif" />
+                    <CommandEmpty className="font-serif">No status found.</CommandEmpty>
+                    <CommandGroup className="bg-background">
                       {statusOptions.map((option) => (
                         <CommandItem
                           key={option.value}
                           value={option.value}
-                          onSelect={() => {
-                            handleSelectChange('status', option.value);
-                            setOpenStatusPopover(false);
-                          }}
+                          onSelect={() => handleSelectChange('status', option.value)}
+                          className="font-serif"
                         >
                           <Check
                             className={cn(
@@ -401,8 +442,9 @@ const AnimalForm: React.FC = () => {
                 onCheckedChange={(checked) => 
                   handleCheckboxChange('is_breeding_stock', checked === true)
                 }
+                className="bg-background"
               />
-              <Label htmlFor="is_breeding_stock">Breeding Stock</Label>
+              <Label htmlFor="is_breeding_stock" className="font-serif">Breeding Stock</Label>
             </div>
 
             <div className="flex items-center space-x-2">
@@ -412,37 +454,36 @@ const AnimalForm: React.FC = () => {
                 onCheckedChange={(checked) => 
                   handleCheckboxChange('is_deceased', checked === true)
                 }
+                className="bg-background"
               />
-              <Label htmlFor="is_deceased">Deceased</Label>
+              <Label htmlFor="is_deceased" className="font-serif">Deceased</Label>
             </div>
           
             <div className="space-y-2">
-              <Label htmlFor="birth_status">Birth Status</Label>
-              <Popover open={openBirthStatusPopover} onOpenChange={setOpenBirthStatusPopover}>
+              <Label htmlFor="birth_status" className="font-serif">Birth Status</Label>
+              <Popover>
                 <PopoverTrigger asChild>
                   <Button
+                    id="birth_status"
                     variant="outline"
                     role="combobox"
-                    aria-expanded={openBirthStatusPopover}
-                    className="w-full justify-between"
+                    className="w-full justify-between font-serif bg-background"
                   >
                     {birthStatusOptions.find(option => option.value === formData.birth_status)?.label || "Select birth status..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-full p-0 bg-background">
-                  <Command>
-                    <CommandInput placeholder="Search birth status..." />
-                    <CommandEmpty>No birth status found.</CommandEmpty>
-                    <CommandGroup>
+                <PopoverContent className="w-full p-0 bg-background border border-border shadow-md">
+                  <Command className="bg-background">
+                    <CommandInput placeholder="Search birth status..." className="font-serif" />
+                    <CommandEmpty className="font-serif">No birth status found.</CommandEmpty>
+                    <CommandGroup className="bg-background">
                       {birthStatusOptions.map((option) => (
                         <CommandItem
                           key={option.value}
                           value={option.value}
-                          onSelect={() => {
-                            handleSelectChange('birth_status', option.value);
-                            setOpenBirthStatusPopover(false);
-                          }}
+                          onSelect={() => handleSelectChange('birth_status', option.value)}
+                          className="font-serif"
                         >
                           <Check
                             className={cn(
@@ -460,32 +501,30 @@ const AnimalForm: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="health_at_birth">Health at Birth</Label>
-              <Popover open={openHealthPopover} onOpenChange={setOpenHealthPopover}>
+              <Label htmlFor="health_at_birth" className="font-serif">Health at Birth</Label>
+              <Popover>
                 <PopoverTrigger asChild>
                   <Button
+                    id="health_at_birth"
                     variant="outline"
                     role="combobox"
-                    aria-expanded={openHealthPopover}
-                    className="w-full justify-between"
+                    className="w-full justify-between font-serif bg-background"
                   >
                     {healthAtBirthOptions.find(option => option.value === formData.health_at_birth)?.label || "Select health status..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-full p-0 bg-background">
-                  <Command>
-                    <CommandInput placeholder="Search health status..." />
-                    <CommandEmpty>No health status found.</CommandEmpty>
-                    <CommandGroup>
+                <PopoverContent className="w-full p-0 bg-background border border-border shadow-md">
+                  <Command className="bg-background">
+                    <CommandInput placeholder="Search health status..." className="font-serif" />
+                    <CommandEmpty className="font-serif">No health status found.</CommandEmpty>
+                    <CommandGroup className="bg-background">
                       {healthAtBirthOptions.map((option) => (
                         <CommandItem
                           key={option.value}
                           value={option.value}
-                          onSelect={() => {
-                            handleSelectChange('health_at_birth', option.value);
-                            setOpenHealthPopover(false);
-                          }}
+                          onSelect={() => handleSelectChange('health_at_birth', option.value)}
+                          className="font-serif"
                         >
                           <Check
                             className={cn(
@@ -503,7 +542,7 @@ const AnimalForm: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="birth_weight">Birth Weight</Label>
+              <Label htmlFor="birth_weight" className="font-serif">Birth Weight</Label>
               <div className="flex space-x-2">
                 <Input
                   id="birth_weight"
@@ -512,46 +551,34 @@ const AnimalForm: React.FC = () => {
                   value={formData.birth_weight || ''}
                   onChange={handleInputChange}
                   placeholder="Enter birth weight"
-                  className="flex-1"
+                  className="flex-1 font-serif bg-background"
                 />
-                <Popover open={openWeightUnitPopover} onOpenChange={setOpenWeightUnitPopover}>
+                <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       role="combobox"
-                      aria-expanded={openWeightUnitPopover}
-                      className="w-20"
+                      className="w-20 font-serif bg-background"
                     >
                       {formData.weight_unit || 'kg'}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[80px] p-0 bg-background">
-                    <Command>
-                      <CommandGroup>
-                        <CommandItem 
-                          onSelect={() => {
-                            handleSelectChange('weight_unit', 'kg');
-                            setOpenWeightUnitPopover(false);
-                          }}
-                        >
-                          <Check className={cn(
-                            "mr-2 h-4 w-4",
-                            formData.weight_unit === 'kg' ? "opacity-100" : "opacity-0"
-                          )}/>
-                          kg
-                        </CommandItem>
-                        <CommandItem 
-                          onSelect={() => {
-                            handleSelectChange('weight_unit', 'lb');
-                            setOpenWeightUnitPopover(false);
-                          }}
-                        >
-                          <Check className={cn(
-                            "mr-2 h-4 w-4",
-                            formData.weight_unit === 'lb' ? "opacity-100" : "opacity-0"
-                          )}/>
-                          lb
-                        </CommandItem>
+                  <PopoverContent className="w-[80px] p-0 bg-background border border-border shadow-md">
+                    <Command className="bg-background">
+                      <CommandGroup className="bg-background">
+                        {weightUnits.map((unit) => (
+                          <CommandItem 
+                            key={unit.value}
+                            onSelect={() => handleSelectChange('weight_unit', unit.value)}
+                            className="font-serif"
+                          >
+                            <Check className={cn(
+                              "mr-2 h-4 w-4",
+                              formData.weight_unit === unit.value ? "opacity-100" : "opacity-0"
+                            )}/>
+                            {unit.label}
+                          </CommandItem>
+                        ))}
                       </CommandGroup>
                     </Command>
                   </PopoverContent>
@@ -560,32 +587,30 @@ const AnimalForm: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="raised_purchased">Origin</Label>
-              <Popover open={openOriginPopover} onOpenChange={setOpenOriginPopover}>
+              <Label htmlFor="raised_purchased" className="font-serif">Origin</Label>
+              <Popover>
                 <PopoverTrigger asChild>
                   <Button
+                    id="raised_purchased"
                     variant="outline"
                     role="combobox"
-                    aria-expanded={openOriginPopover}
-                    className="w-full justify-between"
+                    className="w-full justify-between font-serif bg-background"
                   >
                     {raisedPurchasedOptions.find(option => option.value === formData.raised_purchased)?.label || "Select origin..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-full p-0 bg-background">
-                  <Command>
-                    <CommandInput placeholder="Search origin..." />
-                    <CommandEmpty>No option found.</CommandEmpty>
-                    <CommandGroup>
+                <PopoverContent className="w-full p-0 bg-background border border-border shadow-md">
+                  <Command className="bg-background">
+                    <CommandInput placeholder="Search origin..." className="font-serif" />
+                    <CommandEmpty className="font-serif">No option found.</CommandEmpty>
+                    <CommandGroup className="bg-background">
                       {raisedPurchasedOptions.map((option) => (
                         <CommandItem
                           key={option.value}
                           value={option.value}
-                          onSelect={() => {
-                            handleSelectChange('raised_purchased', option.value);
-                            setOpenOriginPopover(false);
-                          }}
+                          onSelect={() => handleSelectChange('raised_purchased', option.value)}
+                          className="font-serif"
                         >
                           <Check
                             className={cn(
@@ -609,15 +634,16 @@ const AnimalForm: React.FC = () => {
                 onCheckedChange={(checked) => 
                   handleCheckboxChange('multiple_birth', checked === true)
                 }
+                className="bg-background"
               />
-              <Label htmlFor="multiple_birth">Multiple Birth</Label>
+              <Label htmlFor="multiple_birth" className="font-serif">Multiple Birth</Label>
             </div>
           
             <div className="space-y-2 md:col-span-2">
-              <Label>Physical Traits</Label>
+              <Label className="font-serif">Physical Traits</Label>
               <div className="flex flex-wrap gap-2 mb-2">
                 {formData.physical_traits?.map((trait, index) => (
-                  <Badge key={index} variant="secondary" className="px-3 py-1">
+                  <Badge key={index} variant="secondary" className="px-3 py-1 font-serif">
                     {trait}
                     <Button 
                       variant="ghost" 
@@ -635,7 +661,7 @@ const AnimalForm: React.FC = () => {
                   value={newTrait}
                   onChange={(e) => setNewTrait(e.target.value)}
                   placeholder="Add a physical trait"
-                  className="flex-1"
+                  className="flex-1 font-serif bg-background"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
@@ -643,15 +669,15 @@ const AnimalForm: React.FC = () => {
                     }
                   }}
                 />
-                <Button type="button" onClick={addTrait}>Add</Button>
+                <Button type="button" onClick={addTrait} className="font-serif">Add</Button>
               </div>
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <Label>Keywords</Label>
+              <Label className="font-serif">Keywords</Label>
               <div className="flex flex-wrap gap-2 mb-2">
                 {formData.keywords?.map((keyword, index) => (
-                  <Badge key={index} variant="outline" className="px-3 py-1">
+                  <Badge key={index} variant="outline" className="px-3 py-1 font-serif">
                     {keyword}
                     <Button 
                       variant="ghost" 
@@ -669,7 +695,7 @@ const AnimalForm: React.FC = () => {
                   value={newKeyword}
                   onChange={(e) => setNewKeyword(e.target.value)}
                   placeholder="Add a keyword"
-                  className="flex-1"
+                  className="flex-1 font-serif bg-background"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
@@ -677,13 +703,13 @@ const AnimalForm: React.FC = () => {
                     }
                   }}
                 />
-                <Button type="button" onClick={addKeyword}>Add</Button>
+                <Button type="button" onClick={addKeyword} className="font-serif">Add</Button>
               </div>
             </div>
           </div>
 
           {error && (
-            <div className="bg-destructive/15 text-destructive px-4 py-2 rounded-md mt-4">
+            <div className="bg-destructive/15 text-destructive px-4 py-2 rounded-md mt-4 font-serif">
               {error}
             </div>
           )}
@@ -693,10 +719,11 @@ const AnimalForm: React.FC = () => {
               type="button"
               variant="outline"
               onClick={() => navigate('/animals')}
+              className="font-serif"
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading} className="font-serif">
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isEditing ? 'Update Animal' : 'Create Animal'}
             </Button>
