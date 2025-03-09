@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
@@ -22,7 +23,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   animalTypes, 
   genderOptions, 
@@ -66,7 +66,6 @@ const AnimalForm: React.FC = () => {
   const [newKeyword, setNewKeyword] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [birthDate, setBirthDate] = useState<Date>(new Date());
-  const [activeTab, setActiveTab] = useState<string>('basic');
 
   useEffect(() => {
     if (isEditing && id) {
@@ -195,469 +194,470 @@ const AnimalForm: React.FC = () => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit}>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-            <TabsList className="grid grid-cols-3 mb-6">
-              <TabsTrigger value="basic">Basic Info</TabsTrigger>
-              <TabsTrigger value="birth">Birth Details</TabsTrigger>
-              <TabsTrigger value="additional">Additional Info</TabsTrigger>
-            </TabsList>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="mb-6">
+            <h3 className="text-lg font-medium">Basic Information</h3>
+            <Separator className="my-2" />
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name *</Label>
+              <Input
+                id="name"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                placeholder="Enter animal name"
+                required
+              />
+            </div>
 
-            <TabsContent value="basic" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Name *</Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    placeholder="Enter animal name"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="type">Animal Type *</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className="w-full justify-between"
-                      >
-                        {formData.type ? formData.type : "Select type..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Search animal type..." />
-                        <CommandEmpty>No type found.</CommandEmpty>
-                        <CommandGroup>
-                          {animalTypes.map((type) => (
-                            <CommandItem
-                              key={type}
-                              value={type}
-                              onSelect={() => handleSelectChange('type', type)}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  formData.type === type ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              {type}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="breed">Breed *</Label>
-                  <Input
-                    id="breed"
-                    name="breed"
-                    value={formData.breed}
-                    onChange={handleInputChange}
-                    placeholder="Enter breed"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="gender">Gender *</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className="w-full justify-between"
-                      >
-                        {genderOptions.find(option => option.value === formData.gender)?.label || "Select gender..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Search gender..." />
-                        <CommandEmpty>No gender found.</CommandEmpty>
-                        <CommandGroup>
-                          {genderOptions.map((option) => (
-                            <CommandItem
-                              key={option.value}
-                              value={option.value}
-                              onSelect={() => handleSelectChange('gender', option.value)}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  formData.gender === option.value ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              {option.label}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="birth_date">Birth Date *</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !formData.birth_date && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.birth_date ? format(new Date(formData.birth_date), 'PPP') : <span>Pick a date</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={birthDate}
-                        onSelect={handleDateChange}
-                        initialFocus
-                        className={cn("p-3 pointer-events-auto")}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="tag_number">Tag Number</Label>
-                  <Input
-                    id="tag_number"
-                    name="tag_number"
-                    value={formData.tag_number || ''}
-                    onChange={handleInputChange}
-                    placeholder="Enter tag number"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className="w-full justify-between"
-                      >
-                        {statusOptions.find(option => option.value === formData.status)?.label || "Select status..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Search status..." />
-                        <CommandEmpty>No status found.</CommandEmpty>
-                        <CommandGroup>
-                          {statusOptions.map((option) => (
-                            <CommandItem
-                              key={option.value}
-                              value={option.value}
-                              onSelect={() => handleSelectChange('status', option.value)}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  formData.status === option.value ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              {option.label}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="is_breeding_stock"
-                    checked={formData.is_breeding_stock}
-                    onCheckedChange={(checked) => 
-                      handleCheckboxChange('is_breeding_stock', checked === true)
-                    }
-                  />
-                  <Label htmlFor="is_breeding_stock">Breeding Stock</Label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="is_deceased"
-                    checked={formData.is_deceased}
-                    onCheckedChange={(checked) => 
-                      handleCheckboxChange('is_deceased', checked === true)
-                    }
-                  />
-                  <Label htmlFor="is_deceased">Deceased</Label>
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="birth" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="birth_status">Birth Status</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className="w-full justify-between"
-                      >
-                        {birthStatusOptions.find(option => option.value === formData.birth_status)?.label || "Select birth status..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Search birth status..." />
-                        <CommandEmpty>No birth status found.</CommandEmpty>
-                        <CommandGroup>
-                          {birthStatusOptions.map((option) => (
-                            <CommandItem
-                              key={option.value}
-                              value={option.value}
-                              onSelect={() => handleSelectChange('birth_status', option.value)}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  formData.birth_status === option.value ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              {option.label}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="health_at_birth">Health at Birth</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className="w-full justify-between"
-                      >
-                        {healthAtBirthOptions.find(option => option.value === formData.health_at_birth)?.label || "Select health status..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Search health status..." />
-                        <CommandEmpty>No health status found.</CommandEmpty>
-                        <CommandGroup>
-                          {healthAtBirthOptions.map((option) => (
-                            <CommandItem
-                              key={option.value}
-                              value={option.value}
-                              onSelect={() => handleSelectChange('health_at_birth', option.value)}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  formData.health_at_birth === option.value ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              {option.label}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="birth_weight">Birth Weight</Label>
-                  <div className="flex space-x-2">
-                    <Input
-                      id="birth_weight"
-                      name="birth_weight"
-                      type="number"
-                      value={formData.birth_weight || ''}
-                      onChange={handleInputChange}
-                      placeholder="Enter birth weight"
-                      className="flex-1"
-                    />
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          className="w-20"
+            <div className="space-y-2">
+              <Label htmlFor="type">Animal Type *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between"
+                  >
+                    {formData.type ? formData.type : "Select type..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0">
+                  <Command>
+                    <CommandInput placeholder="Search animal type..." />
+                    <CommandEmpty>No type found.</CommandEmpty>
+                    <CommandGroup>
+                      {animalTypes.map((type) => (
+                        <CommandItem
+                          key={type}
+                          value={type}
+                          onSelect={() => handleSelectChange('type', type)}
                         >
-                          {formData.weight_unit || 'kg'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-full p-0">
-                        <Command>
-                          <CommandGroup>
-                            <CommandItem onSelect={() => handleSelectChange('weight_unit', 'kg')}>
-                              <Check className={cn(
-                                "mr-2 h-4 w-4",
-                                formData.weight_unit === 'kg' ? "opacity-100" : "opacity-0"
-                              )}/>
-                              kg
-                            </CommandItem>
-                            <CommandItem onSelect={() => handleSelectChange('weight_unit', 'lb')}>
-                              <Check className={cn(
-                                "mr-2 h-4 w-4",
-                                formData.weight_unit === 'lb' ? "opacity-100" : "opacity-0"
-                              )}/>
-                              lb
-                            </CommandItem>
-                          </CommandGroup>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              formData.type === type ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {type}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="raised_purchased">Origin</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className="w-full justify-between"
-                      >
-                        {raisedPurchasedOptions.find(option => option.value === formData.raised_purchased)?.label || "Select origin..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Search origin..." />
-                        <CommandEmpty>No option found.</CommandEmpty>
-                        <CommandGroup>
-                          {raisedPurchasedOptions.map((option) => (
-                            <CommandItem
-                              key={option.value}
-                              value={option.value}
-                              onSelect={() => handleSelectChange('raised_purchased', option.value)}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  formData.raised_purchased === option.value ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              {option.label}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
+            <div className="space-y-2">
+              <Label htmlFor="breed">Breed *</Label>
+              <Input
+                id="breed"
+                name="breed"
+                value={formData.breed}
+                onChange={handleInputChange}
+                placeholder="Enter breed"
+                required
+              />
+            </div>
 
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="multiple_birth"
-                    checked={formData.multiple_birth}
-                    onCheckedChange={(checked) => 
-                      handleCheckboxChange('multiple_birth', checked === true)
-                    }
+            <div className="space-y-2">
+              <Label htmlFor="gender">Gender *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between"
+                  >
+                    {genderOptions.find(option => option.value === formData.gender)?.label || "Select gender..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0">
+                  <Command>
+                    <CommandInput placeholder="Search gender..." />
+                    <CommandEmpty>No gender found.</CommandEmpty>
+                    <CommandGroup>
+                      {genderOptions.map((option) => (
+                        <CommandItem
+                          key={option.value}
+                          value={option.value}
+                          onSelect={() => handleSelectChange('gender', option.value)}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              formData.gender === option.value ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {option.label}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="birth_date">Birth Date *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !formData.birth_date && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.birth_date ? format(new Date(formData.birth_date), 'PPP') : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={birthDate}
+                    onSelect={handleDateChange}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
                   />
-                  <Label htmlFor="multiple_birth">Multiple Birth</Label>
-                </div>
-              </div>
-            </TabsContent>
+                </PopoverContent>
+              </Popover>
+            </div>
 
-            <TabsContent value="additional" className="space-y-6">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Physical Traits</Label>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {formData.physical_traits?.map((trait, index) => (
-                      <Badge key={index} variant="secondary" className="px-3 py-1">
-                        {trait}
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-4 w-4 p-0 ml-2" 
-                          onClick={() => removeTrait(trait)}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </Badge>
-                    ))}
-                  </div>
-                  <div className="flex space-x-2">
-                    <Input
-                      value={newTrait}
-                      onChange={(e) => setNewTrait(e.target.value)}
-                      placeholder="Add a physical trait"
-                      className="flex-1"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addTrait();
-                        }
-                      }}
-                    />
-                    <Button type="button" onClick={addTrait}>Add</Button>
-                  </div>
-                </div>
+            <div className="space-y-2">
+              <Label htmlFor="tag_number">Tag Number</Label>
+              <Input
+                id="tag_number"
+                name="tag_number"
+                value={formData.tag_number || ''}
+                onChange={handleInputChange}
+                placeholder="Enter tag number"
+              />
+            </div>
 
-                <div className="space-y-2">
-                  <Label>Keywords</Label>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {formData.keywords?.map((keyword, index) => (
-                      <Badge key={index} variant="outline" className="px-3 py-1">
-                        {keyword}
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-4 w-4 p-0 ml-2" 
-                          onClick={() => removeKeyword(keyword)}
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between"
+                  >
+                    {statusOptions.find(option => option.value === formData.status)?.label || "Select status..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0">
+                  <Command>
+                    <CommandInput placeholder="Search status..." />
+                    <CommandEmpty>No status found.</CommandEmpty>
+                    <CommandGroup>
+                      {statusOptions.map((option) => (
+                        <CommandItem
+                          key={option.value}
+                          value={option.value}
+                          onSelect={() => handleSelectChange('status', option.value)}
                         >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </Badge>
-                    ))}
-                  </div>
-                  <div className="flex space-x-2">
-                    <Input
-                      value={newKeyword}
-                      onChange={(e) => setNewKeyword(e.target.value)}
-                      placeholder="Add a keyword"
-                      className="flex-1"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addKeyword();
-                        }
-                      }}
-                    />
-                    <Button type="button" onClick={addKeyword}>Add</Button>
-                  </div>
-                </div>
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              formData.status === option.value ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {option.label}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="is_breeding_stock"
+                checked={formData.is_breeding_stock}
+                onCheckedChange={(checked) => 
+                  handleCheckboxChange('is_breeding_stock', checked === true)
+                }
+              />
+              <Label htmlFor="is_breeding_stock">Breeding Stock</Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="is_deceased"
+                checked={formData.is_deceased}
+                onCheckedChange={(checked) => 
+                  handleCheckboxChange('is_deceased', checked === true)
+                }
+              />
+              <Label htmlFor="is_deceased">Deceased</Label>
+            </div>
+          </div>
+          
+          <div className="mb-6 mt-8">
+            <h3 className="text-lg font-medium">Birth Details</h3>
+            <Separator className="my-2" />
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="birth_status">Birth Status</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between"
+                  >
+                    {birthStatusOptions.find(option => option.value === formData.birth_status)?.label || "Select birth status..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0">
+                  <Command>
+                    <CommandInput placeholder="Search birth status..." />
+                    <CommandEmpty>No birth status found.</CommandEmpty>
+                    <CommandGroup>
+                      {birthStatusOptions.map((option) => (
+                        <CommandItem
+                          key={option.value}
+                          value={option.value}
+                          onSelect={() => handleSelectChange('birth_status', option.value)}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              formData.birth_status === option.value ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {option.label}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="health_at_birth">Health at Birth</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between"
+                  >
+                    {healthAtBirthOptions.find(option => option.value === formData.health_at_birth)?.label || "Select health status..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0">
+                  <Command>
+                    <CommandInput placeholder="Search health status..." />
+                    <CommandEmpty>No health status found.</CommandEmpty>
+                    <CommandGroup>
+                      {healthAtBirthOptions.map((option) => (
+                        <CommandItem
+                          key={option.value}
+                          value={option.value}
+                          onSelect={() => handleSelectChange('health_at_birth', option.value)}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              formData.health_at_birth === option.value ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {option.label}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="birth_weight">Birth Weight</Label>
+              <div className="flex space-x-2">
+                <Input
+                  id="birth_weight"
+                  name="birth_weight"
+                  type="number"
+                  value={formData.birth_weight || ''}
+                  onChange={handleInputChange}
+                  placeholder="Enter birth weight"
+                  className="flex-1"
+                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-20"
+                    >
+                      {formData.weight_unit || 'kg'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandGroup>
+                        <CommandItem onSelect={() => handleSelectChange('weight_unit', 'kg')}>
+                          <Check className={cn(
+                            "mr-2 h-4 w-4",
+                            formData.weight_unit === 'kg' ? "opacity-100" : "opacity-0"
+                          )}/>
+                          kg
+                        </CommandItem>
+                        <CommandItem onSelect={() => handleSelectChange('weight_unit', 'lb')}>
+                          <Check className={cn(
+                            "mr-2 h-4 w-4",
+                            formData.weight_unit === 'lb' ? "opacity-100" : "opacity-0"
+                          )}/>
+                          lb
+                        </CommandItem>
+                      </CommandGroup>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
-            </TabsContent>
-          </Tabs>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="raised_purchased">Origin</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between"
+                  >
+                    {raisedPurchasedOptions.find(option => option.value === formData.raised_purchased)?.label || "Select origin..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0">
+                  <Command>
+                    <CommandInput placeholder="Search origin..." />
+                    <CommandEmpty>No option found.</CommandEmpty>
+                    <CommandGroup>
+                      {raisedPurchasedOptions.map((option) => (
+                        <CommandItem
+                          key={option.value}
+                          value={option.value}
+                          onSelect={() => handleSelectChange('raised_purchased', option.value)}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              formData.raised_purchased === option.value ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {option.label}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="multiple_birth"
+                checked={formData.multiple_birth}
+                onCheckedChange={(checked) => 
+                  handleCheckboxChange('multiple_birth', checked === true)
+                }
+              />
+              <Label htmlFor="multiple_birth">Multiple Birth</Label>
+            </div>
+          </div>
+          
+          <div className="mb-6 mt-8">
+            <h3 className="text-lg font-medium">Additional Information</h3>
+            <Separator className="my-2" />
+          </div>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Physical Traits</Label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {formData.physical_traits?.map((trait, index) => (
+                  <Badge key={index} variant="secondary" className="px-3 py-1">
+                    {trait}
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-4 w-4 p-0 ml-2" 
+                      onClick={() => removeTrait(trait)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </Badge>
+                ))}
+              </div>
+              <div className="flex space-x-2">
+                <Input
+                  value={newTrait}
+                  onChange={(e) => setNewTrait(e.target.value)}
+                  placeholder="Add a physical trait"
+                  className="flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addTrait();
+                    }
+                  }}
+                />
+                <Button type="button" onClick={addTrait}>Add</Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Keywords</Label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {formData.keywords?.map((keyword, index) => (
+                  <Badge key={index} variant="outline" className="px-3 py-1">
+                    {keyword}
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-4 w-4 p-0 ml-2" 
+                      onClick={() => removeKeyword(keyword)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </Badge>
+                ))}
+              </div>
+              <div className="flex space-x-2">
+                <Input
+                  value={newKeyword}
+                  onChange={(e) => setNewKeyword(e.target.value)}
+                  placeholder="Add a keyword"
+                  className="flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addKeyword();
+                    }
+                  }}
+                />
+                <Button type="button" onClick={addKeyword}>Add</Button>
+              </div>
+            </div>
+          </div>
 
           {error && (
             <div className="bg-destructive/15 text-destructive px-4 py-2 rounded-md mt-4">
