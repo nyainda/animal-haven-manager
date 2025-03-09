@@ -17,7 +17,7 @@ export interface Animal {
   next_checkup_date: string | null;
   birth_weight: number | null;
   weight_unit: string | null;
-  birth_status: 'normal' | 'difficult' | 'ceasarean' | 'unknown';
+  birth_status: 'normal' | 'difficult' | 'cesarean' | 'unknown';
   colostrum_intake: string | null;
   health_at_birth: 'healthy' | 'weak' | 'sick' | 'unknown';
   vaccinations: string[];
@@ -45,7 +45,7 @@ export interface AnimalFormData {
   is_deceased?: boolean;
   birth_weight?: number | null;
   weight_unit?: string | null;
-  birth_status?: 'normal' | 'difficult' | 'ceasarean' | 'unknown';
+  birth_status?: 'normal' | 'difficult' | 'cesarean' | 'unknown';
   health_at_birth?: 'healthy' | 'weak' | 'sick' | 'unknown';
   multiple_birth?: boolean;
   raised_purchased?: 'raised' | 'purchased';
@@ -74,7 +74,7 @@ export const genderOptions = [
 export const birthStatusOptions = [
   { value: 'normal', label: 'Normal' },
   { value: 'difficult', label: 'Difficult' },
-  { value: 'ceasarean', label: 'Ceasarean' },
+  { value: 'cesarean', label: 'Cesarean' },
   { value: 'unknown', label: 'Unknown' }
 ];
 

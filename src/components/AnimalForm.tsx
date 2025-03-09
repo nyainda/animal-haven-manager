@@ -66,6 +66,13 @@ const AnimalForm: React.FC = () => {
   const [newKeyword, setNewKeyword] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [birthDate, setBirthDate] = useState<Date>(new Date());
+  const [openTypePopover, setOpenTypePopover] = useState(false);
+  const [openGenderPopover, setOpenGenderPopover] = useState(false);
+  const [openStatusPopover, setOpenStatusPopover] = useState(false);
+  const [openBirthStatusPopover, setOpenBirthStatusPopover] = useState(false);
+  const [openHealthPopover, setOpenHealthPopover] = useState(false);
+  const [openOriginPopover, setOpenOriginPopover] = useState(false);
+  const [openWeightUnitPopover, setOpenWeightUnitPopover] = useState(false);
 
   useEffect(() => {
     if (isEditing && id) {
@@ -160,10 +167,10 @@ const AnimalForm: React.FC = () => {
 
     try {
       if (isEditing && id) {
-        const updated = await updateAnimal(id, formData);
+        await updateAnimal(id, formData);
         toast.success('Animal updated successfully');
       } else {
-        const created = await createAnimal(formData);
+        await createAnimal(formData);
         toast.success('Animal created successfully');
       }
       navigate('/animals');
@@ -190,16 +197,11 @@ const AnimalForm: React.FC = () => {
       <CardHeader>
         <CardTitle>{isEditing ? 'Edit Animal' : 'Add New Animal'}</CardTitle>
         <CardDescription>
-          {isEditing ? 'Update the information for this animal' : 'Fill out the form to add a new animal'}
+          Enter all animal information in one form
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="mb-6">
-            <h3 className="text-lg font-medium">Basic Information</h3>
-            <Separator className="my-2" />
-          </div>
-          
+        <form onSubmit={handleSubmit} className="space-y-6">          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label htmlFor="name">Name *</Label>
@@ -215,11 +217,12 @@ const AnimalForm: React.FC = () => {
 
             <div className="space-y-2">
               <Label htmlFor="type">Animal Type *</Label>
-              <Popover>
+              <Popover open={openTypePopover} onOpenChange={setOpenTypePopover}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     role="combobox"
+                    aria-expanded={openTypePopover}
                     className="w-full justify-between"
                   >
                     {formData.type ? formData.type : "Select type..."}
@@ -235,7 +238,10 @@ const AnimalForm: React.FC = () => {
                         <CommandItem
                           key={type}
                           value={type}
-                          onSelect={() => handleSelectChange('type', type)}
+                          onSelect={() => {
+                            handleSelectChange('type', type);
+                            setOpenTypePopover(false);
+                          }}
                         >
                           <Check
                             className={cn(
@@ -266,11 +272,12 @@ const AnimalForm: React.FC = () => {
 
             <div className="space-y-2">
               <Label htmlFor="gender">Gender *</Label>
-              <Popover>
+              <Popover open={openGenderPopover} onOpenChange={setOpenGenderPopover}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     role="combobox"
+                    aria-expanded={openGenderPopover}
                     className="w-full justify-between"
                   >
                     {genderOptions.find(option => option.value === formData.gender)?.label || "Select gender..."}
@@ -286,7 +293,10 @@ const AnimalForm: React.FC = () => {
                         <CommandItem
                           key={option.value}
                           value={option.value}
-                          onSelect={() => handleSelectChange('gender', option.value)}
+                          onSelect={() => {
+                            handleSelectChange('gender', option.value);
+                            setOpenGenderPopover(false);
+                          }}
                         >
                           <Check
                             className={cn(
@@ -324,7 +334,7 @@ const AnimalForm: React.FC = () => {
                     selected={birthDate}
                     onSelect={handleDateChange}
                     initialFocus
-                    className={cn("p-3 pointer-events-auto")}
+                    className="bg-background"
                   />
                 </PopoverContent>
               </Popover>
@@ -343,18 +353,19 @@ const AnimalForm: React.FC = () => {
 
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
-              <Popover>
+              <Popover open={openStatusPopover} onOpenChange={setOpenStatusPopover}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     role="combobox"
+                    aria-expanded={openStatusPopover}
                     className="w-full justify-between"
                   >
                     {statusOptions.find(option => option.value === formData.status)?.label || "Select status..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-full p-0">
+                <PopoverContent className="w-full p-0 bg-background">
                   <Command>
                     <CommandInput placeholder="Search status..." />
                     <CommandEmpty>No status found.</CommandEmpty>
@@ -363,7 +374,10 @@ const AnimalForm: React.FC = () => {
                         <CommandItem
                           key={option.value}
                           value={option.value}
-                          onSelect={() => handleSelectChange('status', option.value)}
+                          onSelect={() => {
+                            handleSelectChange('status', option.value);
+                            setOpenStatusPopover(false);
+                          }}
                         >
                           <Check
                             className={cn(
@@ -401,28 +415,22 @@ const AnimalForm: React.FC = () => {
               />
               <Label htmlFor="is_deceased">Deceased</Label>
             </div>
-          </div>
           
-          <div className="mb-6 mt-8">
-            <h3 className="text-lg font-medium">Birth Details</h3>
-            <Separator className="my-2" />
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label htmlFor="birth_status">Birth Status</Label>
-              <Popover>
+              <Popover open={openBirthStatusPopover} onOpenChange={setOpenBirthStatusPopover}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     role="combobox"
+                    aria-expanded={openBirthStatusPopover}
                     className="w-full justify-between"
                   >
                     {birthStatusOptions.find(option => option.value === formData.birth_status)?.label || "Select birth status..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-full p-0">
+                <PopoverContent className="w-full p-0 bg-background">
                   <Command>
                     <CommandInput placeholder="Search birth status..." />
                     <CommandEmpty>No birth status found.</CommandEmpty>
@@ -431,7 +439,10 @@ const AnimalForm: React.FC = () => {
                         <CommandItem
                           key={option.value}
                           value={option.value}
-                          onSelect={() => handleSelectChange('birth_status', option.value)}
+                          onSelect={() => {
+                            handleSelectChange('birth_status', option.value);
+                            setOpenBirthStatusPopover(false);
+                          }}
                         >
                           <Check
                             className={cn(
@@ -450,18 +461,19 @@ const AnimalForm: React.FC = () => {
 
             <div className="space-y-2">
               <Label htmlFor="health_at_birth">Health at Birth</Label>
-              <Popover>
+              <Popover open={openHealthPopover} onOpenChange={setOpenHealthPopover}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     role="combobox"
+                    aria-expanded={openHealthPopover}
                     className="w-full justify-between"
                   >
                     {healthAtBirthOptions.find(option => option.value === formData.health_at_birth)?.label || "Select health status..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-full p-0">
+                <PopoverContent className="w-full p-0 bg-background">
                   <Command>
                     <CommandInput placeholder="Search health status..." />
                     <CommandEmpty>No health status found.</CommandEmpty>
@@ -470,7 +482,10 @@ const AnimalForm: React.FC = () => {
                         <CommandItem
                           key={option.value}
                           value={option.value}
-                          onSelect={() => handleSelectChange('health_at_birth', option.value)}
+                          onSelect={() => {
+                            handleSelectChange('health_at_birth', option.value);
+                            setOpenHealthPopover(false);
+                          }}
                         >
                           <Check
                             className={cn(
@@ -499,27 +514,38 @@ const AnimalForm: React.FC = () => {
                   placeholder="Enter birth weight"
                   className="flex-1"
                 />
-                <Popover>
+                <Popover open={openWeightUnitPopover} onOpenChange={setOpenWeightUnitPopover}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       role="combobox"
+                      aria-expanded={openWeightUnitPopover}
                       className="w-20"
                     >
                       {formData.weight_unit || 'kg'}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-full p-0">
+                  <PopoverContent className="w-[80px] p-0 bg-background">
                     <Command>
                       <CommandGroup>
-                        <CommandItem onSelect={() => handleSelectChange('weight_unit', 'kg')}>
+                        <CommandItem 
+                          onSelect={() => {
+                            handleSelectChange('weight_unit', 'kg');
+                            setOpenWeightUnitPopover(false);
+                          }}
+                        >
                           <Check className={cn(
                             "mr-2 h-4 w-4",
                             formData.weight_unit === 'kg' ? "opacity-100" : "opacity-0"
                           )}/>
                           kg
                         </CommandItem>
-                        <CommandItem onSelect={() => handleSelectChange('weight_unit', 'lb')}>
+                        <CommandItem 
+                          onSelect={() => {
+                            handleSelectChange('weight_unit', 'lb');
+                            setOpenWeightUnitPopover(false);
+                          }}
+                        >
                           <Check className={cn(
                             "mr-2 h-4 w-4",
                             formData.weight_unit === 'lb' ? "opacity-100" : "opacity-0"
@@ -535,18 +561,19 @@ const AnimalForm: React.FC = () => {
 
             <div className="space-y-2">
               <Label htmlFor="raised_purchased">Origin</Label>
-              <Popover>
+              <Popover open={openOriginPopover} onOpenChange={setOpenOriginPopover}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     role="combobox"
+                    aria-expanded={openOriginPopover}
                     className="w-full justify-between"
                   >
                     {raisedPurchasedOptions.find(option => option.value === formData.raised_purchased)?.label || "Select origin..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-full p-0">
+                <PopoverContent className="w-full p-0 bg-background">
                   <Command>
                     <CommandInput placeholder="Search origin..." />
                     <CommandEmpty>No option found.</CommandEmpty>
@@ -555,7 +582,10 @@ const AnimalForm: React.FC = () => {
                         <CommandItem
                           key={option.value}
                           value={option.value}
-                          onSelect={() => handleSelectChange('raised_purchased', option.value)}
+                          onSelect={() => {
+                            handleSelectChange('raised_purchased', option.value);
+                            setOpenOriginPopover(false);
+                          }}
                         >
                           <Check
                             className={cn(
@@ -582,15 +612,8 @@ const AnimalForm: React.FC = () => {
               />
               <Label htmlFor="multiple_birth">Multiple Birth</Label>
             </div>
-          </div>
           
-          <div className="mb-6 mt-8">
-            <h3 className="text-lg font-medium">Additional Information</h3>
-            <Separator className="my-2" />
-          </div>
-          
-          <div className="space-y-4">
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-2">
               <Label>Physical Traits</Label>
               <div className="flex flex-wrap gap-2 mb-2">
                 {formData.physical_traits?.map((trait, index) => (
@@ -624,7 +647,7 @@ const AnimalForm: React.FC = () => {
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-2">
               <Label>Keywords</Label>
               <div className="flex flex-wrap gap-2 mb-2">
                 {formData.keywords?.map((keyword, index) => (
