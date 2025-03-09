@@ -22,6 +22,7 @@ import AnimalActivities from "./pages/animal/AnimalActivities";
 import AnimalBreedings from "./pages/animal/AnimalBreedings";
 import AnimalHealth from "./pages/animal/AnimalHealth";
 import AnimalNotes from "./pages/animal/AnimalNotes";
+import AnimalNoteForm from "./pages/animal/AnimalNoteForm";
 import AnimalProduction from "./pages/animal/AnimalProduction";
 
 const queryClient = new QueryClient();
@@ -68,9 +69,9 @@ const App = () => (
               
               {/* Animal Notes */}
               <Route path="/animals/:id/notes" element={<AnimalNotes />} />
-              <Route path="/animals/:id/notes/new" element={<AnimalNotes />} />
+              <Route path="/animals/:id/notes/new" element={<AnimalNoteForm />} />
               <Route path="/animals/:id/notes/:noteId" element={<AnimalNotes />} />
-              <Route path="/animals/:id/notes/:noteId/edit" element={<AnimalNotes />} />
+              <Route path="/animals/:id/notes/:noteId/edit" element={<AnimalNoteForm />} />
               
               {/* Animal Production */}
               <Route path="/animals/:id/production" element={<AnimalProduction />} />
