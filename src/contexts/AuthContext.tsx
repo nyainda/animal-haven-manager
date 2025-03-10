@@ -2,12 +2,9 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
-//const API_BASE_URL = 'http://127.0.0.1:8000/api';
-//const CSRF_URL = 'http://127.0.0.1:8000/sanctum/csrf-cookie';
-
+// Configurable API endpoints
 const API_BASE_URL = 'https://animal-management-master-wyohh0.laravel.cloud/api';
 const CSRF_URL = 'https://animal-management-master-wyohh0.laravel.cloud/sanctum/csrf-cookie';
-
 
 interface User {
   id: string;
@@ -42,21 +39,45 @@ const logError = (endpoint: string, error: any) => {
   console.error(`[AUTH] Error from ${endpoint}:`, error);
 };
 
-// Fetch CSRF token
-const fetchCsrfToken = async () => {
+// Improved CSRF token fetch with better error handling and retry mechanism
+const fetchCsrfToken = async (retryCount = 0): Promise<boolean> => {
+  if (retryCount > 2) {
+    console.warn('[AUTH] Max CSRF fetch retries reached, proceeding without CSRF token');
+    return false;
+  }
+  
   try {
+    console.log('[AUTH] Fetching CSRF token...');
     const response = await fetch(CSRF_URL, {
       method: 'GET',
       credentials: 'include',
+      mode: 'cors',
+      headers: {
+        'Accept': 'application/json',
+      }
     });
-    if (!response.ok) throw new Error('Failed to fetch CSRF token');
-    console.log('[AUTH] CSRF token fetched');
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch CSRF token: ${response.status} ${response.statusText}`);
+    }
+    
+    console.log('[AUTH] CSRF token fetched successfully');
+    return true;
   } catch (error) {
-    console.warn('[AUTH] CSRF fetch failed, proceeding anyway:', error);
+    console.warn(`[AUTH] CSRF fetch attempt ${retryCount + 1} failed:`, error);
+    
+    // Wait a bit before retrying
+    if (retryCount < 2) {
+      console.log(`[AUTH] Retrying CSRF fetch in ${(retryCount + 1) * 1000}ms...`);
+      await new Promise(r => setTimeout(r, (retryCount + 1) * 1000));
+      return fetchCsrfToken(retryCount + 1);
+    }
+    
+    return false;
   }
 };
 
-// Helper function for API requests
+// Helper function for API requests with improved error handling
 const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
   const token = localStorage.getItem('auth_token');
   
@@ -71,14 +92,18 @@ const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
     .split('; ')
     .find(row => row.startsWith('XSRF-TOKEN='))
     ?.split('=')[1];
+  
   if (xsrfToken) {
     defaultHeaders['X-XSRF-TOKEN'] = decodeURIComponent(xsrfToken);
+  } else {
+    console.warn('[AUTH] X-XSRF-TOKEN cookie not found, proceeding without CSRF protection');
   }
 
   const requestOptions = {
     ...options,
     headers: { ...defaultHeaders, ...options.headers },
     credentials: 'include', // Include cookies for Sanctum
+    mode: 'cors' as RequestMode, // Explicitly set CORS mode
   };
   
   logRequest(endpoint, requestOptions, options.body);
@@ -97,7 +122,13 @@ const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
     }
     
     return responseData;
-  } catch (error) {
+  } catch (error: any) {
+    // Enhanced error logging with more context
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      console.error('[AUTH] Network error - server might be unreachable:', error);
+      throw new Error('Network error: Unable to connect to the server. Please check your internet connection and try again.');
+    }
+    
     logError(endpoint, error);
     throw error;
   }
@@ -115,7 +146,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const userData = await apiFetch('/user');
       return userData.data || userData; // Adjust based on response structure
-    } catch (error) {
+    } catch (error: any) {
+      if (error.status === 401) {
+        console.log('[AUTH] User not authenticated');
+        return null;
+      }
       console.error('[AUTH] Error fetching user data:', error);
       return null;
     }
@@ -131,7 +166,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       try {
-        await fetchCsrfToken(); // Fetch CSRF on initial load
+        const csrfSuccess = await fetchCsrfToken(); // Fetch CSRF on initial load
+        if (!csrfSuccess) {
+          console.warn('[AUTH] Proceeding without CSRF token');
+        }
+        
         const userData = await fetchCurrentUser();
         if (userData) {
           setUser(userData);
@@ -153,12 +192,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkAuth();
   }, []);
 
+  // Improved auth operations with better error handling
+  
   const login = async (email: string, password: string) => {
     setLoading(true);
     setError(null);
     
     try {
-      await fetchCsrfToken();
+      const csrfSuccess = await fetchCsrfToken();
+      if (!csrfSuccess) {
+        console.warn('[AUTH] Proceeding with login without CSRF token');
+      }
+      
       const response = await apiFetch('/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
@@ -193,7 +238,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     
     try {
-      await fetchCsrfToken();
+      const csrfSuccess = await fetchCsrfToken();
+      if (!csrfSuccess) {
+        console.warn('[AUTH] Proceeding with registration without CSRF token');
+      }
+      
       await apiFetch('/register', {
         method: 'POST',
         body: JSON.stringify({ name, email, password, password_confirmation }),
@@ -212,11 +261,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      await fetchCsrfToken();
+      const csrfSuccess = await fetchCsrfToken();
+      if (!csrfSuccess) {
+        console.warn('[AUTH] Proceeding with logout without CSRF token');
+      }
+      
       await apiFetch('/logout', { method: 'POST' });
     } catch (error) {
       console.error('[AUTH] Logout error:', error);
     } finally {
+      // Always clear local storage even if the request fails
       setUser(null);
       localStorage.removeItem('user');
       localStorage.removeItem('auth_token');
@@ -230,7 +284,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     
     try {
-      await fetchCsrfToken();
+      const csrfSuccess = await fetchCsrfToken();
+      if (!csrfSuccess) {
+        console.warn('[AUTH] Proceeding with password reset request without CSRF token');
+      }
+      
       await apiFetch('/forgot-password', {
         method: 'POST',
         body: JSON.stringify({ email }),
@@ -252,7 +310,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     
     try {
-      await fetchCsrfToken();
+      const csrfSuccess = await fetchCsrfToken();
+      if (!csrfSuccess) {
+        console.warn('[AUTH] Proceeding with password reset without CSRF token');
+      }
+      
       await apiFetch('/reset-password', {
         method: 'POST',
         body: JSON.stringify({ token, email, password, password_confirmation }),
@@ -293,7 +355,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     
     try {
-      await fetchCsrfToken();
+      const csrfSuccess = await fetchCsrfToken();
+      if (!csrfSuccess) {
+        console.warn('[AUTH] Proceeding with email verification resend without CSRF token');
+      }
+      
       await apiFetch('/email/verification-notification', { method: 'POST' });
       toast.success('Verification email resent!');
     } catch (err: any) {
