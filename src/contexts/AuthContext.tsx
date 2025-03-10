@@ -2,8 +2,12 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api';
-const CSRF_URL = 'http://127.0.0.1:8000/sanctum/csrf-cookie';
+//const API_BASE_URL = 'http://127.0.0.1:8000/api';
+//const CSRF_URL = 'http://127.0.0.1:8000/sanctum/csrf-cookie';
+
+const API_BASE_URL = 'https://animal-management-master-wyohh0.laravel.cloud/api';
+const CSRF_URL = 'https://animal-management-master-wyohh0.laravel.cloud/sanctum/csrf-cookie';
+
 
 interface User {
   id: string;
