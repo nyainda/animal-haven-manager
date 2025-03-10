@@ -306,12 +306,42 @@ const Dashboard: React.FC = () => {
               <span className={`mx-4 font-medium ${activeTab === 'overview' && 'text-primary'}`}>Dashboard</span>
             </div>
           </div>
+          
           <div className="px-4 py-2 hover:bg-sidebar-accent cursor-pointer" onClick={() => navigate('/animals')}>
             <div className="flex items-center">
               <Dog className="h-5 w-5 text-sidebar-foreground" />
               <span className="mx-4 font-medium">Animals</span>
             </div>
           </div>
+
+          <div className="px-4 py-2 hover:bg-sidebar-accent cursor-pointer" onClick={() => navigate('/forms/note')}>
+  <div className="flex items-center">
+    <FileText className="h-5 w-5 text-sidebar-foreground" />
+    <span className="mx-4 font-medium">Notes</span>
+  </div>
+</div>
+
+<div className="px-4 py-2 hover:bg-sidebar-accent cursor-pointer" onClick={() => navigate('/forms/feeding')}>
+  <div className="flex items-center">
+    <FileText className="h-5 w-5 text-sidebar-foreground" />
+    <span className="mx-4 font-medium">Notes</span>
+  </div>
+</div>
+
+<div className="px-4 py-2 hover:bg-sidebar-accent cursor-pointer" onClick={() => navigate('/forms/transaction')}>
+  <div className="flex items-center">
+    <FileText className="h-5 w-5 text-sidebar-foreground" />
+    <span className="mx-4 font-medium">Notes</span>
+  </div>
+</div>
+
+<div className="px-4 py-2 hover:bg-sidebar-accent cursor-pointer" onClick={() => navigate('/forms/task')}>
+  <div className="flex items-center">
+    <FileText className="h-5 w-5 text-sidebar-foreground" />
+    <span className="mx-4 font-medium">Notes</span>
+  </div>
+</div>
+          
           <div className={`px-4 py-2 hover:bg-sidebar-accent cursor-pointer ${activeTab === 'activity' && 'bg-sidebar-accent border-l-4 border-primary'}`} onClick={() => setActiveTab('activity')}>
             <div className="flex items-center">
               <ActivityIcon className={`h-5 w-5 ${activeTab === 'activity' ? 'text-primary' : 'text-sidebar-foreground'}`} />

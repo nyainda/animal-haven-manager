@@ -1,28 +1,24 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
-import { CalendarIcon, Check, ChevronsUpDown, Loader2, Save, X } from 'lucide-react';
+import { CalendarIcon, Check, ChevronDown, Loader2, Save, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from "@/components/ui/command";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   animalTypes, 
   breedsByType,
@@ -45,39 +41,44 @@ const AnimalForm: React.FC = () => {
   const [formData, setFormData] = useState<AnimalFormData>({
     name: '',
     type: 'cattle',
-    breed: '',
-    gender: 'unknown',
+    breed: breedsByType['cattle'][0],
+    gender: 'male',
     birth_date: format(new Date(), 'yyyy-MM-dd'),
-    birth_time: format(new Date(), 'HH:mm:ss'),
-    tag_number: '',
+    birth_time: '', // Default to empty string, not required
+    tag_number: undefined,
     status: 'Active',
     is_breeding_stock: false,
     is_deceased: false,
-    birth_weight: null,
+    birth_weight: undefined,
     weight_unit: 'kg',
     birth_status: 'normal',
+    colostrum_intake: null,
     health_at_birth: 'healthy',
+    vaccinations: [],
+    milk_feeding: null,
     multiple_birth: false,
+    birth_order: null,
+    gestation_length: null,
+    breeder_info: null,
     raised_purchased: 'raised',
+    birth_photos: null,
     physical_traits: [],
     keywords: []
   });
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isFetching, setIsFetching] = useState<boolean>(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [newTrait, setNewTrait] = useState<string>('');
   const [newKeyword, setNewKeyword] = useState<string>('');
-  const [error, setError] = useState<string | null>(null);
+  const [newVaccination, setNewVaccination] = useState<string>('');
   const [birthDate, setBirthDate] = useState<Date>(new Date());
-  
-  // Dropdown states
-  const [breedOptions, setBreedOptions] = useState<string[]>(breedsByType[formData.type] || []);
-  
+  const [nextCheckupDate, setNextCheckupDate] = useState<Date | undefined>(undefined);
+  const [breedOptions, setBreedOptions] = useState<string[]>(breedsByType[formData.type]);
+
   useEffect(() => {
-    // Update breed options when animal type changes
-    setBreedOptions(breedsByType[formData.type] || []);
-    
-    // If switching type, select the first breed from the new options
-    if (breedsByType[formData.type] && !breedsByType[formData.type].includes(formData.breed)) {
+    setBreedOptions(breedsByType[formData.type]);
+    if (!breedsByType[formData.type].includes(formData.breed)) {
       setFormData(prev => ({ ...prev, breed: breedsByType[formData.type][0] }));
     }
   }, [formData.type]);
@@ -85,136 +86,188 @@ const AnimalForm: React.FC = () => {
   useEffect(() => {
     if (isEditing && id) {
       const loadAnimal = async () => {
-        setIsLoading(true);
+        setIsFetching(true);
         try {
           const animal = await fetchAnimal(id);
+          const birthDateTime = animal.birth_date ? parseISO(animal.birth_date) : new Date();
+          const nextCheckup = animal.next_checkup_date ? parseISO(animal.next_checkup_date) : undefined;
           const formattedData: AnimalFormData = {
             ...animal,
-            birth_date: animal.birth_date ? animal.birth_date.split('T')[0] : format(new Date(), 'yyyy-MM-dd'),
+            birth_date: format(birthDateTime, 'yyyy-MM-dd'),
+            birth_time: animal.birth_time || '', // Ensure empty string if null
+            tag_number: animal.tag_number || undefined,
+            birth_weight: animal.birth_weight || undefined,
+            colostrum_intake: animal.colostrum_intake || null,
+            vaccinations: animal.vaccinations || [],
+            milk_feeding: animal.milk_feeding || null,
+            birth_order: animal.birth_order || null,
+            gestation_length: animal.gestation_length || null,
+            breeder_info: animal.breeder_info || null,
+            birth_photos: animal.birth_photos || null,
+            physical_traits: animal.physical_traits || [],
+            keywords: animal.keywords || []
           };
           setFormData(formattedData);
-          if (animal.birth_date) {
-            setBirthDate(parseISO(animal.birth_date));
-          }
-          
-          // Update breed options based on the loaded animal type
-          setBreedOptions(breedsByType[animal.type] || []);
-          
+          setBirthDate(birthDateTime);
+          setNextCheckupDate(nextCheckup);
+          setBreedOptions(breedsByType[animal.type]);
+          toast.success('Animal data loaded successfully');
         } catch (error) {
           console.error('Error loading animal:', error);
-          toast.error('Failed to load animal data');
-          setError('Failed to load animal data');
+          toast.error('Failed to load animal data. You can still edit the form with default values.');
         } finally {
-          setIsLoading(false);
+          setIsFetching(false);
         }
       };
-
       loadAnimal();
     }
   }, [id, isEditing]);
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const parsedValue = 
+      name === 'birth_weight' || name === 'birth_order' || name === 'gestation_length'
+        ? (value === '' ? null : Number(value))
+        : value;
+    setFormData(prev => ({ ...prev, [name]: parsedValue }));
+    if (formErrors[name]) {
+      setFormErrors(prev => ({ ...prev, [name]: '' }));
+    }
   };
 
-  const handleCheckboxChange = (name: string, checked: boolean) => {
-    setFormData((prev) => ({ ...prev, [name]: checked }));
+  const handleCheckboxChange = (name: keyof AnimalFormData) => (checked: boolean) => {
+    setFormData(prev => ({ ...prev, [name]: checked }));
   };
 
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [name]: value }));
+  const handleSelectChange = (name: keyof AnimalFormData, value: string) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (formErrors[name]) {
+      setFormErrors(prev => ({ ...prev, [name]: '' }));
+    }
   };
 
   const handleDateChange = (date: Date | undefined) => {
     if (date) {
       setBirthDate(date);
-      setFormData((prev) => ({ 
-        ...prev, 
-        birth_date: format(date, 'yyyy-MM-dd') 
-      }));
+      setFormData(prev => ({ ...prev, birth_date: format(date, 'yyyy-MM-dd') }));
+      if (formErrors.birth_date) {
+        setFormErrors(prev => ({ ...prev, birth_date: '' }));
+      }
     }
   };
 
-  const addTrait = () => {
-    if (newTrait.trim()) {
-      setFormData((prev) => ({
+  const handleNextCheckupDateChange = (date: Date | undefined) => {
+    setNextCheckupDate(date);
+  };
+
+  const addItem = (field: 'physical_traits' | 'keywords' | 'vaccinations', value: string, setter: (value: string) => void) => {
+    if (value.trim()) {
+      setFormData(prev => ({
         ...prev,
-        physical_traits: [...(prev.physical_traits || []), newTrait.trim()]
+        [field]: [...(prev[field] || []), value.trim()]
       }));
-      setNewTrait('');
+      setter('');
     }
   };
 
-  const removeTrait = (trait: string) => {
-    setFormData((prev) => ({
+  const removeItem = (field: 'physical_traits' | 'keywords' | 'vaccinations', value: string) => {
+    setFormData(prev => ({
       ...prev,
-      physical_traits: (prev.physical_traits || []).filter((t) => t !== trait)
+      [field]: (prev[field] || []).filter((item: string) => item !== value)
     }));
   };
 
-  const addKeyword = () => {
-    if (newKeyword.trim()) {
-      setFormData((prev) => ({
-        ...prev,
-        keywords: [...(prev.keywords || []), newKeyword.trim()]
-      }));
-      setNewKeyword('');
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+    
+    if (!formData.name.trim()) {
+      errors.name = 'Name is required';
     }
-  };
+    if (!formData.birth_date) {
+      errors.birth_date = 'Birth date is required';
+    }
+    if (formData.birth_weight && formData.birth_weight < 0) {
+      errors.birth_weight = 'Birth weight cannot be negative';
+    }
+    if (formData.birth_order && formData.birth_order < 0) {
+      errors.birth_order = 'Birth order cannot be negative';
+    }
+    if (formData.gestation_length && formData.gestation_length < 0) {
+      errors.gestation_length = 'Gestation length cannot be negative';
+    }
+    if (formData.tag_number && isNaN(Number(formData.tag_number))) {
+      errors.tag_number = 'Tag number must be numeric';
+    }
+    // No validation for birth_time - it's optional
 
-  const removeKeyword = (keyword: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      keywords: (prev.keywords || []).filter((k) => k !== keyword)
-    }));
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateForm()) {
+      toast.error('Please fix the form errors before submitting');
+      return;
+    }
+
     setIsLoading(true);
-    setError(null);
+    const submissionData: Partial<Animal> = {
+      ...formData,
+      birth_time: formData.birth_time || null, // Send null if empty
+      next_checkup_date: nextCheckupDate ? format(nextCheckupDate, 'yyyy-MM-dd') : null,
+    };
 
     try {
       if (isEditing && id) {
-        await updateAnimal(id, formData);
+        await updateAnimal(id, submissionData);
         toast.success('Animal updated successfully');
       } else {
-        await createAnimal(formData);
+        await createAnimal(submissionData as AnimalFormData);
         toast.success('Animal created successfully');
       }
       navigate('/animals');
     } catch (error: any) {
       console.error('Error saving animal:', error);
-      setError(error.message || 'Failed to save animal');
-      toast.error(error.message || 'Failed to save animal');
+      const errorMessage = error.message || 'Failed to save animal';
+      if (errorMessage.includes('birth time field must be a valid date')) {
+        setFormErrors(prev => ({
+          ...prev,
+          birth_time: 'Please enter a valid time (HH:mm:ss) or leave it blank',
+        }));
+        toast.error('Update failed: Invalid birth time format');
+      } else if (errorMessage.includes('tag number has already been taken')) {
+        setFormErrors(prev => ({
+          ...prev,
+          tag_number: 'This tag number is already in use by another animal',
+        }));
+        toast.error('Update failed: Tag number conflict');
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (isLoading && isEditing) {
-    return (
-      <div className="w-full h-64 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2 text-lg font-serif">Loading animal data...</span>
-      </div>
-    );
-  }
-
   return (
     <Card className="w-full max-w-4xl mx-auto shadow-md border-border">
       <CardHeader className="bg-card">
-        <CardTitle className="font-serif text-2xl">{isEditing ? 'Edit Animal' : 'Add New Animal'}</CardTitle>
-        <CardDescription className="font-serif">
-          Enter all animal information in this form
-        </CardDescription>
+        <CardTitle className="font-serif text-2xl">
+          {isEditing ? 'Edit Animal' : 'Add New Animal'}
+          {isFetching && (
+            <span className="ml-2 text-sm text-muted-foreground">
+              <Loader2 className="inline h-4 w-4 animate-spin" /> Loading data...
+            </span>
+          )}
+        </CardTitle>
       </CardHeader>
       <CardContent className="bg-card pt-6">
-        <form onSubmit={handleSubmit} className="space-y-6">          
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Name */}
             <div className="space-y-2">
               <Label htmlFor="name" className="font-serif">Name *</Label>
               <Input
@@ -223,165 +276,122 @@ const AnimalForm: React.FC = () => {
                 value={formData.name}
                 onChange={handleInputChange}
                 placeholder="Enter animal name"
-                className="font-serif bg-background"
-                required
+                className={cn("font-serif bg-background", formErrors.name && "border-destructive")}
+                disabled={isLoading}
               />
+              {formErrors.name && <p className="text-destructive text-sm">{formErrors.name}</p>}
             </div>
 
+            {/* Animal Type */}
             <div className="space-y-2">
               <Label htmlFor="type" className="font-serif">Animal Type *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    id="type"
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={true}
-                    className="w-full justify-between font-serif bg-background"
-                  >
-                    {formData.type || "Select type..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0 bg-background border border-border shadow-md">
-                  <Command className="bg-background">
-                    <CommandInput placeholder="Search animal type..." className="font-serif" />
-                    <CommandEmpty className="font-serif">No type found.</CommandEmpty>
-                    <CommandGroup className="bg-background max-h-[200px] overflow-y-auto">
-                      {animalTypes.map((type) => (
-                        <CommandItem
-                          key={type}
-                          value={type}
-                          onSelect={() => {
-                            handleSelectChange('type', type);
-                          }}
-                          className="font-serif"
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              formData.type === type ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {type}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <Select 
+                value={formData.type} 
+                onValueChange={(value) => handleSelectChange('type', value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger className="w-full font-serif bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="font-serif bg-background">
+                  {animalTypes.map((type) => (
+                    <SelectItem key={type} value={type} className="font-serif">
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
+            {/* Breed */}
             <div className="space-y-2">
               <Label htmlFor="breed" className="font-serif">Breed *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    id="breed"
-                    variant="outline"
-                    role="combobox"
-                    className="w-full justify-between font-serif bg-background"
-                  >
-                    {formData.breed || "Select breed..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0 bg-background border border-border shadow-md">
-                  <Command className="bg-background">
-                    <CommandInput placeholder="Search breed..." className="font-serif" />
-                    <CommandEmpty className="font-serif">No breed found.</CommandEmpty>
-                    <CommandGroup className="bg-background max-h-[200px] overflow-y-auto">
-                      {breedOptions.map((breed) => (
-                        <CommandItem
-                          key={breed}
-                          value={breed}
-                          onSelect={() => handleSelectChange('breed', breed)}
-                          className="font-serif"
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              formData.breed === breed ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {breed}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <Select 
+                value={formData.breed} 
+                onValueChange={(value) => handleSelectChange('breed', value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger className="w-full font-serif bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="font-serif bg-background">
+                  {breedOptions.map((breed) => (
+                    <SelectItem key={breed} value={breed} className="font-serif">
+                      {breed}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
+            {/* Gender */}
             <div className="space-y-2">
               <Label htmlFor="gender" className="font-serif">Gender *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    id="gender"
-                    variant="outline"
-                    role="combobox"
-                    className="w-full justify-between font-serif bg-background"
-                  >
-                    {genderOptions.find(option => option.value === formData.gender)?.label || "Select gender..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0 bg-background border border-border shadow-md">
-                  <Command className="bg-background">
-                    <CommandInput placeholder="Search gender..." className="font-serif" />
-                    <CommandEmpty className="font-serif">No gender found.</CommandEmpty>
-                    <CommandGroup className="bg-background">
-                      {genderOptions.map((option) => (
-                        <CommandItem
-                          key={option.value}
-                          value={option.value}
-                          onSelect={() => handleSelectChange('gender', option.value)}
-                          className="font-serif"
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              formData.gender === option.value ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {option.label}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <Select 
+                value={formData.gender} 
+                onValueChange={(value) => handleSelectChange('gender', value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger className="w-full font-serif bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="font-serif bg-background">
+                  {genderOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value} className="font-serif">
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
+            {/* Birth Date */}
             <div className="space-y-2">
               <Label htmlFor="birth_date" className="font-serif">Birth Date *</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
-                    id="birth_date"
                     variant="outline"
                     className={cn(
                       "w-full justify-start text-left font-normal font-serif bg-background",
-                      !formData.birth_date && "text-muted-foreground"
+                      formErrors.birth_date && "border-destructive"
                     )}
+                    disabled={isLoading}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {formData.birth_date ? format(new Date(formData.birth_date), 'PPP') : <span>Pick a date</span>}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 bg-card border border-border shadow-md" align="start">
+                <PopoverContent className="w-auto p-0 bg-card border border-border shadow-md">
                   <Calendar
                     mode="single"
                     selected={birthDate}
                     onSelect={handleDateChange}
                     initialFocus
                     className="bg-card"
+                    disabled={isLoading}
                   />
                 </PopoverContent>
               </Popover>
+              {formErrors.birth_date && <p className="text-destructive text-sm">{formErrors.birth_date}</p>}
             </div>
 
+            {/* Birth Time */}
+            <div className="space-y-2">
+              <Label htmlFor="birth_time" className="font-serif">Birth Time (Optional)</Label>
+              <Input
+                id="birth_time"
+                name="birth_time"
+                value={formData.birth_time}
+                onChange={handleInputChange}
+                placeholder="HH:mm:ss (optional)"
+                className={cn("font-serif bg-background", formErrors.birth_time && "border-destructive")}
+                disabled={isLoading}
+              />
+              {formErrors.birth_time && <p className="text-destructive text-sm">{formErrors.birth_time}</p>}
+            </div>
+
+            {/* Tag Number */}
             <div className="space-y-2">
               <Label htmlFor="tag_number" className="font-serif">Tag Number</Label>
               <Input
@@ -390,157 +400,88 @@ const AnimalForm: React.FC = () => {
                 value={formData.tag_number || ''}
                 onChange={handleInputChange}
                 placeholder="Enter tag number"
-                className="font-serif bg-background"
+                className={cn("font-serif bg-background", formErrors.tag_number && "border-destructive")}
+                disabled={isLoading}
               />
+              {formErrors.tag_number && <p className="text-destructive text-sm">{formErrors.tag_number}</p>}
             </div>
 
+            {/* Status */}
             <div className="space-y-2">
               <Label htmlFor="status" className="font-serif">Status</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    id="status"
-                    variant="outline"
-                    role="combobox"
-                    className="w-full justify-between font-serif bg-background"
-                  >
-                    {statusOptions.find(option => option.value === formData.status)?.label || "Select status..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0 bg-background border border-border shadow-md">
-                  <Command className="bg-background">
-                    <CommandInput placeholder="Search status..." className="font-serif" />
-                    <CommandEmpty className="font-serif">No status found.</CommandEmpty>
-                    <CommandGroup className="bg-background">
-                      {statusOptions.map((option) => (
-                        <CommandItem
-                          key={option.value}
-                          value={option.value}
-                          onSelect={() => handleSelectChange('status', option.value)}
-                          className="font-serif"
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              formData.status === option.value ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {option.label}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <Select 
+                value={formData.status} 
+                onValueChange={(value) => handleSelectChange('status', value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger className="w-full font-serif bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="font-serif bg-background">
+                  {statusOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value} className="font-serif">
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="is_breeding_stock"
-                checked={formData.is_breeding_stock}
-                onCheckedChange={(checked) => 
-                  handleCheckboxChange('is_breeding_stock', checked === true)
-                }
-                className="bg-background"
-              />
-              <Label htmlFor="is_breeding_stock" className="font-serif">Breeding Stock</Label>
+            {/* Checkboxes */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="is_breeding_stock"
+                  checked={formData.is_breeding_stock}
+                  onCheckedChange={handleCheckboxChange('is_breeding_stock')}
+                  className="bg-background"
+                  disabled={isLoading}
+                />
+                <Label htmlFor="is_breeding_stock" className="font-serif">Breeding Stock</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="is_deceased"
+                  checked={formData.is_deceased}
+                  onCheckedChange={handleCheckboxChange('is_deceased')}
+                  className="bg-background"
+                  disabled={isLoading}
+                />
+                <Label htmlFor="is_deceased" className="font-serif">Deceased</Label>
+              </div>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="is_deceased"
-                checked={formData.is_deceased}
-                onCheckedChange={(checked) => 
-                  handleCheckboxChange('is_deceased', checked === true)
-                }
-                className="bg-background"
-              />
-              <Label htmlFor="is_deceased" className="font-serif">Deceased</Label>
-            </div>
-          
+            {/* Next Checkup Date */}
             <div className="space-y-2">
-              <Label htmlFor="birth_status" className="font-serif">Birth Status</Label>
+              <Label htmlFor="next_checkup_date" className="font-serif">Next Checkup Date</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
-                    id="birth_status"
                     variant="outline"
-                    role="combobox"
-                    className="w-full justify-between font-serif bg-background"
+                    className={cn(
+                      "w-full justify-start text-left font-normal font-serif bg-background",
+                      !nextCheckupDate && "text-muted-foreground"
+                    )}
+                    disabled={isLoading}
                   >
-                    {birthStatusOptions.find(option => option.value === formData.birth_status)?.label || "Select birth status..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {nextCheckupDate ? format(nextCheckupDate, 'PPP') : <span>Pick a date</span>}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-full p-0 bg-background border border-border shadow-md">
-                  <Command className="bg-background">
-                    <CommandInput placeholder="Search birth status..." className="font-serif" />
-                    <CommandEmpty className="font-serif">No birth status found.</CommandEmpty>
-                    <CommandGroup className="bg-background">
-                      {birthStatusOptions.map((option) => (
-                        <CommandItem
-                          key={option.value}
-                          value={option.value}
-                          onSelect={() => handleSelectChange('birth_status', option.value)}
-                          className="font-serif"
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              formData.birth_status === option.value ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {option.label}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </Command>
+                <PopoverContent className="w-auto p-0 bg-card border border-border shadow-md">
+                  <Calendar
+                    mode="single"
+                    selected={nextCheckupDate}
+                    onSelect={handleNextCheckupDateChange}
+                    initialFocus
+                    className="bg-card"
+                    disabled={isLoading}
+                  />
                 </PopoverContent>
               </Popover>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="health_at_birth" className="font-serif">Health at Birth</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    id="health_at_birth"
-                    variant="outline"
-                    role="combobox"
-                    className="w-full justify-between font-serif bg-background"
-                  >
-                    {healthAtBirthOptions.find(option => option.value === formData.health_at_birth)?.label || "Select health status..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0 bg-background border border-border shadow-md">
-                  <Command className="bg-background">
-                    <CommandInput placeholder="Search health status..." className="font-serif" />
-                    <CommandEmpty className="font-serif">No health status found.</CommandEmpty>
-                    <CommandGroup className="bg-background">
-                      {healthAtBirthOptions.map((option) => (
-                        <CommandItem
-                          key={option.value}
-                          value={option.value}
-                          onSelect={() => handleSelectChange('health_at_birth', option.value)}
-                          className="font-serif"
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              formData.health_at_birth === option.value ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {option.label}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-
+            {/* Birth Weight */}
             <div className="space-y-2">
               <Label htmlFor="birth_weight" className="font-serif">Birth Weight</Label>
               <div className="flex space-x-2">
@@ -548,97 +489,239 @@ const AnimalForm: React.FC = () => {
                   id="birth_weight"
                   name="birth_weight"
                   type="number"
-                  value={formData.birth_weight || ''}
+                  value={formData.birth_weight ?? ''}
                   onChange={handleInputChange}
                   placeholder="Enter birth weight"
-                  className="flex-1 font-serif bg-background"
+                  className={cn("flex-1 font-serif bg-background", formErrors.birth_weight && "border-destructive")}
+                  min="0"
+                  step="0.1"
+                  disabled={isLoading}
                 />
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      className="w-20 font-serif bg-background"
+                <Select 
+                  value={formData.weight_unit} 
+                  onValueChange={(value) => handleSelectChange('weight_unit', value)}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger className="w-20 font-serif bg-background">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="font-serif bg-background">
+                    {weightUnits.map((unit) => (
+                      <SelectItem key={unit.value} value={unit.value} className="font-serif">
+                        {unit.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {formErrors.birth_weight && <p className="text-destructive text-sm">{formErrors.birth_weight}</p>}
+            </div>
+
+            {/* Birth Status */}
+            <div className="space-y-2">
+              <Label htmlFor="birth_status" className="font-serif">Birth Status</Label>
+              <Select 
+                value={formData.birth_status} 
+                onValueChange={(value) => handleSelectChange('birth_status', value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger className="w-full font-serif bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="font-serif bg-background">
+                  {birthStatusOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value} className="font-serif">
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Colostrum Intake */}
+            <div className="space-y-2">
+              <Label htmlFor="colostrum_intake" className="font-serif">Colostrum Intake</Label>
+              <Input
+                id="colostrum_intake"
+                name="colostrum_intake"
+                value={formData.colostrum_intake || ''}
+                onChange={handleInputChange}
+                placeholder="Enter colostrum intake"
+                className="font-serif bg-background"
+                disabled={isLoading}
+              />
+            </div>
+
+            {/* Health at Birth */}
+            <div className="space-y-2">
+              <Label htmlFor="health_at_birth" className="font-serif">Health at Birth</Label>
+              <Select 
+                value={formData.health_at_birth} 
+                onValueChange={(value) => handleSelectChange('health_at_birth', value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger className="w-full font-serif bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="font-serif bg-background">
+                  {healthAtBirthOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value} className="font-serif">
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Vaccinations */}
+            <div className="space-y-2 md:col-span-2">
+              <Label className="font-serif">Vaccinations</Label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {formData.vaccinations?.map((vaccination, index) => (
+                  <Badge key={index} variant="outline" className="px-3 py-1 font-serif">
+                    {vaccination}
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-4 w-4 p-0 ml-2" 
+                      onClick={() => removeItem('vaccinations', vaccination)}
+                      disabled={isLoading}
                     >
-                      {formData.weight_unit || 'kg'}
+                      <X className="h-3 w-3" />
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[80px] p-0 bg-background border border-border shadow-md">
-                    <Command className="bg-background">
-                      <CommandGroup className="bg-background">
-                        {weightUnits.map((unit) => (
-                          <CommandItem 
-                            key={unit.value}
-                            onSelect={() => handleSelectChange('weight_unit', unit.value)}
-                            className="font-serif"
-                          >
-                            <Check className={cn(
-                              "mr-2 h-4 w-4",
-                              formData.weight_unit === unit.value ? "opacity-100" : "opacity-0"
-                            )}/>
-                            {unit.label}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                  </Badge>
+                ))}
+              </div>
+              <div className="flex space-x-2">
+                <Input
+                  value={newVaccination}
+                  onChange={(e) => setNewVaccination(e.target.value)}
+                  placeholder="Add a vaccination"
+                  className="flex-1 font-serif bg-background"
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addItem('vaccinations', newVaccination, setNewVaccination))}
+                  disabled={isLoading}
+                />
+                <Button 
+                  type="button" 
+                  onClick={() => addItem('vaccinations', newVaccination, setNewVaccination)} 
+                  className="font-serif"
+                  disabled={isLoading}
+                >
+                  Add
+                </Button>
               </div>
             </div>
 
+            {/* Milk Feeding */}
             <div className="space-y-2">
-              <Label htmlFor="raised_purchased" className="font-serif">Origin</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    id="raised_purchased"
-                    variant="outline"
-                    role="combobox"
-                    className="w-full justify-between font-serif bg-background"
-                  >
-                    {raisedPurchasedOptions.find(option => option.value === formData.raised_purchased)?.label || "Select origin..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0 bg-background border border-border shadow-md">
-                  <Command className="bg-background">
-                    <CommandInput placeholder="Search origin..." className="font-serif" />
-                    <CommandEmpty className="font-serif">No option found.</CommandEmpty>
-                    <CommandGroup className="bg-background">
-                      {raisedPurchasedOptions.map((option) => (
-                        <CommandItem
-                          key={option.value}
-                          value={option.value}
-                          onSelect={() => handleSelectChange('raised_purchased', option.value)}
-                          className="font-serif"
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              formData.raised_purchased === option.value ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {option.label}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <Label htmlFor="milk_feeding" className="font-serif">Milk Feeding</Label>
+              <Input
+                id="milk_feeding"
+                name="milk_feeding"
+                value={formData.milk_feeding || ''}
+                onChange={handleInputChange}
+                placeholder="Enter milk feeding details"
+                className="font-serif bg-background"
+                disabled={isLoading}
+              />
             </div>
 
+            {/* Multiple Birth */}
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="multiple_birth"
                 checked={formData.multiple_birth}
-                onCheckedChange={(checked) => 
-                  handleCheckboxChange('multiple_birth', checked === true)
-                }
+                onCheckedChange={handleCheckboxChange('multiple_birth')}
                 className="bg-background"
+                disabled={isLoading}
               />
               <Label htmlFor="multiple_birth" className="font-serif">Multiple Birth</Label>
             </div>
-          
+
+            {/* Birth Order */}
+            <div className="space-y-2">
+              <Label htmlFor="birth_order" className="font-serif">Birth Order</Label>
+              <Input
+                id="birth_order"
+                name="birth_order"
+                type="number"
+                value={formData.birth_order ?? ''}
+                onChange={handleInputChange}
+                placeholder="Enter birth order"
+                className={cn("font-serif bg-background", formErrors.birth_order && "border-destructive")}
+                min="0"
+                disabled={isLoading}
+              />
+              {formErrors.birth_order && <p className="text-destructive text-sm">{formErrors.birth_order}</p>}
+            </div>
+
+            {/* Gestation Length */}
+            <div className="space-y-2">
+              <Label htmlFor="gestation_length" className="font-serif">Gestation Length (days)</Label>
+              <Input
+                id="gestation_length"
+                name="gestation_length"
+                type="number"
+                value={formData.gestation_length ?? ''}
+                onChange={handleInputChange}
+                placeholder="Enter gestation length"
+                className={cn("font-serif bg-background", formErrors.gestation_length && "border-destructive")}
+                min="0"
+                disabled={isLoading}
+              />
+              {formErrors.gestation_length && <p className="text-destructive text-sm">{formErrors.gestation_length}</p>}
+            </div>
+
+            {/* Breeder Info */}
+            <div className="space-y-2">
+              <Label htmlFor="breeder_info" className="font-serif">Breeder Info</Label>
+              <Input
+                id="breeder_info"
+                name="breeder_info"
+                value={formData.breeder_info || ''}
+                onChange={handleInputChange}
+                placeholder="Enter breeder information"
+                className="font-serif bg-background"
+                disabled={isLoading}
+              />
+            </div>
+
+            {/* Origin */}
+            <div className="space-y-2">
+              <Label htmlFor="raised_purchased" className="font-serif">Origin</Label>
+              <Select 
+                value={formData.raised_purchased} 
+                onValueChange={(value) => handleSelectChange('raised_purchased', value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger className="w-full font-serif bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="font-serif bg-background">
+                  {raisedPurchasedOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value} className="font-serif">
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Birth Photos */}
+            <div className="space-y-2">
+              <Label htmlFor="birth_photos" className="font-serif">Birth Photos URL</Label>
+              <Input
+                id="birth_photos"
+                name="birth_photos"
+                value={formData.birth_photos || ''}
+                onChange={handleInputChange}
+                placeholder="Enter URL to birth photos"
+                className="font-serif bg-background"
+                disabled={isLoading}
+              />
+            </div>
+
+            {/* Physical Traits */}
             <div className="space-y-2 md:col-span-2">
               <Label className="font-serif">Physical Traits</Label>
               <div className="flex flex-wrap gap-2 mb-2">
@@ -649,7 +732,8 @@ const AnimalForm: React.FC = () => {
                       variant="ghost" 
                       size="sm" 
                       className="h-4 w-4 p-0 ml-2" 
-                      onClick={() => removeTrait(trait)}
+                      onClick={() => removeItem('physical_traits', trait)}
+                      disabled={isLoading}
                     >
                       <X className="h-3 w-3" />
                     </Button>
@@ -662,17 +746,21 @@ const AnimalForm: React.FC = () => {
                   onChange={(e) => setNewTrait(e.target.value)}
                   placeholder="Add a physical trait"
                   className="flex-1 font-serif bg-background"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      addTrait();
-                    }
-                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addItem('physical_traits', newTrait, setNewTrait))}
+                  disabled={isLoading}
                 />
-                <Button type="button" onClick={addTrait} className="font-serif">Add</Button>
+                <Button 
+                  type="button" 
+                  onClick={() => addItem('physical_traits', newTrait, setNewTrait)} 
+                  className="font-serif"
+                  disabled={isLoading}
+                >
+                  Add
+                </Button>
               </div>
             </div>
 
+            {/* Keywords */}
             <div className="space-y-2 md:col-span-2">
               <Label className="font-serif">Keywords</Label>
               <div className="flex flex-wrap gap-2 mb-2">
@@ -683,7 +771,8 @@ const AnimalForm: React.FC = () => {
                       variant="ghost" 
                       size="sm" 
                       className="h-4 w-4 p-0 ml-2" 
-                      onClick={() => removeKeyword(keyword)}
+                      onClick={() => removeItem('keywords', keyword)}
+                      disabled={isLoading}
                     >
                       <X className="h-3 w-3" />
                     </Button>
@@ -696,23 +785,20 @@ const AnimalForm: React.FC = () => {
                   onChange={(e) => setNewKeyword(e.target.value)}
                   placeholder="Add a keyword"
                   className="flex-1 font-serif bg-background"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      addKeyword();
-                    }
-                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addItem('keywords', newKeyword, setNewKeyword))}
+                  disabled={isLoading}
                 />
-                <Button type="button" onClick={addKeyword} className="font-serif">Add</Button>
+                <Button 
+                  type="button" 
+                  onClick={() => addItem('keywords', newKeyword, setNewKeyword)} 
+                  className="font-serif"
+                  disabled={isLoading}
+                >
+                  Add
+                </Button>
               </div>
             </div>
           </div>
-
-          {error && (
-            <div className="bg-destructive/15 text-destructive px-4 py-2 rounded-md mt-4 font-serif">
-              {error}
-            </div>
-          )}
 
           <div className="flex justify-end gap-4 mt-8">
             <Button
@@ -720,12 +806,13 @@ const AnimalForm: React.FC = () => {
               variant="outline"
               onClick={() => navigate('/animals')}
               className="font-serif"
+              disabled={isLoading}
             >
               Cancel
             </Button>
             <Button type="submit" disabled={isLoading} className="font-serif">
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isEditing ? 'Update Animal' : 'Create Animal'}
+              {isEditing ? "Update Animal" : "Create Animal"}
             </Button>
           </div>
         </form>

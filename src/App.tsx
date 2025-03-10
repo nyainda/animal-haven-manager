@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -24,6 +23,12 @@ import AnimalHealth from "./pages/animal/AnimalHealth";
 import AnimalNotes from "./pages/animal/AnimalNotes";
 import AnimalNoteForm from "./pages/animal/AnimalNoteForm";
 import AnimalProduction from "./pages/animal/AnimalProduction";
+
+// Import new form components
+import NoteForm from "./components/forms/NoteForm";
+import FeedingForm from "./components/forms/FeedingForm";
+import TaskForm from "./components/forms/TaskForm";
+import TransactionForm from "./components/forms/TransactionForm";
 
 const queryClient = new QueryClient();
 
@@ -78,6 +83,16 @@ const App = () => (
               <Route path="/animals/:id/production/new" element={<AnimalProduction />} />
               <Route path="/animals/:id/production/:productionId" element={<AnimalProduction />} />
               <Route path="/animals/:id/production/:productionId/edit" element={<AnimalProduction />} />
+              
+              {/* New Form Routes */}
+              <Route path="/forms/note" element={<NoteForm />} />
+              <Route path="/forms/feeding" element={<FeedingForm />} />
+              <Route path="/forms/task" element={<TaskForm />} />
+              <Route path="/forms/transaction" element={<TransactionForm />} />
+              <Route path="/animals/:id/forms/note" element={<NoteForm />} />
+              <Route path="/animals/:id/forms/feeding" element={<FeedingForm />} />
+              <Route path="/animals/:id/forms/task" element={<TaskForm />} />
+              <Route path="/animals/:id/forms/transaction" element={<TransactionForm />} />
               
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

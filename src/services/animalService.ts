@@ -1,351 +1,247 @@
-
-import { Animal, AnimalFormData } from "../types/AnimalTypes";
 import { toast } from "sonner";
+import { Animal, AnimalFormData } from "../types/AnimalTypes";
 
-// Base API URL
+// Base API URLs
 const API_URL = "http://127.0.0.1:8000/api/animals";
+const CSRF_URL = "http://127.0.0.1:8000/sanctum/csrf-cookie";
 
-// Mock animal data (will be used as fallback if API is unavailable)
-const MOCK_ANIMALS: Animal[] = [
-  {
-    id: "1",
-    internal_id: "CAT/25/0001",
-    animal_id: "anim-001",
-    name: "Bella",
-    type: "cattle",
-    breed: "Angus",
-    gender: "female",
-    birth_date: "2023-05-15",
-    birth_time: "08:30:00",
-    tag_number: "TAG1234",
-    status: "Active",
-    is_breeding_stock: true,
-    age: 2,
-    is_deceased: false,
-    next_checkup_date: "2025-04-15",
-    birth_weight: 75,
-    weight_unit: "kg",
-    birth_status: "normal",
-    colostrum_intake: "good",
-    health_at_birth: "healthy",
-    vaccinations: ["rabies", "distemper"],
-    milk_feeding: "formula",
-    multiple_birth: false,
-    birth_order: null,
-    gestation_length: 283,
-    breeder_info: "Alpine Farms",
-    raised_purchased: "raised",
-    birth_photos: null,
-    physical_traits: ["black coat", "white face"],
-    keywords: ["registered", "show quality"]
-  },
-  {
-    id: "2",
-    internal_id: "CAT/25/0002",
-    animal_id: "anim-002",
-    name: "Max",
-    type: "cattle",
-    breed: "Hereford",
-    gender: "male",
-    birth_date: "2022-08-10",
-    birth_time: "14:45:00",
-    tag_number: "TAG5678",
-    status: "Active",
-    is_breeding_stock: true,
-    age: 3,
-    is_deceased: false,
-    next_checkup_date: "2025-05-10",
-    birth_weight: 82,
-    weight_unit: "kg",
-    birth_status: "normal",
-    colostrum_intake: "excellent",
-    health_at_birth: "healthy",
-    vaccinations: ["rabies", "blackleg"],
-    milk_feeding: "dam raised",
-    multiple_birth: false,
-    birth_order: null,
-    gestation_length: 275,
-    breeder_info: "Mountain View Ranch",
-    raised_purchased: "purchased",
-    birth_photos: null,
-    physical_traits: ["red coat", "white face"],
-    keywords: ["prize winner"]
-  },
-  {
-    id: "3",
-    internal_id: "PIG/25/0001",
-    animal_id: "anim-003",
-    name: "Wilbur",
-    type: "pig",
-    breed: "Yorkshire",
-    gender: "male",
-    birth_date: "2024-01-20",
-    birth_time: "10:15:00",
-    tag_number: "TAG9012",
-    status: "Active",
-    is_breeding_stock: false,
-    age: 1,
-    is_deceased: false,
-    next_checkup_date: "2025-04-20",
-    birth_weight: 2.5,
-    weight_unit: "kg",
-    birth_status: "normal",
-    colostrum_intake: "good",
-    health_at_birth: "healthy",
-    vaccinations: ["erysipelas"],
-    milk_feeding: "sow raised",
-    multiple_birth: true,
-    birth_order: 3,
-    gestation_length: 115,
-    breeder_info: "Green Valley Farm",
-    raised_purchased: "raised",
-    birth_photos: null,
-    physical_traits: ["pink", "curly tail"],
-    keywords: ["friendly"]
-  }
-];
 
-export const fetchAnimals = async (): Promise<Animal[]> => {
+interface PaginatedResponse {
+  current_page: number;
+  data: Animal[];
+  first_page_url: string;
+  from: number;
+  last_page: number;
+  last_page_url: string;
+  next_page_url: string | null;
+  path: string;
+  per_page: number;
+  prev_page_url: string | null;
+  to: number;
+  total: number;
+}
+
+// Helper to fetch CSRF token
+const fetchCsrfToken = async () => {
   try {
-    // Use the real API endpoint
-    const response = await fetch(API_URL);
-    
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    return data;
+    const response = await fetch(CSRF_URL, {
+      method: 'GET',
+      credentials: 'include', // Include cookies for Sanctum
+    });
+    if (!response.ok) throw new Error(`Failed to fetch CSRF token: ${response.status}`);
+    console.log('[ANIMAL] CSRF token fetched successfully');
   } catch (error) {
-    console.error('Error fetching animals:', error);
-    console.warn('Falling back to mock data due to API error');
-    // Return mock data as fallback
-    return [...MOCK_ANIMALS];
+    console.warn('[ANIMAL] CSRF fetch failed, proceeding anyway:', error);
+    // Proceed anyway, as some setups might not require CSRF for GET
   }
 };
 
-export const fetchAnimal = async (id: string): Promise<Animal> => {
+// Helper to get authentication headers
+const getAuthHeaders = (): Record<string, string> => {
+  const token = localStorage.getItem('auth_token');
+  const xsrfToken = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('XSRF-TOKEN='))
+    ?.split('=')[1];
+
+  return {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(xsrfToken ? { 'X-XSRF-TOKEN': decodeURIComponent(xsrfToken) } : {}),
+  };
+};
+
+// Fetch all animals (handles paginated response)
+export const fetchAnimals = async (): Promise<Animal[]> => {
+  await fetchCsrfToken();
   try {
-    // Use the real API endpoint
-    const response = await fetch(`${API_URL}/${id}`);
-    
+    const response = await fetch(API_URL, {
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+
+    console.log('[ANIMAL] Fetch Animals Status:', response.status);
+    const rawData = await response.json();
+    console.log('[ANIMAL] Raw Fetch Animals Response:', rawData);
+
     if (!response.ok) {
       throw new Error(`API error: ${response.status} ${response.statusText}`);
     }
-    
-    const animal = await response.json();
+
+    // Extract animals from paginated response
+    const animals = rawData.data && Array.isArray(rawData.data.data)
+      ? rawData.data.data
+      : [];
+    console.log('[ANIMAL] Processed Animals:', animals);
+    return animals;
+  } catch (error) {
+    console.error('[ANIMAL] Error fetching animals:', error);
+    toast.error(`Failed to fetch animals: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw error;
+  }
+};
+
+// Fetch a single animal by ID
+export const fetchAnimal = async (id: string): Promise<Animal> => {
+  await fetchCsrfToken();
+  try {
+    const response = await fetch(`${API_URL}/${id}`, {
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+
+    console.log('[ANIMAL] Fetch Animal Status:', response.status);
+    const rawData = await response.json();
+    console.log('[ANIMAL] Raw Fetch Animal Response:', rawData);
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+
+    // Handle potential wrapping in 'data'
+    const animal = rawData.data || rawData;
+    console.log('[ANIMAL] Processed Animal:', animal);
     return animal;
   } catch (error) {
-    console.error(`Error fetching animal ${id}:`, error);
-    console.warn('Falling back to mock data due to API error');
-    
-    // Fallback to mock data
-    const animal = MOCK_ANIMALS.find(a => a.id === id);
-    if (!animal) {
-      throw new Error('Animal not found');
-    }
-    
-    return { ...animal };
+    console.error(`[ANIMAL] Error fetching animal ${id}:`, error);
+    toast.error(`Failed to fetch animal: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw error;
   }
 };
 
+// Create a new animal
 export const createAnimal = async (animalData: AnimalFormData): Promise<Animal> => {
+  await fetchCsrfToken();
   try {
-    // Use the real API endpoint
     const response = await fetch(API_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(),
+      credentials: 'include',
       body: JSON.stringify(animalData),
     });
-    
+
+    console.log('[ANIMAL] Create Animal Status:', response.status);
+    const rawData = await response.json();
+    console.log('[ANIMAL] Raw Create Animal Response:', rawData);
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      const errorMessage = errorData?.message || `API error: ${response.status} ${response.statusText}`;
+      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
       throw new Error(errorMessage);
     }
-    
-    const newAnimal = await response.json();
+
+    const newAnimal = rawData.data || rawData;
     toast.success(`Animal ${newAnimal.name} created successfully`);
+    console.log('[ANIMAL] Created Animal:', newAnimal);
     return newAnimal;
   } catch (error) {
-    console.error('Error creating animal:', error);
+    console.error('[ANIMAL] Error creating animal:', error);
     toast.error(`Failed to create animal: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    console.warn('Falling back to mock implementation due to API error');
-    
-    // Fallback to mock implementation
-    const newAnimal: Animal = {
-      id: `${Date.now()}`,
-      internal_id: `${animalData.type.toUpperCase()}/${new Date().getFullYear().toString().slice(-2)}/${String(MOCK_ANIMALS.length + 1).padStart(4, '0')}`,
-      animal_id: `anim-${Date.now().toString().slice(-6)}`,
-      name: animalData.name,
-      type: animalData.type,
-      breed: animalData.breed,
-      gender: animalData.gender,
-      birth_date: animalData.birth_date,
-      birth_time: animalData.birth_time || "08:00:00",
-      tag_number: animalData.tag_number || `TAG${Math.floor(Math.random() * 10000000)}`,
-      status: animalData.status || "Active",
-      is_breeding_stock: animalData.is_breeding_stock || false,
-      age: new Date().getFullYear() - new Date(animalData.birth_date).getFullYear(),
-      is_deceased: animalData.is_deceased || false,
-      next_checkup_date: null,
-      birth_weight: animalData.birth_weight || null,
-      weight_unit: animalData.weight_unit || null,
-      birth_status: animalData.birth_status || "normal",
-      colostrum_intake: null,
-      health_at_birth: animalData.health_at_birth || "healthy",
-      vaccinations: [],
-      milk_feeding: null,
-      multiple_birth: animalData.multiple_birth || false,
-      birth_order: null,
-      gestation_length: null,
-      breeder_info: null,
-      raised_purchased: animalData.raised_purchased || "raised",
-      birth_photos: null,
-      physical_traits: animalData.physical_traits || [],
-      keywords: animalData.keywords || []
-    };
-    
-    // For demo purposes, we'll just add it to our mock data
-    MOCK_ANIMALS.push(newAnimal);
-    toast.success(`Animal ${newAnimal.name} created successfully`);
-    
-    return newAnimal;
+    throw error;
   }
 };
 
+// Update an existing animal
 export const updateAnimal = async (id: string, animalData: Partial<AnimalFormData>): Promise<Animal> => {
+  await fetchCsrfToken();
   try {
-    // Use the real API endpoint
-    const response = await fetch(`${API_URL}/${id}`, {
+    const url = `${API_URL}/${id}`;
+    const response = await fetch(url, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(),
+      credentials: 'include',
       body: JSON.stringify(animalData),
     });
-    
+
+    console.log('[ANIMAL] Update Animal Status:', response.status);
+    const rawData = await response.json();
+    console.log('[ANIMAL] Raw Update Animal Response:', rawData);
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      const errorMessage = errorData?.message || `API error: ${response.status} ${response.statusText}`;
+      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
       throw new Error(errorMessage);
     }
-    
-    const updatedAnimal = await response.json();
+
+    const updatedAnimal = rawData.data || rawData;
     toast.success(`Animal ${updatedAnimal.name} updated successfully`);
+    console.log('[ANIMAL] Updated Animal:', updatedAnimal);
     return updatedAnimal;
   } catch (error) {
-    console.error(`Error updating animal ${id}:`, error);
+    console.error(`[ANIMAL] Error updating animal ${id}:`, error);
     toast.error(`Failed to update animal: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    console.warn('Falling back to mock implementation due to API error');
-    
-    // Fallback to mock implementation
-    const animalIndex = MOCK_ANIMALS.findIndex(a => a.id === id);
-    if (animalIndex === -1) {
-      throw new Error('Animal not found');
-    }
-    
-    // Update the animal
-    const updatedAnimal = {
-      ...MOCK_ANIMALS[animalIndex],
-      ...animalData,
-    };
-    
-    MOCK_ANIMALS[animalIndex] = updatedAnimal;
-    toast.success(`Animal ${updatedAnimal.name} updated successfully`);
-    
-    return updatedAnimal;
+    throw error;
   }
 };
 
+// Delete an animal
 export const deleteAnimal = async (id: string): Promise<void> => {
+  await fetchCsrfToken();
   try {
-    // Use the real API endpoint
     const response = await fetch(`${API_URL}/${id}`, {
       method: 'DELETE',
+      headers: getAuthHeaders(),
+      credentials: 'include',
     });
-    
+
+    console.log('[ANIMAL] Delete Animal Status:', response.status);
+    const rawData = await response.json();
+    console.log('[ANIMAL] Raw Delete Animal Response:', rawData);
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      const errorMessage = errorData?.message || `API error: ${response.status} ${response.statusText}`;
+      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
       throw new Error(errorMessage);
     }
-    
-    toast.success("Animal deleted successfully");
+
+    toast.success('Animal deleted successfully');
   } catch (error) {
-    console.error(`Error deleting animal ${id}:`, error);
+    console.error(`[ANIMAL] Error deleting animal ${id}:`, error);
     toast.error(`Failed to delete animal: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    console.warn('Falling back to mock implementation due to API error');
-    
-    // Fallback to mock implementation
-    const animalIndex = MOCK_ANIMALS.findIndex(a => a.id === id);
-    if (animalIndex === -1) {
-      throw new Error('Animal not found');
-    }
-    
-    MOCK_ANIMALS.splice(animalIndex, 1);
-    toast.success("Animal deleted successfully");
+    throw error;
   }
 };
 
-// Added function to export animals to CSV
-export const exportAnimalsToCSV = (): void => {
+// Export animals to CSV
+export const exportAnimalsToCSV = async (): Promise<void> => {
   try {
-    // Get the data
-    const animals = [...MOCK_ANIMALS];
-    
-    // Define the fields to include in the CSV
+    const animals = await fetchAnimals();
+
+    // Define fields to export based on your Animal type
     const fields = [
-      'id', 'internal_id', 'animal_id', 'name', 'type', 'breed', 'gender', 
-      'birth_date', 'birth_time', 'tag_number', 'status', 'is_breeding_stock',
-      'age', 'is_deceased', 'birth_weight', 'weight_unit', 'birth_status',
-      'health_at_birth', 'multiple_birth', 'raised_purchased'
+      'id', 'name', 'type', 'breed', 'gender', 'birth_date', 'tag_number',
+      'status', 'is_breeding_stock', 'age', 'is_deceased',
     ];
-    
-    // Create CSV header
+
     const header = fields.join(',');
-    
-    // Create CSV rows
+
     const rows = animals.map(animal => {
       return fields.map(field => {
-        // Handle special cases
-        if (field === 'is_breeding_stock' || field === 'is_deceased' || field === 'multiple_birth') {
+        if (field === 'is_breeding_stock' || field === 'is_deceased') {
           return animal[field] ? 'Yes' : 'No';
         }
-        
-        // Get the value, replace commas with spaces to avoid CSV issues
-        const value = animal[field] !== null && animal[field] !== undefined 
-          ? String(animal[field]).replace(/,/g, ' ') 
+        const value = animal[field] !== null && animal[field] !== undefined
+          ? String(animal[field]).replace(/,/g, ' ')
           : '';
-          
-        // Wrap in quotes if it contains spaces
         return value.includes(' ') ? `"${value}"` : value;
       }).join(',');
     });
-    
-    // Combine header and rows
+
     const csv = [header, ...rows].join('\n');
-    
-    // Create a Blob with the CSV content
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    
-    // Create a link element to download the file
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
-    
+
     link.setAttribute('href', url);
     link.setAttribute('download', `animal_export_${new Date().toISOString().split('T')[0]}.csv`);
     link.style.visibility = 'hidden';
-    
+
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+
     toast.success('Animals exported to CSV successfully');
   } catch (error) {
-    console.error('Error exporting animals to CSV:', error);
+    console.error('[ANIMAL] Error exporting animals to CSV:', error);
     toast.error(`Failed to export animals: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw error;
   }
 };

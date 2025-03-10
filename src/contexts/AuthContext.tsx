@@ -2,7 +2,9 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
-// Define the user type based on API response
+const API_BASE_URL = 'http://127.0.0.1:8000/api';
+const CSRF_URL = 'http://127.0.0.1:8000/sanctum/csrf-cookie';
+
 interface User {
   id: string;
   name: string;
@@ -10,7 +12,6 @@ interface User {
   avatar: string | null;
 }
 
-// Define the auth context type
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
@@ -18,206 +19,284 @@ interface AuthContextType {
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string, password_confirmation: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
-  resetPassword: (token: string, password: string) => Promise<void>;
-  verifyEmail: (token: string) => Promise<void>;
+  resetPassword: (token: string, email: string, password: string, password_confirmation: string) => Promise<void>;
+  verifyEmail: (id: string, hash: string) => Promise<void>;
+  resendVerificationEmail: () => Promise<void>;
 }
 
-// Mock user data
-const MOCK_USER: User = {
-  id: '1',
-  name: 'Demo User',
-  email: 'demo@example.com',
-  avatar: null
+const logRequest = (endpoint: string, options: any, data: any = null) => {
+  console.log(`[AUTH] Request to ${endpoint}:`, { options, data });
 };
 
-// Create the auth context
+const logResponse = (endpoint: string, response: any) => {
+  console.log(`[AUTH] Response from ${endpoint}:`, response);
+};
+
+const logError = (endpoint: string, error: any) => {
+  console.error(`[AUTH] Error from ${endpoint}:`, error);
+};
+
+// Fetch CSRF token
+const fetchCsrfToken = async () => {
+  try {
+    const response = await fetch(CSRF_URL, {
+      method: 'GET',
+      credentials: 'include',
+    });
+    if (!response.ok) throw new Error('Failed to fetch CSRF token');
+    console.log('[AUTH] CSRF token fetched');
+  } catch (error) {
+    console.warn('[AUTH] CSRF fetch failed, proceeding anyway:', error);
+  }
+};
+
+// Helper function for API requests
+const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
+  const token = localStorage.getItem('auth_token');
+  
+  const defaultHeaders: HeadersInit = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+  };
+
+  // Add X-XSRF-TOKEN if available
+  const xsrfToken = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('XSRF-TOKEN='))
+    ?.split('=')[1];
+  if (xsrfToken) {
+    defaultHeaders['X-XSRF-TOKEN'] = decodeURIComponent(xsrfToken);
+  }
+
+  const requestOptions = {
+    ...options,
+    headers: { ...defaultHeaders, ...options.headers },
+    credentials: 'include', // Include cookies for Sanctum
+  };
+  
+  logRequest(endpoint, requestOptions, options.body);
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, requestOptions);
+    const contentType = response.headers.get('content-type');
+    const responseData = contentType?.includes('application/json') 
+      ? await response.json() 
+      : await response.text();
+    
+    logResponse(endpoint, { status: response.status, data: responseData });
+    
+    if (!response.ok) {
+      throw { status: response.status, data: responseData };
+    }
+    
+    return responseData;
+  } catch (error) {
+    logError(endpoint, error);
+    throw error;
+  }
+};
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Create the auth provider
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Check if user is authenticated on load
-  useEffect(() => {
-    const token = localStorage.getItem('auth_token');
-    const storedUser = localStorage.getItem('user');
-    
-    if (token && storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-      } catch (err) {
-        console.error('Error parsing user data:', err);
-        localStorage.removeItem('user');
-        localStorage.removeItem('auth_token');
-      }
+  const fetchCurrentUser = async () => {
+    try {
+      const userData = await apiFetch('/user');
+      return userData.data || userData; // Adjust based on response structure
+    } catch (error) {
+      console.error('[AUTH] Error fetching user data:', error);
+      return null;
     }
-    setLoading(false);
+  };
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        console.log('[AUTH] No token found');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        await fetchCsrfToken(); // Fetch CSRF on initial load
+        const userData = await fetchCurrentUser();
+        if (userData) {
+          setUser(userData);
+          localStorage.setItem('user', JSON.stringify(userData));
+        } else {
+          console.warn('[AUTH] No user data, clearing token');
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('user');
+        }
+      } catch (err) {
+        console.error('[AUTH] Auth check failed:', err);
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    checkAuth();
   }, []);
 
-  // Auto-login for demo purposes
-  useEffect(() => {
-    const hasVisited = localStorage.getItem('has_visited');
-    if (!hasVisited && !user) {
-      // Auto-login with mock user for demo
-      const token = `mock-token-${Date.now()}`;
-      localStorage.setItem('user', JSON.stringify(MOCK_USER));
-      localStorage.setItem('auth_token', token);
-      localStorage.setItem('has_visited', 'true');
-      setUser(MOCK_USER);
-    }
-  }, [user]);
-
-  // Login function using mock data
   const login = async (email: string, password: string) => {
     setLoading(true);
     setError(null);
     
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Simple validation (in a real app, this would be server-side)
-      if (email.trim() === '' || password.trim() === '') {
-        throw new Error('Email and password are required');
-      }
-      
-      // In a real app, we would validate credentials server-side
-      // For demo purposes, any non-empty credentials will work
-      
-      // Generate a mock token
-      const token = `mock-token-${Date.now()}`;
-      
-      // Save user and token to localStorage
-      localStorage.setItem('user', JSON.stringify(MOCK_USER));
+      await fetchCsrfToken();
+      const response = await apiFetch('/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+
+      const token = response.access_token || response.token || response.data?.token;
+      if (!token) throw new Error('No token received from server');
+
       localStorage.setItem('auth_token', token);
-      
-      setUser(MOCK_USER);
+      const userData = response.data?.user || response.user || {
+        id: '1',
+        name: email.split('@')[0],
+        email,
+        avatar: null,
+      };
+
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
       toast.success('Successfully logged in!');
       navigate('/dashboard');
     } catch (err: any) {
-      console.error('Login error:', err);
-      setError(err.message || 'Invalid email or password. Please try again.');
-      toast.error('Login failed. Please try again.');
+      const errorMessage = err.data?.message || err.message || 'Login failed';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  // Register function using mock data
   const register = async (name: string, email: string, password: string, password_confirmation: string) => {
     setLoading(true);
     setError(null);
     
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
+      await fetchCsrfToken();
+      await apiFetch('/register', {
+        method: 'POST',
+        body: JSON.stringify({ name, email, password, password_confirmation }),
+      });
       
-      // Simple validation (in a real app, this would be server-side)
-      if (name.trim() === '' || email.trim() === '' || password.trim() === '') {
-        throw new Error('All fields are required');
-      }
-      
-      if (password !== password_confirmation) {
-        throw new Error('Passwords do not match');
-      }
-      
-      // In a real app, we would create a user server-side
-      // For demo purposes, we'll just show a success message
-      
-      toast.success('Registration successful! Please log in.');
+      toast.success('Registration successful! Please check your email for verification.');
       navigate('/login');
     } catch (err: any) {
-      console.error('Registration error:', err);
-      setError(err.message || 'Registration failed. This email may already be in use.');
-      toast.error('Registration failed. Please try again.');
+      const errorMessage = err.data?.message || err.data?.errors?.email?.[0] || 'Registration failed';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  // Logout function
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('auth_token');
-    toast.success('Successfully logged out');
-    navigate('/login');
+  const logout = async () => {
+    try {
+      await fetchCsrfToken();
+      await apiFetch('/logout', { method: 'POST' });
+    } catch (error) {
+      console.error('[AUTH] Logout error:', error);
+    } finally {
+      setUser(null);
+      localStorage.removeItem('user');
+      localStorage.removeItem('auth_token');
+      toast.success('Successfully logged out');
+      navigate('/login');
+    }
   };
 
-  // Forgot password function (mock implementation)
   const forgotPassword = async (email: string) => {
     setLoading(true);
     setError(null);
     
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
+      await fetchCsrfToken();
+      await apiFetch('/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      });
       
-      if (email.trim() === '') {
-        throw new Error('Email is required');
-      }
-      
-      toast.success('Password reset link sent to your email! (demo mode)');
-      return Promise.resolve();
+      toast.success('Password reset link sent to your email!');
     } catch (err: any) {
-      console.error('Forgot password error:', err);
-      setError(err.message || 'Failed to send reset link. Please try again.');
-      toast.error('Failed to send reset link. Please try again.');
-      return Promise.reject(err);
+      const errorMessage = err.data?.message || 'Failed to send reset link';
+      setError(errorMessage);
+      toast.error(errorMessage);
+      throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  // Reset password function (mock implementation)
-  const resetPassword = async (token: string, password: string) => {
+  const resetPassword = async (token: string, email: string, password: string, password_confirmation: string) => {
     setLoading(true);
     setError(null);
     
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
+      await fetchCsrfToken();
+      await apiFetch('/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({ token, email, password, password_confirmation }),
+      });
       
-      if (password.trim() === '') {
-        throw new Error('Password is required');
-      }
-      
-      toast.success('Password has been reset successfully! (demo mode)');
+      toast.success('Password reset successfully!');
       navigate('/login');
-      return Promise.resolve();
     } catch (err: any) {
-      console.error('Reset password error:', err);
-      setError(err.message || 'Failed to reset password. The link may have expired.');
-      toast.error('Failed to reset password. Please try again.');
-      return Promise.reject(err);
+      const errorMessage = err.data?.message || 'Failed to reset password';
+      setError(errorMessage);
+      toast.error(errorMessage);
+      throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  // Verify email function (mock implementation)
-  const verifyEmail = async (token: string) => {
+  const verifyEmail = async (id: string, hash: string) => {
     setLoading(true);
     setError(null);
     
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      toast.success('Email verified successfully! (demo mode)');
+      await apiFetch(`/verify-email/${id}/${hash}`, { method: 'GET' });
+      toast.success('Email verified successfully!');
       navigate('/login');
-      return Promise.resolve();
     } catch (err: any) {
-      console.error('Verify email error:', err);
-      setError(err.message || 'Failed to verify email. The link may have expired.');
-      toast.error('Failed to verify email. Please try again.');
-      return Promise.reject(err);
+      const errorMessage = err.data?.message || 'Failed to verify email';
+      setError(errorMessage);
+      toast.error(errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resendVerificationEmail = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      await fetchCsrfToken();
+      await apiFetch('/email/verification-notification', { method: 'POST' });
+      toast.success('Verification email resent!');
+    } catch (err: any) {
+      const errorMessage = err.data?.message || 'Failed to resend verification email';
+      setError(errorMessage);
+      toast.error(errorMessage);
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -225,7 +304,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const value = {
     user,
-    isAuthenticated: !!user,
+    isAuthenticated: !!user && !!localStorage.getItem('auth_token'),
     loading,
     error,
     login,
@@ -234,12 +313,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     forgotPassword,
     resetPassword,
     verifyEmail,
+    resendVerificationEmail,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// Create the auth hook
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
