@@ -39,6 +39,7 @@ import {
 import { fetchAnimals, deleteAnimal, exportAnimalsToCSV } from '@/services/animalService';
 import { Animal } from '@/types/AnimalTypes';
 import { useTheme } from '@/contexts/ThemeContext';
+import AnimalNotes from './animal/AnimalNotes'; 
 
 const Animals: React.FC = () => {
   const navigate = useNavigate();
@@ -450,6 +451,8 @@ const Animals: React.FC = () => {
                         </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end gap-2">
+                          
+                          
                             <Button
                               variant="ghost"
                               size="icon"

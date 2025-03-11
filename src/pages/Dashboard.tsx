@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
@@ -43,6 +42,32 @@ const Dashboard: React.FC = () => {
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
+  const [notifications, setNotifications] = useState<Notification[]>([
+    {
+      id: '1',
+      content: 'Max (Dog) is due for vaccination',
+      time: '2 hours ago',
+      read: false
+    },
+    {
+      id: '2',
+      content: 'New adoption application received',
+      time: '4 hours ago',
+      read: false
+    },
+    {
+      id: '3',
+      content: 'Staff meeting tomorrow at 10 AM',
+      time: 'Yesterday',
+      read: true
+    },
+    {
+      id: '4',
+      content: 'Monthly report is ready for review',
+      time: '2 days ago',
+      read: true
+    }
+  ]);
   
   // Calendar states
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -73,7 +98,7 @@ const Dashboard: React.FC = () => {
   const [mobileNotifications, setMobileNotifications] = useState(false);
   const [darkModeSystem, setDarkModeSystem] = useState(false);
   
-  // Activity and notification data
+  // Activity data
   const activities: Activity[] = [
     {
       id: '1',
@@ -104,33 +129,6 @@ const Dashboard: React.FC = () => {
       user: 'Sarah Williams'
     }
   ];
-  
-  const notifications: Notification[] = [
-    {
-      id: '1',
-      content: 'Max (Dog) is due for vaccination',
-      time: '2 hours ago',
-      read: false
-    },
-    {
-      id: '2',
-      content: 'New adoption application received',
-      time: '4 hours ago',
-      read: false
-    },
-    {
-      id: '3',
-      content: 'Staff meeting tomorrow at 10 AM',
-      time: 'Yesterday',
-      read: true
-    },
-    {
-      id: '4',
-      content: 'Monthly report is ready for review',
-      time: '2 days ago',
-      read: true
-    }
-  ];
 
   const animalData = [
     { name: 'Dogs', value: 5, color: '#10B981' },
@@ -154,6 +152,22 @@ const Dashboard: React.FC = () => {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const markAllNotificationsAsRead = () => {
+    setNotifications(prev => 
+      prev.map(notification => ({ ...notification, read: true }))
+    );
+    toast.success('All notifications marked as read');
+  };
+
+  const handleNotificationClick = (id: string) => {
+    setNotifications(prev => 
+      prev.map(notification => 
+        notification.id === id ? { ...notification, read: true } : notification
+      )
+    );
+    toast.success('Notification marked as read');
   };
 
   const renderCalendar = () => {
@@ -289,6 +303,10 @@ const Dashboard: React.FC = () => {
     );
   };
 
+  const handleAnimalClick = (id: string) => {
+    navigate(`/animals/${id}`);
+  };
+
   if (!isAuthenticated) {
     return null; // Or a loading spinner
   }
@@ -315,32 +333,32 @@ const Dashboard: React.FC = () => {
           </div>
 
           <div className="px-4 py-2 hover:bg-sidebar-accent cursor-pointer" onClick={() => navigate('/forms/note')}>
-  <div className="flex items-center">
-    <FileText className="h-5 w-5 text-sidebar-foreground" />
-    <span className="mx-4 font-medium">Notes</span>
-  </div>
-</div>
+            <div className="flex items-center">
+              <FileText className="h-5 w-5 text-sidebar-foreground" />
+              <span className="mx-4 font-medium">Notes</span>
+            </div>
+          </div>
 
-<div className="px-4 py-2 hover:bg-sidebar-accent cursor-pointer" onClick={() => navigate('/forms/feeding')}>
-  <div className="flex items-center">
-    <FileText className="h-5 w-5 text-sidebar-foreground" />
-    <span className="mx-4 font-medium">Notes</span>
-  </div>
-</div>
+          <div className="px-4 py-2 hover:bg-sidebar-accent cursor-pointer" onClick={() => navigate('/forms/feeding')}>
+            <div className="flex items-center">
+              <FileText className="h-5 w-5 text-sidebar-foreground" />
+              <span className="mx-4 font-medium">Feeding</span>
+            </div>
+          </div>
 
-<div className="px-4 py-2 hover:bg-sidebar-accent cursor-pointer" onClick={() => navigate('/forms/transaction')}>
-  <div className="flex items-center">
-    <FileText className="h-5 w-5 text-sidebar-foreground" />
-    <span className="mx-4 font-medium">Notes</span>
-  </div>
-</div>
+          <div className="px-4 py-2 hover:bg-sidebar-accent cursor-pointer" onClick={() => navigate('/forms/transaction')}>
+            <div className="flex items-center">
+              <FileText className="h-5 w-5 text-sidebar-foreground" />
+              <span className="mx-4 font-medium">Transactions</span>
+            </div>
+          </div>
 
-<div className="px-4 py-2 hover:bg-sidebar-accent cursor-pointer" onClick={() => navigate('/forms/task')}>
-  <div className="flex items-center">
-    <FileText className="h-5 w-5 text-sidebar-foreground" />
-    <span className="mx-4 font-medium">Notes</span>
-  </div>
-</div>
+          <div className="px-4 py-2 hover:bg-sidebar-accent cursor-pointer" onClick={() => navigate('/forms/task')}>
+            <div className="flex items-center">
+              <ListTodo className="h-5 w-5 text-sidebar-foreground" />
+              <span className="mx-4 font-medium">Tasks</span>
+            </div>
+          </div>
           
           <div className={`px-4 py-2 hover:bg-sidebar-accent cursor-pointer ${activeTab === 'activity' && 'bg-sidebar-accent border-l-4 border-primary'}`} onClick={() => setActiveTab('activity')}>
             <div className="flex items-center">
@@ -405,7 +423,7 @@ const Dashboard: React.FC = () => {
               <div className="relative">
                 <button 
                   className="p-2 rounded-full hover:bg-secondary relative"
-                  onClick={() => toast.info('This would open the notifications panel')}
+                  onClick={() => setActiveTab('activity')}
                 >
                   <Bell className="h-5 w-5" />
                   {notifications.filter(n => !n.read).length > 0 && (
@@ -502,7 +520,7 @@ const Dashboard: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        <tr className="border-b hover:bg-muted">
+                        <tr className="border-b hover:bg-muted cursor-pointer" onClick={() => handleAnimalClick("1")}>
                           <td className="px-4 py-3">Luna</td>
                           <td className="px-4 py-3 flex items-center">
                             <Cat className="h-4 w-4 mr-2" />
@@ -513,7 +531,7 @@ const Dashboard: React.FC = () => {
                             <span className="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 rounded-full text-xs">Healthy</span>
                           </td>
                         </tr>
-                        <tr className="border-b hover:bg-muted">
+                        <tr className="border-b hover:bg-muted cursor-pointer" onClick={() => handleAnimalClick("2")}>
                           <td className="px-4 py-3">Max</td>
                           <td className="px-4 py-3 flex items-center">
                             <Dog className="h-4 w-4 mr-2" />
@@ -524,7 +542,7 @@ const Dashboard: React.FC = () => {
                             <span className="px-2 py-1 bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100 rounded-full text-xs">Checkup Needed</span>
                           </td>
                         </tr>
-                        <tr className="border-b hover:bg-muted">
+                        <tr className="border-b hover:bg-muted cursor-pointer" onClick={() => handleAnimalClick("3")}>
                           <td className="px-4 py-3">Tweetie</td>
                           <td className="px-4 py-3 flex items-center">
                             <Bird className="h-4 w-4 mr-2" />
@@ -603,10 +621,11 @@ const Dashboard: React.FC = () => {
                       <div 
                         key={notification.id} 
                         className={cn(
-                          "p-3 rounded-lg border relative",
+                          "p-3 rounded-lg border relative cursor-pointer",
                           !notification.read && "bg-primary/5 border-primary/30",
                           "hover:bg-muted/30 transition-colors"
                         )}
+                        onClick={() => handleNotificationClick(notification.id)}
                       >
                         {!notification.read && (
                           <div className="absolute top-3 right-3 w-2 h-2 rounded-full bg-primary" />
@@ -617,7 +636,7 @@ const Dashboard: React.FC = () => {
                     ))}
                   </div>
                   <div className="mt-4 text-center">
-                    <Button variant="ghost">Mark All as Read</Button>
+                    <Button variant="ghost" onClick={markAllNotificationsAsRead}>Mark All as Read</Button>
                   </div>
                 </Card>
               </div>

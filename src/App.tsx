@@ -24,11 +24,14 @@ import AnimalNotes from "./pages/animal/AnimalNotes";
 import AnimalNoteForm from "./pages/animal/AnimalNoteForm";
 import AnimalProduction from "./pages/animal/AnimalProduction";
 
+
 // Import new form components
 import NoteForm from "./components/forms/NoteForm";
 import FeedingForm from "./components/forms/FeedingForm";
 import TaskForm from "./components/forms/TaskForm";
 import TransactionForm from "./components/forms/TransactionForm";
+import AnimalTasks from './pages/animal/AnimalTasks';
+import AnimalTaskForm from './pages/animal/AnimalTaskForm';
 
 const queryClient = new QueryClient();
 
@@ -55,6 +58,11 @@ const App = () => (
               <Route path="/animals/new" element={<AnimalForm />} />
               <Route path="/animals/:id" element={<AnimalDetails />} />
               <Route path="/animals/:id/edit" element={<AnimalForm />} />
+
+              <Route path="/animals/:id" element={<AnimalDetails />} />
+              <Route path="/animals/:id/tasks" element={<AnimalTasks />} />
+              <Route path="/animals/:id/tasks/new" element={<AnimalTaskForm />} />
+              <Route path="/animals/:id/tasks/:taskId/edit" element={<AnimalTaskForm />} />
               
               {/* Animal Activities */}
               <Route path="/animals/:id/activities" element={<AnimalActivities />} />

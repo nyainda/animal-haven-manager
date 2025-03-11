@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
@@ -17,20 +16,17 @@ const VerifyEmail: React.FC = () => {
   
   const navigate = useNavigate();
   const location = useLocation();
-  const { verifyEmail } = useAuth();
+  const { verifyEmail, resendVerificationEmail } = useAuth();
   
-  // Get token from URL query params
   const queryParams = new URLSearchParams(location.search);
   const token = queryParams.get('token');
   
-  // Get email from location state (passed from register page)
   useEffect(() => {
     if (location.state && location.state.email) {
       setEmail(location.state.email);
     }
   }, [location.state]);
   
-  // Cooldown timer for resend button
   useEffect(() => {
     let timer: number;
     if (cooldown > 0) {
@@ -41,7 +37,6 @@ const VerifyEmail: React.FC = () => {
     };
   }, [cooldown]);
   
-  // Verify email token if present
   useEffect(() => {
     const verifyToken = async () => {
       if (!token) return;
@@ -53,12 +48,11 @@ const VerifyEmail: React.FC = () => {
         await verifyEmail(token);
         setIsVerified(true);
         
-        // Trigger confetti animation
         setTimeout(() => {
           confetti({
             particleCount: 100,
             spread: 70,
-            origin: { y: 0.6 }
+            origin: { y: 0.6, x: 0.5 }
           });
         }, 300);
       } catch (err) {
@@ -78,12 +72,9 @@ const VerifyEmail: React.FC = () => {
     setError('');
     
     try {
-      // Mock API call - in a real app, would call a resend verification endpoint
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await resendVerificationEmail();
+      setCooldown(30);
       
-      setCooldown(30); // 30 second cooldown
-      
-      // Show success message
       const resendSuccess = document.getElementById('resend-success');
       if (resendSuccess) {
         resendSuccess.classList.remove('hidden');

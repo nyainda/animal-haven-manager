@@ -30,8 +30,11 @@ export interface NoteFormData {
 }
 
 // Base API URL
-const API_URL = 'http://127.0.0.1:8000/api/animals';
-const CSRF_URL = 'http://127.0.0.1:8000/sanctum/csrf-cookie';
+// const API_URL = 'http://127.0.0.1:8000/api/animals';
+// const CSRF_URL = 'http://127.0.0.1:8000/sanctum/csrf-cookie';
+
+const API_URL = 'https://animal-management-master-wyohh0.laravel.cloud/api/animals';
+const CSRF_URL = 'https://animal-management-master-wyohh0.laravel.cloud/sanctum/csrf-cookie';
 
 // Helper to fetch CSRF token
 const fetchCsrfToken = async () => {
@@ -67,7 +70,7 @@ const getAuthHeaders = (): Record<string, string> => {
 export const createNote = async (animalId: string, noteData: NoteFormData): Promise<Note> => {
   await fetchCsrfToken();
   try {
-    const url = `${API_URL}/${animalId}/notes`; // Correct endpoint for creating notes
+    const url = `${API_URL}/${animalId}/notes`; 
     const response = await fetch(url, {
       method: 'POST',
       headers: getAuthHeaders(),
@@ -95,7 +98,7 @@ export const createNote = async (animalId: string, noteData: NoteFormData): Prom
   }
 };
 
-// Fetch all notes for an animal (optional, for completeness)
+// Fetch all notes for an animal
 export const fetchNotes = async (animalId: string): Promise<Note[]> => {
   await fetchCsrfToken();
   try {
@@ -113,12 +116,104 @@ export const fetchNotes = async (animalId: string): Promise<Note[]> => {
       throw new Error(`API error: ${response.status} ${response.statusText}`);
     }
 
-    const notes = Array.isArray(rawData.data) ? rawData.data : rawData;
+    // Handle different API response formats
+    const notes = Array.isArray(rawData.data) ? rawData.data : 
+                  rawData.data && Array.isArray(rawData.data.data) ? rawData.data.data : 
+                  Array.isArray(rawData) ? rawData : [];
+                  
     console.log('[NOTE] Processed Notes:', notes);
     return notes;
   } catch (error) {
     console.error(`[NOTE] Error fetching notes for animal ${animalId}:`, error);
     toast.error(`Failed to fetch notes: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw error;
+  }
+};
+
+// Fetch a single note
+export const fetchNote = async (animalId: string, noteId: string): Promise<Note> => {
+  await fetchCsrfToken();
+  try {
+    const url = `${API_URL}/${animalId}/notes/${noteId}`;
+    const response = await fetch(url, {
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+
+    console.log('[NOTE] Fetch Note Status:', response.status);
+    const rawData = await response.json();
+    console.log('[NOTE] Raw Fetch Note Response:', rawData);
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+
+    const note = rawData.data || rawData;
+    console.log('[NOTE] Processed Note:', note);
+    return note;
+  } catch (error) {
+    console.error(`[NOTE] Error fetching note ${noteId} for animal ${animalId}:`, error);
+    toast.error(`Failed to fetch note: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw error;
+  }
+};
+
+// Update a note
+export const updateNote = async (animalId: string, noteId: string, noteData: Partial<NoteFormData>): Promise<Note> => {
+  await fetchCsrfToken();
+  try {
+    const url = `${API_URL}/${animalId}/notes/${noteId}`;
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(noteData),
+    });
+
+    console.log('[NOTE] Update Note Status:', response.status);
+    const rawData = await response.json();
+    console.log('[NOTE] Raw Update Note Response:', rawData);
+
+    if (!response.ok) {
+      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
+      throw new Error(errorMessage);
+    }
+
+    const updatedNote = rawData.data || rawData;
+    toast.success(rawData.message || 'Note updated successfully');
+    console.log('[NOTE] Updated Note:', updatedNote);
+    return updatedNote;
+  } catch (error) {
+    console.error(`[NOTE] Error updating note ${noteId} for animal ${animalId}:`, error);
+    toast.error(`Failed to update note: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw error;
+  }
+};
+
+// Delete a note
+export const deleteNote = async (animalId: string, noteId: string): Promise<void> => {
+  await fetchCsrfToken();
+  try {
+    const url = `${API_URL}/${animalId}/notes/${noteId}`;
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+
+    console.log('[NOTE] Delete Note Status:', response.status);
+    const rawData = await response.json();
+    console.log('[NOTE] Raw Delete Note Response:', rawData);
+
+    if (!response.ok) {
+      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
+      throw new Error(errorMessage);
+    }
+
+    toast.success(rawData.message || 'Note deleted successfully');
+  } catch (error) {
+    console.error(`[NOTE] Error deleting note ${noteId} for animal ${animalId}:`, error);
+    toast.error(`Failed to delete note: ${error instanceof Error ? error.message : 'Unknown error'}`);
     throw error;
   }
 };

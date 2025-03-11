@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -248,9 +249,17 @@ const Navbar: React.FC = () => {
 const NavLink: React.FC<{ href: string; active: boolean; children: React.ReactNode }> = ({ 
   href, active, children 
 }) => {
+  const navigate = useNavigate();
+  
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    navigate(href);
+  };
+  
   return (
-    <Link 
-      to={href}
+    <a 
+      href={href}
+      onClick={handleClick}
       className={cn(
         "font-serif text-base font-medium transition-colors rounded-md px-3 py-1.5",
         active 
@@ -259,7 +268,7 @@ const NavLink: React.FC<{ href: string; active: boolean; children: React.ReactNo
       )}
     >
       {children}
-    </Link>
+    </a>
   );
 };
 
@@ -267,13 +276,21 @@ const NavLink: React.FC<{ href: string; active: boolean; children: React.ReactNo
 const MobileNavLink: React.FC<{ href: string; active: boolean; children: React.ReactNode }> = ({ 
   href, active, children 
 }) => {
+  const navigate = useNavigate();
+  
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    navigate(href);
+  };
+  
   return (
     <motion.div
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
     >
-      <Link 
-        to={href}
+      <a 
+        href={href}
+        onClick={handleClick}
         className={cn(
           "flex items-center justify-between py-3 px-4 my-1 rounded-lg text-base font-serif transition-all",
           active 
@@ -283,7 +300,7 @@ const MobileNavLink: React.FC<{ href: string; active: boolean; children: React.R
       >
         <span>{children}</span>
         <ChevronRight className="h-4 w-4 opacity-70" />
-      </Link>
+      </a>
     </motion.div>
   );
 };
