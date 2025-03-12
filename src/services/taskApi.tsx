@@ -141,10 +141,19 @@ export const fetchTasks = async (animalId: string): Promise<Task[]> => {
 };
 
 // Fetch a single task
+// Fetch a single task
 export const fetchTask = async (animalId: string, taskId: string): Promise<Task> => {
   await fetchCsrfToken();
   try {
+    // Ensure taskId is valid before making the request
+    if (!taskId || taskId === 'undefined') {
+      throw new Error('Invalid task ID provided');
+    }
+    
+    
     const url = `${API_URL}/${animalId}/tasks/${taskId}`;
+    console.log(`[TASK] Fetching task with URL: ${url}`);
+    
     const response = await fetch(url, {
       method: 'GET',
       headers: getAuthHeaders(),
@@ -152,14 +161,28 @@ export const fetchTask = async (animalId: string, taskId: string): Promise<Task>
     });
 
     console.log('[TASK] Fetch Task Status:', response.status);
+    
+    // Handle 404 specifically to provide a clearer error message
+    if (response.status === 404) {
+      throw new Error(`Task with ID ${taskId} not found`);
+    }
+    
     const rawData = await response.json();
     console.log('[TASK] Raw Fetch Task Response:', rawData);
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
+      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
+      throw new Error(errorMessage);
     }
 
+    // Check if the data structure matches what we expect
     const task = rawData.data || rawData;
+    
+    // Validate that we actually got a task object
+    if (!task || !task.task_id) {
+      throw new Error('Invalid task data received from server');
+    }
+    
     console.log('[TASK] Processed Task:', task);
     return task;
   } catch (error) {

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader2, Calendar, AlertCircle } from 'lucide-react';
@@ -9,16 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
+  Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { format } from 'date-fns';
@@ -26,11 +19,16 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { createNote, updateNote, fetchNote, NoteFormData } from '@/services/noteApi';
 
+// Define error state type
+interface FormErrors {
+  [key: string]: string[];
+}
+
 const AnimalNoteForm: React.FC = () => {
   const { id, noteId } = useParams<{ id: string; noteId: string }>();
   const navigate = useNavigate();
   const isEditing = !!noteId;
-  
+
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<NoteFormData>({
     content: '',
@@ -42,6 +40,7 @@ const AnimalNoteForm: React.FC = () => {
     due_date: format(new Date(), 'yyyy-MM-dd'),
   });
   const [keywordInput, setKeywordInput] = useState('');
+  const [errors, setErrors] = useState<FormErrors>({});
 
   // Fetch existing note data if editing
   useEffect(() => {
@@ -51,7 +50,6 @@ const AnimalNoteForm: React.FC = () => {
       setIsLoading(true);
       try {
         const note = await fetchNote(id, noteId);
-        
         setFormData({
           content: note.content || '',
           category: note.category || 'General',
@@ -60,8 +58,9 @@ const AnimalNoteForm: React.FC = () => {
           status: note.status || 'Active',
           priority: note.priority || 'Normal',
           due_date: note.due_date || format(new Date(), 'yyyy-MM-dd'),
-          file_path: note.file_path || undefined
+          file_path: note.file_path || undefined,
         });
+        setErrors({}); // Clear errors on successful load
       } catch (error) {
         console.error('Error fetching note:', error);
         toast.error('Failed to load note data');
@@ -78,19 +77,32 @@ const AnimalNoteForm: React.FC = () => {
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    // Clear error for this field when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: [] }));
+    }
   };
 
   const handleSelectChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: [] }));
+    }
   };
 
   const handleSwitchChange = (name: string, checked: boolean) => {
     setFormData((prev) => ({ ...prev, [name]: checked }));
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: [] }));
+    }
   };
 
   const handleDateChange = (date: Date | undefined) => {
     if (date) {
       setFormData((prev) => ({ ...prev, due_date: format(date, 'yyyy-MM-dd') }));
+      if (errors.due_date) {
+        setErrors(prev => ({ ...prev, due_date: [] }));
+      }
     }
   };
 
@@ -98,23 +110,34 @@ const AnimalNoteForm: React.FC = () => {
     if (keywordInput.trim() && !formData.keywords.includes(keywordInput.trim())) {
       setFormData((prev) => ({
         ...prev,
-        keywords: [...prev.keywords, keywordInput.trim()]
+        keywords: [...prev.keywords, keywordInput.trim()],
       }));
       setKeywordInput('');
+      if (errors.keywords) {
+        setErrors(prev => ({ ...prev, keywords: [] }));
+      }
     }
   };
 
   const removeKeyword = (keyword: string) => {
     setFormData((prev) => ({
       ...prev,
-      keywords: prev.keywords.filter(k => k !== keyword)
+      keywords: prev.keywords.filter(k => k !== keyword),
     }));
+    if (errors.keywords) {
+      setErrors(prev => ({ ...prev, keywords: [] }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.content.trim() || !formData.category.trim()) {
+      setErrors(prev => ({
+        ...prev,
+        content: !formData.content.trim() ? ['The content field is required.'] : prev.content,
+        category: !formData.category.trim() ? ['The category field is required.'] : prev.category,
+      }));
       toast.error('Please fill in all required fields');
       return;
     }
@@ -125,7 +148,8 @@ const AnimalNoteForm: React.FC = () => {
     }
     
     setIsLoading(true);
-    
+    setErrors({}); // Clear previous errors
+
     try {
       if (isEditing && noteId) {
         await updateNote(id, noteId, formData);
@@ -135,9 +159,18 @@ const AnimalNoteForm: React.FC = () => {
         toast.success('Note created successfully');
       }
       navigate(`/animals/${id}/notes`);
-    } catch (error) {
-      console.error('Error saving note:', error);
-      toast.error(`Failed to save note: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } catch (error: any) {
+      if (error.message && error.message.includes('API error')) {
+        const errorData = JSON.parse(error.message.replace('API error: ', ''));
+        if (errorData.errors) {
+          setErrors(errorData.errors); // Set field-specific errors
+          toast.error(errorData.message || 'Failed to save note');
+        } else {
+          toast.error(errorData.message || 'Failed to save note');
+        }
+      } else {
+        toast.error(`Failed to save note: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -178,22 +211,23 @@ const AnimalNoteForm: React.FC = () => {
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                  <SelectItem value="General">General</SelectItem>
-    <SelectItem value="Health">Health</SelectItem>
-    <SelectItem value="Feeding">Feeding</SelectItem>
-    <SelectItem value="Behavior">Behavior</SelectItem>
-    <SelectItem value="Breeding">Breeding</SelectItem>
-    <SelectItem value="Task">Task</SelectItem>
-    <SelectItem value="Training">Training</SelectItem>
-    <SelectItem value="Grooming">Grooming</SelectItem>
-    <SelectItem value="Housing">Housing</SelectItem>
-    <SelectItem value="Equipment">Equipment</SelectItem>
-    <SelectItem value="Socialization">Socialization</SelectItem>
-    <SelectItem value="Safety">Safety</SelectItem>
-    <SelectItem value="Nutrition">Nutrition</SelectItem>
-    <SelectItem value="Exercise">Exercise</SelectItem>
+                    <SelectItem value="General">General</SelectItem>
+                    <SelectItem value="Health">Health</SelectItem>
+                    <SelectItem value="Feeding">Feeding</SelectItem>
+                    <SelectItem value="Behavior">Behavior</SelectItem>
+                    <SelectItem value="Breeding">Breeding</SelectItem>
+                    <SelectItem value="Task">Task</SelectItem>
+                    <SelectItem value="Training">Training</SelectItem>
+                    <SelectItem value="Grooming">Grooming</SelectItem>
+                    <SelectItem value="Housing">Housing</SelectItem>
+                    <SelectItem value="Equipment">Equipment</SelectItem>
+                    <SelectItem value="Socialization">Socialization</SelectItem>
+                    <SelectItem value="Safety">Safety</SelectItem>
+                    <SelectItem value="Nutrition">Nutrition</SelectItem>
+                    <SelectItem value="Exercise">Exercise</SelectItem>
                   </SelectContent>
                 </Select>
+                {errors.category && <p className="text-red-500 text-sm">{errors.category[0]}</p>}
               </div>
               
               <div className="space-y-2">
@@ -206,11 +240,12 @@ const AnimalNoteForm: React.FC = () => {
                     <SelectValue placeholder="Select priority" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">medium</SelectItem>
-                    <SelectItem value="high">high</SelectItem>
+                    <SelectItem value="Low">Low</SelectItem>
+                    <SelectItem value="Normal">Normal</SelectItem>
+                    <SelectItem value="High">High</SelectItem>
                   </SelectContent>
                 </Select>
+                {errors.priority && <p className="text-red-500 text-sm">{errors.priority[0]}</p>}
               </div>
             </div>
             
@@ -225,6 +260,7 @@ const AnimalNoteForm: React.FC = () => {
                 rows={8}
                 required
               />
+              {errors.content && <p className="text-red-500 text-sm">{errors.content[0]}</p>}
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -252,6 +288,7 @@ const AnimalNoteForm: React.FC = () => {
                     />
                   </PopoverContent>
                 </Popover>
+                {errors.due_date && <p className="text-red-500 text-sm">{errors.due_date[0]}</p>}
               </div>
               
               <div className="space-y-2">
@@ -264,12 +301,12 @@ const AnimalNoteForm: React.FC = () => {
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
-                   
-                    <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="archived">Archived</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="Completed">Completed</SelectItem>
+                    <SelectItem value="Archived">Archived</SelectItem>
+                    <SelectItem value="Pending">Pending</SelectItem>
                   </SelectContent>
                 </Select>
+                {errors.status && <p className="text-red-500 text-sm">{errors.status[0]}</p>}
               </div>
             </div>
             
@@ -289,7 +326,7 @@ const AnimalNoteForm: React.FC = () => {
                 />
                 <Button type="button" onClick={addKeyword}>Add</Button>
               </div>
-              
+              {errors.keywords && <p className="text-red-500 text-sm">{errors.keywords[0]}</p>}
               {formData.keywords.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-2">
                   {formData.keywords.map((keyword, index) => (
@@ -303,7 +340,7 @@ const AnimalNoteForm: React.FC = () => {
                         onClick={() => removeKeyword(keyword)}
                         className="ml-1 text-secondary-foreground/70 hover:text-secondary-foreground"
                       >
-                        &times;
+                        ×
                       </button>
                     </div>
                   ))}
@@ -318,6 +355,7 @@ const AnimalNoteForm: React.FC = () => {
                 onCheckedChange={(checked) => handleSwitchChange('add_to_calendar', checked)}
               />
               <Label htmlFor="add_to_calendar">Add to calendar</Label>
+              {errors.add_to_calendar && <p className="text-red-500 text-sm">{errors.add_to_calendar[0]}</p>}
             </div>
             
             <div className="flex justify-end gap-3">

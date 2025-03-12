@@ -18,10 +18,15 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { createTask, updateTask, fetchTask, TaskFormData } from '@/services/taskApi';
 
+// Define error state type
+interface FormErrors {
+  [key: string]: string[];
+}
+
 const AnimalTaskForm: React.FC = () => {
   const { id, taskId } = useParams<{ id: string; taskId: string }>();
   const navigate = useNavigate();
-  const isEditing = !!taskId;
+  const isEditing = !!taskId && taskId !== 'undefined';
 
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<TaskFormData>({
@@ -35,8 +40,22 @@ const AnimalTaskForm: React.FC = () => {
     priority: 'medium',
     status: 'pending',
   });
+  const [errors, setErrors] = useState<FormErrors>({});
+
+  // Normalize time to HH:mm format (e.g., "09:00")
+  const normalizeTime = (time: string): string => {
+    if (!time) return '00:00'; // Fallback for invalid time
+    const [hours, minutes] = time.split(':');
+    return `${hours.padStart(2, '0')}:${minutes.slice(0, 2)}`;
+  };
 
   useEffect(() => {
+    if (isEditing && (!taskId || taskId === 'undefined')) {
+      toast.error('Invalid task ID');
+      navigate(`/animals/${id}/tasks`);
+      return;
+    }
+
     const fetchTaskData = async () => {
       if (!isEditing || !id || !taskId) return;
       
@@ -47,30 +66,48 @@ const AnimalTaskForm: React.FC = () => {
           ...task,
           start_date: format(parseISO(task.start_date), 'yyyy-MM-dd'),
           end_date: format(parseISO(task.end_date), 'yyyy-MM-dd'),
+          start_time: normalizeTime(task.start_time),
+          end_time: normalizeTime(task.end_time),
           end_repeat_date: task.end_repeat_date ? format(parseISO(task.end_repeat_date), 'yyyy-MM-dd') : undefined,
         });
+        setErrors({}); // Clear errors on successful load
       } catch (error) {
         toast.error('Failed to load task data');
+        navigate(`/animals/${id}/tasks`);
       } finally {
         setIsLoading(false);
       }
     };
-
+  
     fetchTaskData();
-  }, [id, taskId, isEditing]);
+  }, [id, taskId, isEditing, navigate]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    if (name === 'start_time' || name === 'end_time') {
+      setFormData(prev => ({ ...prev, [name]: normalizeTime(value) }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
+    // Clear error for this field when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: [] }));
+    }
   };
 
   const handleSelectChange = (name: string, value: string) => {
     setFormData(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: [] }));
+    }
   };
 
   const handleDateChange = (name: string, date: Date | undefined) => {
     if (date) {
       setFormData(prev => ({ ...prev, [name]: format(date, 'yyyy-MM-dd') }));
+      if (errors[name]) {
+        setErrors(prev => ({ ...prev, [name]: [] }));
+      }
     }
   };
 
@@ -81,22 +118,64 @@ const AnimalTaskForm: React.FC = () => {
     setFormData(prev => ({ ...prev, duration }));
   };
 
+  const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const durationValue = parseInt(e.target.value);
+    
+    if (isNaN(durationValue) || durationValue <= 0) return;
+    
+    const start = new Date(`${formData.start_date}T${formData.start_time}`);
+    const end = new Date(start.getTime() + durationValue * 60000);
+    
+    setFormData(prev => ({ 
+      ...prev, 
+      duration: durationValue,
+      end_date: format(end, 'yyyy-MM-dd'),
+      end_time: normalizeTime(format(end, 'HH:mm')),
+    }));
+    if (errors.duration) {
+      setErrors(prev => ({ ...prev, duration: [] }));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
+  
+    if (isEditing && (!taskId || taskId === 'undefined')) {
+      toast.error('Invalid task ID');
+      return;
+    }
+  
+    const normalizedFormData = {
+      ...formData,
+      start_time: normalizeTime(formData.start_time),
+      end_time: normalizeTime(formData.end_time),
+    };
 
     setIsLoading(true);
+    setErrors({}); // Clear previous errors
+
     try {
       if (isEditing && taskId) {
-        await updateTask(id, taskId, formData);
+        await updateTask(id, taskId, normalizedFormData);
         toast.success('Task updated successfully');
       } else {
-        await createTask(id, formData);
+        await createTask(id, normalizedFormData);
         toast.success('Task created successfully');
       }
       navigate(`/animals/${id}/tasks`);
-    } catch (error) {
-      toast.error('Failed to save task');
+    } catch (error: any) {
+      if (error.message && error.message.includes('API error')) {
+        const errorData = JSON.parse(error.message.replace('API error: ', ''));
+        if (errorData.errors) {
+          setErrors(errorData.errors); // Set field-specific errors
+          toast.error(errorData.message || 'Failed to save task');
+        } else {
+          toast.error(errorData.message || 'Failed to save task');
+        }
+      } else {
+        toast.error('An unexpected error occurred');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -134,6 +213,7 @@ const AnimalTaskForm: React.FC = () => {
                   onChange={handleInputChange}
                   required
                 />
+                {errors.title && <p className="text-red-500 text-sm">{errors.title[0]}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="task_type">Task Type</Label>
@@ -145,12 +225,14 @@ const AnimalTaskForm: React.FC = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="health_check">Health Check</SelectItem>
                     <SelectItem value="feeding">Feeding</SelectItem>
-                    <SelectItem value="training">Training</SelectItem>
-                    <SelectItem value="grooming">Grooming</SelectItem>
+                    <SelectItem value="vaccination">Vaccination</SelectItem>
+                    <SelectItem value="milking">Milking</SelectItem>
+                    <SelectItem value="health_check">Health check</SelectItem>
+                    <SelectItem value="cleaning">Cleaning</SelectItem>
                   </SelectContent>
                 </Select>
+                {errors.task_type && <p className="text-red-500 text-sm">{errors.task_type[0]}</p>}
               </div>
             </div>
 
@@ -172,6 +254,7 @@ const AnimalTaskForm: React.FC = () => {
                     />
                   </PopoverContent>
                 </Popover>
+                {errors.start_date && <p className="text-red-500 text-sm">{errors.start_date[0]}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="start_time">Start Time</Label>
@@ -184,6 +267,7 @@ const AnimalTaskForm: React.FC = () => {
                   onBlur={calculateDuration}
                   required
                 />
+                {errors.start_time && <p className="text-red-500 text-sm">{errors.start_time[0]}</p>}
               </div>
             </div>
 
@@ -205,6 +289,7 @@ const AnimalTaskForm: React.FC = () => {
                     />
                   </PopoverContent>
                 </Popover>
+                {errors.end_date && <p className="text-red-500 text-sm">{errors.end_date[0]}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="end_time">End Time</Label>
@@ -217,6 +302,23 @@ const AnimalTaskForm: React.FC = () => {
                   onBlur={calculateDuration}
                   required
                 />
+                {errors.end_time && <p className="text-red-500 text-sm">{errors.end_time[0]}</p>}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="duration">Duration (minutes)</Label>
+                <Input
+                  type="number"
+                  id="duration"
+                  name="duration"
+                  value={formData.duration}
+                  onChange={handleDurationChange}
+                  min="1"
+                  required
+                />
+                {errors.duration && <p className="text-red-500 text-sm">{errors.duration[0]}</p>}
               </div>
             </div>
 
@@ -225,9 +327,10 @@ const AnimalTaskForm: React.FC = () => {
               <Textarea
                 id="description"
                 name="description"
-                value={formData.description}
+                value={formData.description || ''}
                 onChange={handleInputChange}
               />
+              {errors.description && <p className="text-red-500 text-sm">{errors.description[0]}</p>}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -246,6 +349,7 @@ const AnimalTaskForm: React.FC = () => {
                     <SelectItem value="high">High</SelectItem>
                   </SelectContent>
                 </Select>
+                {errors.priority && <p className="text-red-500 text-sm">{errors.priority[0]}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
@@ -259,18 +363,21 @@ const AnimalTaskForm: React.FC = () => {
                   <SelectContent>
                     <SelectItem value="pending">Pending</SelectItem>
                     <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="archived">Archived</SelectItem>
+                    <SelectItem value="in_progress">Progress</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
                   </SelectContent>
                 </Select>
+                {errors.status && <p className="text-red-500 text-sm">{errors.status[0]}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="location">Location</Label>
                 <Input
                   id="location"
                   name="location"
-                  value={formData.location}
+                  value={formData.location || ''}
                   onChange={handleInputChange}
                 />
+                {errors.location && <p className="text-red-500 text-sm">{errors.location[0]}</p>}
               </div>
             </div>
 
@@ -290,6 +397,7 @@ const AnimalTaskForm: React.FC = () => {
                     <SelectItem value="monthly">Monthly</SelectItem>
                   </SelectContent>
                 </Select>
+                {errors.repeats && <p className="text-red-500 text-sm">{errors.repeats[0]}</p>}
               </div>
               {formData.repeats && (
                 <>
@@ -303,6 +411,7 @@ const AnimalTaskForm: React.FC = () => {
                       onChange={handleInputChange}
                       min="1"
                     />
+                    {errors.repeat_frequency && <p className="text-red-500 text-sm">{errors.repeat_frequency[0]}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="end_repeat_date">End Repeat Date</Label>
@@ -321,6 +430,7 @@ const AnimalTaskForm: React.FC = () => {
                         />
                       </PopoverContent>
                     </Popover>
+                    {errors.end_repeat_date && <p className="text-red-500 text-sm">{errors.end_repeat_date[0]}</p>}
                   </div>
                 </>
               )}

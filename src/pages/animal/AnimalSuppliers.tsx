@@ -2,35 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { 
-  ArrowLeft, Plus, CheckSquare, Loader2, Calendar, Edit, Trash2,
-  AlertTriangle, Clock, Tag, BarChart3, CheckCircle2, XCircle
+  ArrowLeft, Plus, Loader2, Calendar, Edit, Trash2, AlertTriangle, Clock, Tag, BarChart3, CheckCircle2, XCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { fetchAnimal } from '@/services/animalService';
-import { fetchTasks, deleteTask, Task } from '@/services/taskApi';
+import { fetchSuppliers, deleteSupplier, Supplier } from '@/services/supplierApi';
 import { Animal } from '@/types/AnimalTypes';
 import { 
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
 import { formatDistanceToNow, format, isPast } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar } from '@/components/ui/avatar';
 
-const AnimalTasks: React.FC = () => {
+const AnimalSuppliers: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [animal, setAnimal] = useState<Animal | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
-  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+  const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
   const [activeTab, setActiveTab] = useState<string>('all');
 
   useEffect(() => {
@@ -44,13 +38,12 @@ const AnimalTasks: React.FC = () => {
       try {
         const animalData = await fetchAnimal(id);
         setAnimal(animalData);
-        
-        // Fetch tasks from the API
-        const tasksData = await fetchTasks(id);
-        setTasks(tasksData);
+
+        const suppliersData = await fetchSuppliers(id);
+        setSuppliers(suppliersData);
       } catch (error) {
         console.error('Error loading data:', error);
-        toast.error('Failed to load animal data or tasks');
+        toast.error('Failed to load animal data or suppliers');
       } finally {
         setLoading(false);
       }
@@ -59,37 +52,37 @@ const AnimalTasks: React.FC = () => {
     loadData();
   }, [id, navigate]);
 
-  const handleDeleteClick = (task: Task) => {
-    setTaskToDelete(task);
+  const handleDeleteClick = (supplier: Supplier) => {
+    setSupplierToDelete(supplier);
     setDeleteConfirmOpen(true);
   };
 
   const handleConfirmDelete = async () => {
-    if (!taskToDelete || !id) return;
-    
+    if (!supplierToDelete || !id) return;
+
     try {
-      await deleteTask(id, taskToDelete.task_id);
-      setTasks(tasks.filter(task => task.task_id !== taskToDelete.task_id));
-      toast.success('Task deleted successfully');
+      await deleteSupplier(id, supplierToDelete.id);
+      setSuppliers(suppliers.filter(supplier => supplier.id !== supplierToDelete.id));
+      toast.success('Supplier deleted successfully');
     } catch (error) {
-      console.error('Error deleting task:', error);
-      toast.error('Failed to delete task');
+      console.error('Error deleting supplier:', error);
+      toast.error('Failed to delete supplier');
     } finally {
       setDeleteConfirmOpen(false);
-      setTaskToDelete(null);
+      setSupplierToDelete(null);
     }
   };
 
-  const getFormattedDateTime = (date: string, time: string) => {
+  const getFormattedDate = (date: string) => {
     try {
-      return format(new Date(`${date}T${time}`), 'PPP hh:mm a');
+      return format(new Date(date), 'PPP');
     } catch {
-      return `${date} ${time}`;
+      return date;
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority?.toLowerCase()) {
+  const getImportanceColor = (importance: string) => {
+    switch (importance?.toLowerCase()) {
       case 'high':
         return 'bg-red-100 text-red-800';
       case 'medium':
@@ -103,13 +96,9 @@ const AnimalTasks: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
-      case 'completed':
+      case 'active':
         return 'bg-green-100 text-green-800';
-      case 'in progress':
-        return 'bg-blue-100 text-blue-800';
-      case 'pending':
-        return 'bg-amber-100 text-amber-800';
-      case 'cancelled':
+      case 'inactive':
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -118,35 +107,31 @@ const AnimalTasks: React.FC = () => {
 
   const getStatusIcon = (status: string) => {
     switch (status?.toLowerCase()) {
-      case 'completed':
+      case 'active':
         return <CheckCircle2 className="h-4 w-4 mr-1" />;
-      case 'in progress':
-        return <Clock className="h-4 w-4 mr-1" />;
-      case 'pending':
-        return <AlertTriangle className="h-4 w-4 mr-1" />;
-      case 'cancelled':
+      case 'inactive':
         return <XCircle className="h-4 w-4 mr-1" />;
       default:
         return null;
     }
   };
 
-  const isPastDue = (date: string, time: string) => {
+  const isContractExpired = (endDate: string) => {
     try {
-      return isPast(new Date(`${date}T${time}`));
+      return isPast(new Date(endDate));
     } catch {
       return false;
     }
   };
 
-  const filteredTasks = () => {
-    if (activeTab === 'all') return tasks;
-    if (activeTab === 'completed') return tasks.filter(task => task.status?.toLowerCase() === 'completed');
-    if (activeTab === 'pending') return tasks.filter(task => task.status?.toLowerCase() === 'pending');
-    if (activeTab === 'overdue') return tasks.filter(task => 
-      isPastDue(task.start_date, task.start_time) && task.status?.toLowerCase() !== 'completed'
+  const filteredSuppliers = () => {
+    if (activeTab === 'all') return suppliers;
+    if (activeTab === 'active') return suppliers.filter(supplier => supplier.status?.toLowerCase() === 'active');
+    if (activeTab === 'inactive') return suppliers.filter(supplier => supplier.status?.toLowerCase() === 'inactive');
+    if (activeTab === 'expired') return suppliers.filter(supplier => 
+      isContractExpired(supplier.contract_end_date) && supplier.status?.toLowerCase() === 'active'
     );
-    return tasks;
+    return suppliers;
   };
 
   if (loading) {
@@ -183,98 +168,91 @@ const AnimalTasks: React.FC = () => {
           </Button>
           <div className="flex items-center">
             <Avatar className="h-12 w-12 mr-4">
-              
+              {/* Add avatar content if available */}
             </Avatar>
             <div>
-              <h1 className="text-2xl font-bold">{animal.name}'s Tasks</h1>
+              <h1 className="text-2xl font-bold">{animal.name}'s Suppliers</h1>
               <p className="text-sm text-muted-foreground">
-                
+                Manage suppliers for {animal.name}
               </p>
             </div>
           </div>
         </div>
-        <Button onClick={() => navigate(`/animals/${id}/tasks/new`)} className="shrink-0">
+        <Button onClick={() => navigate(`/animals/${id}/suppliers/new`)} className="shrink-0">
           <Plus className="mr-2 h-4 w-4" />
-          Add Task
+          Add Supplier
         </Button>
       </div>
       
       <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="mb-8">
         <TabsList className="mb-4">
-          <TabsTrigger value="all">All Tasks</TabsTrigger>
-          <TabsTrigger value="pending">Pending</TabsTrigger>
-          <TabsTrigger value="completed">Completed</TabsTrigger>
-          <TabsTrigger value="overdue">Overdue</TabsTrigger>
+          <TabsTrigger value="all">All Suppliers</TabsTrigger>
+          <TabsTrigger value="active">Active</TabsTrigger>
+          <TabsTrigger value="inactive">Inactive</TabsTrigger>
+          <TabsTrigger value="expired">Expired Contracts</TabsTrigger>
         </TabsList>
         
         <TabsContent value={activeTab}>
-          {filteredTasks().length === 0 ? (
+          {filteredSuppliers().length === 0 ? (
             <Card className="mb-6">
               <CardContent className="pt-6">
                 <div className="rounded-lg border border-dashed p-8 text-center">
-                  <CheckSquare className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No {activeTab !== 'all' ? activeTab : ''} Tasks</h3>
+                  <Tag className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No {activeTab !== 'all' ? activeTab : ''} Suppliers</h3>
                   <p className="text-muted-foreground mb-4">
                     {activeTab === 'all' 
-                      ? "No tasks have been recorded for this animal yet." 
-                      : `No ${activeTab} tasks found for this animal.`}
+                      ? "No suppliers have been recorded for this animal yet." 
+                      : `No ${activeTab} suppliers found for this animal.`}
                   </p>
-                  <Button onClick={() => navigate(`/animals/${id}/tasks/new`)}>
-                    Add Task
+                  <Button onClick={() => navigate(`/animals/${id}/suppliers/new`)}>
+                    Add Supplier
                   </Button>
                 </div>
               </CardContent>
             </Card>
           ) : (
             <div className="grid grid-cols-1 gap-6">
-              {filteredTasks().map((task) => {
-                const isPastDueTask = isPastDue(task.start_date, task.start_time) && 
-                  task.status?.toLowerCase() !== 'completed';
-                
+              {filteredSuppliers().map((supplier) => {
+                const isExpired = isContractExpired(supplier.contract_end_date) && 
+                  supplier.status?.toLowerCase() === 'active';
+
                 return (
                   <Card 
-                    key={task.task_id} 
-                    className={`overflow-hidden ${isPastDueTask ? 'border-red-300' : ''}`}
+                    key={supplier.id} 
+                    className={`overflow-hidden ${isExpired ? 'border-red-300' : ''}`}
                   >
-                    {isPastDueTask && (
+                    {isExpired && (
                       <div className="bg-red-100 px-4 py-1 flex items-center">
                         <AlertTriangle className="h-4 w-4 text-red-700 mr-2" />
-                        <span className="text-sm text-red-700 font-medium">Past due</span>
+                        <span className="text-sm text-red-700 font-medium">Contract Expired</span>
                       </div>
                     )}
                     <CardHeader className="flex flex-row items-start justify-between pb-2">
                       <div>
-                        <CardTitle className="text-xl">{task.title}</CardTitle>
+                        <CardTitle className="text-xl">{supplier.name}</CardTitle>
                         <div className="flex flex-wrap items-center text-sm text-muted-foreground mt-1 gap-x-3 gap-y-1">
                           <div className="flex items-center">
                             <Calendar className="h-3.5 w-3.5 mr-1" />
-                            {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
+                            Added: {formatDistanceToNow(new Date(supplier.created_at), { addSuffix: true })}
                           </div>
                           <div className="flex items-center">
                             <Clock className="h-3.5 w-3.5 mr-1" />
-                            Due: {getFormattedDateTime(task.start_date, task.start_time)}
+                            Contract Ends: {getFormattedDate(supplier.contract_end_date)}
                           </div>
                         </div>
                       </div>
                       <div className="flex space-x-2">
-                     
-<Button
-  variant="ghost"
-  size="icon"
-  onClick={() => {
-    if (task.task_id) {
-      navigate(`/animals/${id}/tasks/${task.task_id}/edit`);
-    } else {
-      toast.error('Task ID is missing');
-    }
-  }}
->
-  <Edit className="h-4 w-4" />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => navigate(`/animals/${id}/suppliers/${supplier.id}/edit`)}
+                        >
+                          <Edit className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDeleteClick(task)}
+                          onClick={() => handleDeleteClick(supplier)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -283,30 +261,34 @@ const AnimalTasks: React.FC = () => {
                     
                     <CardContent className="pt-2">
                       <p className="whitespace-pre-line mb-4 text-sm">
-                        {task.description || 'No description provided'}
+                        {supplier.notes || `${supplier.shop_name} - ${supplier.product_type}`}
                       </p>
                       
                       <div className="flex flex-wrap gap-2 mt-4">
-                        {task.task_type && (
+                        {supplier.type && (
                           <Badge variant="outline" className="flex items-center">
                             <Tag className="h-3 w-3 mr-1" />
-                            {task.task_type}
+                            {supplier.type}
                           </Badge>
                         )}
-                        
-                        {task.priority && (
-                          <Badge variant="outline" className={`flex items-center ${getPriorityColor(task.priority)}`}>
+                        {supplier.supplier_importance && (
+                          <Badge variant="outline" className={`flex items-center ${getImportanceColor(supplier.supplier_importance)}`}>
                             <BarChart3 className="h-3 w-3 mr-1" />
-                            {task.priority}
+                            {supplier.supplier_importance}
                           </Badge>
                         )}
-                        
-                        {task.status && (
-                          <Badge variant="outline" className={`flex items-center ${getStatusColor(task.status)}`}>
-                            {getStatusIcon(task.status)}
-                            {task.status}
+                        {supplier.status && (
+                          <Badge variant="outline" className={`flex items-center ${getStatusColor(supplier.status)}`}>
+                            {getStatusIcon(supplier.status)}
+                            {supplier.status}
                           </Badge>
                         )}
+                      </div>
+
+                      <div className="mt-4 text-sm text-muted-foreground">
+                        <p><strong>Contact:</strong> {supplier.contact_name || 'N/A'} ({supplier.contact_email || 'No email'})</p>
+                        <p><strong>Phone:</strong> {supplier.phone}</p>
+                        <p><strong>Address:</strong> {supplier.address}, {supplier.city}, {supplier.state} {supplier.postal_code}, {supplier.country}</p>
                       </div>
                     </CardContent>
                   </Card>
@@ -322,7 +304,7 @@ const AnimalTasks: React.FC = () => {
           <DialogHeader>
             <DialogTitle>Confirm Deletion</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this task? This action cannot be undone.
+              Are you sure you want to delete this supplier? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -339,4 +321,4 @@ const AnimalTasks: React.FC = () => {
   );
 };
 
-export default AnimalTasks;
+export default AnimalSuppliers;

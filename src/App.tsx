@@ -24,6 +24,10 @@ import AnimalNotes from "./pages/animal/AnimalNotes";
 import AnimalNoteForm from "./pages/animal/AnimalNoteForm";
 import AnimalProduction from "./pages/animal/AnimalProduction";
 
+// Import supplier components
+
+import AnimalSuppliers from "./pages/animal/AnimalSuppliers";
+import AnimalSupplierForm from "./pages/animal/AnimalSupplierForm";
 
 // Import new form components
 import NoteForm from "./components/forms/NoteForm";
@@ -59,7 +63,6 @@ const App = () => (
               <Route path="/animals/:id" element={<AnimalDetails />} />
               <Route path="/animals/:id/edit" element={<AnimalForm />} />
 
-              <Route path="/animals/:id" element={<AnimalDetails />} />
               <Route path="/animals/:id/tasks" element={<AnimalTasks />} />
               <Route path="/animals/:id/tasks/new" element={<AnimalTaskForm />} />
               <Route path="/animals/:id/tasks/:taskId/edit" element={<AnimalTaskForm />} />
@@ -91,6 +94,15 @@ const App = () => (
               <Route path="/animals/:id/production/new" element={<AnimalProduction />} />
               <Route path="/animals/:id/production/:productionId" element={<AnimalProduction />} />
               <Route path="/animals/:id/production/:productionId/edit" element={<AnimalProduction />} />
+              
+              {/* Supplier Routes */}
+             
+              
+              {/* Animal Supplier Routes */}
+              <Route path="/animals/:id/suppliers" element={<AnimalSuppliers />} />
+              <Route path="/animals/:id/suppliers/new" element={<AnimalSupplierForm />} />
+              <Route path="/animals/:id/suppliers/:supplierId" element={<AnimalSuppliers />} />
+              <Route path="/animals/:id/suppliers/:supplierId/edit" element={<AnimalSupplierForm />} />
               
               {/* New Form Routes */}
               <Route path="/forms/note" element={<NoteForm />} />

@@ -2,53 +2,37 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { 
-  CalendarIcon, 
-  ArrowLeft, 
-  Edit, 
-  Trash2, 
-  AlertTriangle, 
-  MoreHorizontal, 
-  FileText, 
-  Activity, 
-  Heart, 
-  FileEdit, 
-  PiggyBank,
-  CheckSquare
+  CalendarIcon, ArrowLeft, Edit, Trash2, AlertTriangle, MoreHorizontal, 
+  FileText, Activity, Heart, FileEdit, PiggyBank, CheckSquare, Tag
 } from 'lucide-react';
 import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
+  Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle 
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { fetchAnimal } from '@/services/animalService';
+import { fetchSuppliers, Supplier } from '@/services/supplierApi';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Animal } from '@/types/AnimalTypes';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, 
+  DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
 const AnimalDetails = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [animal, setAnimal] = useState<Animal | null>(null);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [upcomingTasks, setUpcomingTasks] = useState([]);
   const [tasksLoading, setTasksLoading] = useState(false);
+  const [suppliersLoading, setSuppliersLoading] = useState(false);
 
   useEffect(() => {
     const getAnimalDetails = async () => {
@@ -56,15 +40,20 @@ const AnimalDetails = () => {
       
       try {
         setLoading(true);
-        const data = await fetchAnimal(id);
-        setAnimal(data);
+        const animalData = await fetchAnimal(id);
+        setAnimal(animalData);
         setError(null);
+
+        setSuppliersLoading(true);
+        const suppliersData = await fetchSuppliers(id);
+        setSuppliers(suppliersData);
       } catch (err) {
-        console.error('Failed to fetch animal details:', err);
-        setError('Failed to load animal details. Please try again later.');
-        toast.error('Could not load animal details');
+        console.error('Failed to fetch animal details or suppliers:', err);
+        setError('Failed to load animal details or suppliers. Please try again later.');
+        toast.error('Could not load animal details or suppliers');
       } finally {
         setLoading(false);
+        setSuppliersLoading(false);
       }
     };
 
@@ -77,70 +66,57 @@ const AnimalDetails = () => {
       
       try {
         setTasksLoading(true);
-        // You'll need to create this function in your services
         const response = await fetch(`/api/animals/${id}/tasks?status=pending&limit=3`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch tasks');
-        }
-        
+        if (!response.ok) throw new Error('Failed to fetch tasks');
         const data = await response.json();
         setUpcomingTasks(data.data || []);
       } catch (err) {
         console.error('Failed to fetch upcoming tasks:', err);
-        // We don't show an error toast for this as it's not critical
       } finally {
         setTasksLoading(false);
       }
     };
 
-    if (animal) {
-      fetchUpcomingTasks();
-    }
+    if (animal) fetchUpcomingTasks();
   }, [id, animal]);
 
-  const handleEdit = () => {
-    navigate(`/animals/${id}/edit`);
-  };
-
-  const handleDelete = () => {
-    toast.error('Delete functionality not implemented yet');
-  };
+  const handleEdit = () => navigate(`/animals/${id}/edit`);
+  const handleDelete = () => toast.error('Delete functionality not implemented yet');
 
   const getFormattedDate = (dateString: string | null | undefined) => {
     if (!dateString) return 'Not specified';
     try {
       return format(parseISO(dateString), 'PPP');
-    } catch (err) {
+    } catch {
       return dateString;
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'active':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100';
-      case 'inactive':
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100';
-      case 'sold':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100';
-      case 'deceased':
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100';
+      case 'active': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100';
+      case 'inactive': return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100';
+      case 'sold': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100';
+      case 'deceased': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100';
     }
   };
 
   const getTaskPriorityColor = (priority) => {
     switch (priority?.toLowerCase()) {
-      case 'high':
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100';
-      case 'medium':
-        return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100';
-      case 'low':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100';
+      case 'high': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100';
+      case 'medium': return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100';
+      case 'low': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100';
+    }
+  };
+
+  const getSupplierImportanceColor = (importance: string) => {
+    switch (importance?.toLowerCase()) {
+      case 'high': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100';
+      case 'medium': return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100';
+      case 'low': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100';
     }
   };
 
@@ -161,14 +137,10 @@ const AnimalDetails = () => {
               <AlertTriangle className="mr-2 h-5 w-5" />
               Error
             </CardTitle>
-            <CardDescription>
-              {error || 'Animal not found'}
-            </CardDescription>
+            <CardDescription>{error || 'Animal not found'}</CardDescription>
           </CardHeader>
           <CardFooter>
-            <Button onClick={() => navigate('/animals')}>
-              Return to Animals
-            </Button>
+            <Button onClick={() => navigate('/animals')}>Return to Animals</Button>
           </CardFooter>
         </Card>
       </div>
@@ -181,48 +153,31 @@ const AnimalDetails = () => {
     { label: 'Notes', href: `/animals/${id}/notes`, icon: FileText },
     { label: 'Production', href: `/animals/${id}/production`, icon: PiggyBank },
     { label: 'Tasks', href: `/animals/${id}/tasks`, icon: CheckSquare },
+    { label: 'Suppliers', href: `/animals/${id}/suppliers`, icon: Tag },
   ];
 
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
         <div className="flex items-center mb-4 md:mb-0">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="mr-2"
-            onClick={() => navigate('/animals')}
-          >
+          <Button variant="ghost" size="sm" className="mr-2" onClick={() => navigate('/animals')}>
             <ArrowLeft className="h-4 w-4 mr-1" />
             Back
           </Button>
           <h1 className="text-2xl font-bold">{animal.name}</h1>
-          <Badge 
-            variant="secondary"
-            className={cn(
-              "ml-3",
-              getStatusColor(animal.status)
-            )}
-          >
+          <Badge variant="secondary" className={cn("ml-3", getStatusColor(animal.status))}>
             {animal.status}
           </Badge>
         </div>
         
         <div className="flex space-x-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handleEdit}
-          >
+          <Button variant="outline" size="sm" onClick={handleEdit}>
             <Edit className="h-4 w-4 mr-2" />
             Edit
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="sm"
-              >
+              <Button variant="ghost" size="sm">
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -265,6 +220,7 @@ const AnimalDetails = () => {
                   <TabsTrigger value="details">Details</TabsTrigger>
                   <TabsTrigger value="birth">Birth Info</TabsTrigger>
                   <TabsTrigger value="production">Production</TabsTrigger>
+                  <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="overview">
@@ -291,13 +247,7 @@ const AnimalDetails = () => {
                     </div>
                     <div>
                       <h3 className="text-sm font-medium text-muted-foreground">Status</h3>
-                      <Badge 
-                        variant="secondary"
-                        className={cn(
-                          "mt-1",
-                          getStatusColor(animal.status)
-                        )}
-                      >
+                      <Badge variant="secondary" className={cn("mt-1", getStatusColor(animal.status))}>
                         {animal.status}
                       </Badge>
                     </div>
@@ -341,9 +291,7 @@ const AnimalDetails = () => {
                       <p className="text-base font-medium mt-1">{getFormattedDate(animal.next_checkup_date)}</p>
                     </div>
                   </div>
-                  
                   <Separator className="my-4" />
-                  
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground mb-2">Physical Traits</h3>
                     <div className="flex flex-wrap gap-2">
@@ -358,9 +306,7 @@ const AnimalDetails = () => {
                       )}
                     </div>
                   </div>
-                  
                   <Separator className="my-4" />
-                  
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground mb-2">Keywords</h3>
                     <div className="flex flex-wrap gap-2">
@@ -390,9 +336,7 @@ const AnimalDetails = () => {
                     <div>
                       <h3 className="text-sm font-medium text-muted-foreground">Birth Weight</h3>
                       <p className="text-base font-medium mt-1">
-                        {animal.birth_weight 
-                          ? `${animal.birth_weight} ${animal.weight_unit}`
-                          : 'Not recorded'}
+                        {animal.birth_weight ? `${animal.birth_weight} ${animal.weight_unit}` : 'Not recorded'}
                       </p>
                     </div>
                     <div>
@@ -410,9 +354,7 @@ const AnimalDetails = () => {
                     <div>
                       <h3 className="text-sm font-medium text-muted-foreground">Gestation Length</h3>
                       <p className="text-base font-medium mt-1">
-                        {animal.gestation_length 
-                          ? `${animal.gestation_length} days`
-                          : 'Not recorded'}
+                        {animal.gestation_length ? `${animal.gestation_length} days` : 'Not recorded'}
                       </p>
                     </div>
                     <div>
@@ -420,9 +362,7 @@ const AnimalDetails = () => {
                       <p className="text-base font-medium mt-1 capitalize">{animal.health_at_birth}</p>
                     </div>
                   </div>
-                  
                   <Separator className="my-4" />
-                  
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground mb-2">Vaccinations</h3>
                     <div className="flex flex-wrap gap-2">
@@ -443,61 +383,93 @@ const AnimalDetails = () => {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <h3 className="text-base font-medium">Production Records</h3>
-                      <Button 
-                        size="sm" 
-                        onClick={() => navigate(`/animals/${id}/production`)}
-                      >
+                      <Button size="sm" onClick={() => navigate(`/animals/${id}/production`)}>
                         <PiggyBank className="h-4 w-4 mr-2" />
                         Manage Production
                       </Button>
                     </div>
-                    
                     <div className="border rounded-lg p-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <h4 className="text-sm font-medium text-muted-foreground">Production Type</h4>
-                          <p className="text-base font-medium mt-1">
-                          
-                          </p>
+                          <p className="text-base font-medium mt-1">Not implemented</p>
                         </div>
                         <div>
                           <h4 className="text-sm font-medium text-muted-foreground">Production Status</h4>
-                          <p className="text-base font-medium mt-1">
-                            
-                          </p>
+                          <p className="text-base font-medium mt-1">Not implemented</p>
                         </div>
                       </div>
-                      
                       <div className="mt-4">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => navigate(`/animals/${id}/production-statistics`)}
-                        >
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/animals/${id}/production-statistics`)}>
                           View Statistics
                         </Button>
                       </div>
                     </div>
-                    
                     <div>
                       <h3 className="text-base font-medium mb-2">Quick Actions</h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => navigate(`/animals/${id}/production/new`)}
-                        >
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/animals/${id}/production/new`)}>
                           Add Production Record
                         </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => navigate(`/animals/${id}/production-statistics`)}
-                        >
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/animals/${id}/production-statistics`)}>
                           Production Statistics
                         </Button>
                       </div>
                     </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="suppliers">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-base font-medium">Suppliers</h3>
+                      <Button size="sm" onClick={() => navigate(`/animals/${id}/suppliers/new`)}>
+                        <Tag className="h-4 w-4 mr-2" />
+                        Add Supplier
+                      </Button>
+                    </div>
+                    {suppliersLoading ? (
+                      <div className="py-4 flex justify-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary"></div>
+                      </div>
+                    ) : suppliers.length > 0 ? (
+                      <div className="space-y-3">
+                        {suppliers.slice(0, 3).map((supplier) => (
+                          <div key={supplier.id} className="border rounded-lg p-3">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="text-sm font-medium">{supplier.name}</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Contract Ends: {getFormattedDate(supplier.contract_end_date)}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {supplier.shop_name} - {supplier.product_type}
+                                </p>
+                              </div>
+                              <Badge variant="secondary" className={getSupplierImportanceColor(supplier.supplier_importance)}>
+                                {supplier.supplier_importance}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="w-full mt-2"
+                          onClick={() => navigate(`/animals/${id}/suppliers`)}
+                        >
+                          View all suppliers
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="py-3 text-center">
+                        <p className="text-sm text-muted-foreground">No suppliers recorded</p>
+                        <Button variant="outline" size="sm" className="mt-2" onClick={() => navigate(`/animals/${id}/suppliers/new`)}>
+                          <Tag className="h-4 w-4 mr-2" />
+                          Add Supplier
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </TabsContent>
               </Tabs>
@@ -548,10 +520,7 @@ const AnimalDetails = () => {
                               Due: {getFormattedDate(task.due_date)}
                             </p>
                           </div>
-                          <Badge 
-                            variant="secondary"
-                            className={getTaskPriorityColor(task.priority)}
-                          >
+                          <Badge variant="secondary" className={getTaskPriorityColor(task.priority)}>
                             {task.priority}
                           </Badge>
                         </div>
@@ -572,12 +541,7 @@ const AnimalDetails = () => {
                 ) : (
                   <div className="py-3 text-center">
                     <p className="text-sm text-muted-foreground">No upcoming tasks</p>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="mt-2"
-                      onClick={() => navigate(`/animals/${id}/tasks/new`)}
-                    >
+                    <Button variant="outline" size="sm" className="mt-2" onClick={() => navigate(`/animals/${id}/tasks/new`)}>
                       <CheckSquare className="h-4 w-4 mr-2" />
                       Create Task
                     </Button>
