@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { 
   CalendarIcon, ArrowLeft, Edit, Trash2, AlertTriangle, MoreHorizontal, 
@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { fetchAnimal } from '@/services/animalService';
 import { fetchSuppliers, Supplier } from '@/services/supplierApi';
+import { fetchProductions, Production } from '@/services/animalProductionApi'; // Import production API
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Animal } from '@/types/AnimalTypes';
@@ -27,7 +28,9 @@ const AnimalDetails = () => {
   const navigate = useNavigate();
   const [animal, setAnimal] = useState<Animal | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [productions, setProductions] = useState<Production[]>([]); // Add state for productions
   const [loading, setLoading] = useState(true);
+  const [productionsLoading, setProductionsLoading] = useState(false); // Loading state for productions
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [upcomingTasks, setUpcomingTasks] = useState([]);
@@ -47,13 +50,18 @@ const AnimalDetails = () => {
         setSuppliersLoading(true);
         const suppliersData = await fetchSuppliers(id);
         setSuppliers(suppliersData);
+
+        setProductionsLoading(true);
+        const productionsData = await fetchProductions(id); // Fetch production records
+        setProductions(productionsData);
       } catch (err) {
-        console.error('Failed to fetch animal details or suppliers:', err);
-        setError('Failed to load animal details or suppliers. Please try again later.');
-        toast.error('Could not load animal details or suppliers');
+        console.error('Failed to fetch animal details, suppliers, or productions:', err);
+        setError('Failed to load animal details, suppliers, or production data. Please try again later.');
+        toast.error('Could not load animal details, suppliers, or production data');
       } finally {
         setLoading(false);
         setSuppliersLoading(false);
+        setProductionsLoading(false);
       }
     };
 
@@ -116,6 +124,15 @@ const AnimalDetails = () => {
       case 'high': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100';
       case 'medium': return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100';
       case 'low': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100';
+    }
+  };
+
+  const getQualityStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'passed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100';
+      case 'failed': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100';
+      case 'pending': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100';
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100';
     }
   };
@@ -216,7 +233,7 @@ const AnimalDetails = () => {
             <CardContent>
               <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="mb-4">
-                  <TabsTrigger value="overviews">Overview</TabsTrigger>
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
                   <TabsTrigger value="details">Details</TabsTrigger>
                   <TabsTrigger value="birth">Birth Info</TabsTrigger>
                   <TabsTrigger value="production">Production</TabsTrigger>
@@ -388,30 +405,72 @@ const AnimalDetails = () => {
                         Manage Production
                       </Button>
                     </div>
-                    <div className="border rounded-lg p-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <h4 className="text-sm font-medium text-muted-foreground">Production Type</h4>
-                          <p className="text-base font-medium mt-1">Not implemented</p>
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-medium text-muted-foreground">Production Status</h4>
-                          <p className="text-base font-medium mt-1">Not implemented</p>
-                        </div>
+                    {productionsLoading ? (
+                      <div className="py-4 flex justify-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary"></div>
                       </div>
-                      <div className="mt-4">
-                        <Button variant="outline" size="sm" onClick={() => navigate(`/animals/${id}/production-statistics`)}>
-                          View Statistics
+                    ) : productions.length > 0 ? (
+                      <div className="space-y-3">
+                        {productions.slice(0, 3).map((production) => (
+                          <div key={production.id} className="border rounded-lg p-3">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="text-sm font-medium">{production.product_category.name}</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {getFormattedDate(production.production_date)} - {production.quantity}{' '}
+                                  {production.product_category.measurement_unit}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Total: ${(parseFloat(production.quantity) * parseFloat(production.price_per_unit)).toFixed(2)}
+                                </p>
+                              </div>
+                              <Badge
+                                variant="secondary"
+                                className={getQualityStatusColor(production.quality_status)}
+                              >
+                                {production.quality_status}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="w-full mt-2"
+                          onClick={() => navigate(`/animals/${id}/production`)}
+                        >
+                          View all production records
                         </Button>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="py-3 text-center">
+                        <p className="text-sm text-muted-foreground">No production records available</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2"
+                          onClick={() => navigate(`/animals/${id}/production/new`)}
+                        >
+                          <PiggyBank className="h-4 w-4 mr-2" />
+                          Add Production Record
+                        </Button>
+                      </div>
+                    )}
                     <div>
                       <h3 className="text-base font-medium mb-2">Quick Actions</h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <Button variant="outline" size="sm" onClick={() => navigate(`/animals/${id}/production/new`)}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/animals/${id}/production/new`)}
+                        >
                           Add Production Record
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => navigate(`/animals/${id}/production-statistics`)}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/animals/${id}/production-statistics`)}
+                        >
                           Production Statistics
                         </Button>
                       </div>

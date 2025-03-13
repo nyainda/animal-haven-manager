@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { 
-  ArrowLeft, Plus, Loader2, Calendar, Edit, Trash2, AlertTriangle, Clock, Tag, BarChart3, CheckCircle2, XCircle
+  ArrowLeft, Plus, Loader2, Calendar, Edit, Trash2, AlertTriangle, Clock, Tag, BarChart3, CheckCircle2, XCircle, Download
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -16,6 +16,8 @@ import { formatDistanceToNow, format, isPast } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar } from '@/components/ui/avatar';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 const AnimalSuppliers: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -26,6 +28,7 @@ const AnimalSuppliers: React.FC = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
   const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
   const [activeTab, setActiveTab] = useState<string>('all');
+  const pdfContentRef = useRef<HTMLDivElement>(null); // Ref to capture PDF content
 
   useEffect(() => {
     if (!id) {
@@ -83,36 +86,26 @@ const AnimalSuppliers: React.FC = () => {
 
   const getImportanceColor = (importance: string) => {
     switch (importance?.toLowerCase()) {
-      case 'high':
-        return 'bg-red-100 text-red-800';
-      case 'medium':
-        return 'bg-amber-100 text-amber-800';
-      case 'low':
-        return 'bg-green-100 text-green-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+      case 'high': return 'bg-red-100 text-red-800';
+      case 'medium': return 'bg-amber-100 text-amber-800';
+      case 'low': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'inactive':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+      case 'active': return 'bg-green-100 text-green-800';
+      case 'inactive': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status?.toLowerCase()) {
-      case 'active':
-        return <CheckCircle2 className="h-4 w-4 mr-1" />;
-      case 'inactive':
-        return <XCircle className="h-4 w-4 mr-1" />;
-      default:
-        return null;
+      case 'active': return <CheckCircle2 className="h-4 w-4 mr-1" />;
+      case 'inactive': return <XCircle className="h-4 w-4 mr-1" />;
+      default: return null;
     }
   };
 
@@ -132,6 +125,47 @@ const AnimalSuppliers: React.FC = () => {
       isContractExpired(supplier.contract_end_date) && supplier.status?.toLowerCase() === 'active'
     );
     return suppliers;
+  };
+
+  const generatePDF = async () => {
+    if (!pdfContentRef.current || !animal) return;
+
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const canvas = await html2canvas(pdfContentRef.current, { scale: 2 });
+    const imgData = canvas.toDataURL('image/png');
+    const imgWidth = 190; // Width in mm (A4 width - margins)
+    const pageHeight = 295; // A4 height in mm
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    let heightLeft = imgHeight;
+    let position = 10; // Top margin
+
+    // Add header
+    pdf.setFontSize(18);
+    pdf.setTextColor(0, 102, 204); // Blue color
+    pdf.text(`${animal.name}'s Suppliers Report`, 10, 20);
+    pdf.setFontSize(10);
+    pdf.setTextColor(100);
+    pdf.text(`Generated on: ${format(new Date(), 'PPPp')}`, 10, 28);
+
+    // Add image content
+    pdf.addImage(imgData, 'PNG', 10, 40, imgWidth, imgHeight);
+    heightLeft -= pageHeight - 40;
+
+    // Handle multiple pages
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight + 40;
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+
+    // Add footer
+    pdf.setFontSize(8);
+    pdf.setTextColor(150);
+    pdf.text(`Animal Management System - Page ${pdf.getNumberOfPages()}`, 10, 290);
+
+    pdf.save(`${animal.name}_suppliers_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    toast.success('PDF report generated successfully');
   };
 
   if (loading) {
@@ -178,10 +212,16 @@ const AnimalSuppliers: React.FC = () => {
             </div>
           </div>
         </div>
-        <Button onClick={() => navigate(`/animals/${id}/suppliers/new`)} className="shrink-0">
-          <Plus className="mr-2 h-4 w-4" />
-          Add Supplier
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => navigate(`/animals/${id}/suppliers/new`)} className="shrink-0">
+            <Plus className="mr-2 h-4 w-4" />
+            Add Supplier
+          </Button>
+          <Button onClick={generatePDF} variant="outline" className="shrink-0">
+            <Download className="mr-2 h-4 w-4" />
+            Download PDF
+          </Button>
+        </div>
       </div>
       
       <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="mb-8">
@@ -211,7 +251,7 @@ const AnimalSuppliers: React.FC = () => {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 gap-6">
+            <div ref={pdfContentRef} className="grid grid-cols-1 gap-6">
               {filteredSuppliers().map((supplier) => {
                 const isExpired = isContractExpired(supplier.contract_end_date) && 
                   supplier.status?.toLowerCase() === 'active';
@@ -302,7 +342,7 @@ const AnimalSuppliers: React.FC = () => {
       <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirms Deletion</DialogTitle>
+            <DialogTitle>Confirm Deletion</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete this supplier? This action cannot be undone.
             </DialogDescription>

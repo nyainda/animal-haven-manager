@@ -23,13 +23,9 @@ import AnimalHealth from "./pages/animal/AnimalHealth";
 import AnimalNotes from "./pages/animal/AnimalNotes";
 import AnimalNoteForm from "./pages/animal/AnimalNoteForm";
 import AnimalProduction from "./pages/animal/AnimalProduction";
-
-// Import supplier components
-
+import AnimalProductionForm from "./pages/animal/AnimalProductionForm"; 
 import AnimalSuppliers from "./pages/animal/AnimalSuppliers";
 import AnimalSupplierForm from "./pages/animal/AnimalSupplierForm";
-
-// Import new form components
 import NoteForm from "./components/forms/NoteForm";
 import FeedingForm from "./components/forms/FeedingForm";
 import TaskForm from "./components/forms/TaskForm";
@@ -91,12 +87,9 @@ const App = () => (
               
               {/* Animal Production */}
               <Route path="/animals/:id/production" element={<AnimalProduction />} />
-              <Route path="/animals/:id/production/new" element={<AnimalProduction />} />
-              <Route path="/animals/:id/production/:productionId" element={<AnimalProduction />} />
-              <Route path="/animals/:id/production/:productionId/edit" element={<AnimalProduction />} />
-              
-              {/* Supplier Routes */}
-             
+              <Route path="/animals/:id/production/new" element={<AnimalProductionForm />} />
+              <Route path="/animals/:id/production/:productionId" element={<AnimalProductionForm />} /> {/* Optional: View mode */}
+              <Route path="/animals/:id/production/:productionId/edit" element={<AnimalProductionForm />} />
               
               {/* Animal Supplier Routes */}
               <Route path="/animals/:id/suppliers" element={<AnimalSuppliers />} />
@@ -114,7 +107,7 @@ const App = () => (
               <Route path="/animals/:id/forms/task" element={<TaskForm />} />
               <Route path="/animals/:id/forms/transaction" element={<TransactionForm />} />
               
-              {/*  ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              {/* Catch-all Route */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>

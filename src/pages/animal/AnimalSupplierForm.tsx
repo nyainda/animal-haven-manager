@@ -270,24 +270,59 @@ const AnimalSupplierForm: React.FC = () => {
 
             {/* Supplier Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="type">Type *</Label>
-                <Select value={formData.type} onValueChange={(value) => handleSelectChange('type', value)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="feed">Feed</SelectItem>
-                    <SelectItem value="equipment">Equipment</SelectItem>
-                    <SelectItem value="medicine">Medicine</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.type && <p className="text-red-500 text-sm">{errors.type[0]}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="product_type">Product Type *</Label>
-                <Input id="product_type" name="product_type" value={formData.product_type} onChange={handleInputChange} required />
-                {errors.product_type && <p className="text-red-500 text-sm">{errors.product_type[0]}</p>}
-              </div>
-            </div>
+  <div className="space-y-2">
+    <Label htmlFor="type">Type *</Label>
+    <Select value={formData.type} onValueChange={(value) => handleSelectChange('type', value)}>
+      <SelectTrigger><SelectValue /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="feed">Feed</SelectItem>
+        <SelectItem value="equipment">Equipment</SelectItem>
+        <SelectItem value="medicine">Medicine</SelectItem>
+        <SelectItem value="veterinary_services">Veterinary Services</SelectItem>
+        <SelectItem value="transportation">Transportation</SelectItem>
+        <SelectItem value="breeding_stock">Breeding Stock</SelectItem>
+        <SelectItem value="cleaning_supplies">Cleaning Supplies</SelectItem>
+        <SelectItem value="consulting">Consulting</SelectItem>
+        <SelectItem value="other">Other</SelectItem>
+      </SelectContent>
+    </Select>
+    {errors.type && <p className="text-red-500 text-sm">{errors.type}</p>}
+  </div>
+  <div className="space-y-2">
+    <Label htmlFor="product_type">Product Type *</Label>
+    <Select value={formData.product_type} onValueChange={(value) => handleSelectChange('product_type', value)}>
+      <SelectTrigger><SelectValue /></SelectTrigger>
+      <SelectContent>
+        {formData.type === 'feed' && (
+          <>
+            <SelectItem value="grain">Grain</SelectItem>
+            <SelectItem value="hay">Hay</SelectItem>
+            <SelectItem value="supplements">Supplements</SelectItem>
+          </>
+        )}
+        {formData.type === 'medicine' && (
+          <>
+            <SelectItem value="antibiotics">Antibiotics</SelectItem>
+            <SelectItem value="vaccines">Vaccines</SelectItem>
+            <SelectItem value="pain_relief">Pain Relief</SelectItem>
+          </>
+        )}
+        {formData.type === 'equipment' && (
+          <>
+            <SelectItem value="fencing">Fencing</SelectItem>
+            <SelectItem value="feeding_troughs">Feeding Troughs</SelectItem>
+            <SelectItem value="milking_machines">Milking Machines</SelectItem>
+          </>
+        )}
+        {/* Add more conditional options for other types as needed */}
+        {(!formData.type || formData.type === 'other') && (
+          <SelectItem value="">Select a type first</SelectItem>
+        )}
+      </SelectContent>
+    </Select>
+    {errors.product_type && <p className="text-red-500 text-sm">{errors.product_type}</p>}
+  </div>
+</div>
 
             <div className="space-y-2">
               <Label htmlFor="shop_name">Shop Name *</Label>
