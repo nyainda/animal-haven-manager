@@ -302,7 +302,7 @@ const AnimalSuppliers: React.FC = () => {
       <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogTitle>Confirms Deletion</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete this supplier? This action cannot be undone.
             </DialogDescription>

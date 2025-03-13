@@ -244,7 +244,7 @@ const AnimalSupplierForm: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="city">City *</Label>
+                <Label htmlFor="city">Citys *</Label>
                 <Input id="city" name="city" value={formData.city} onChange={handleInputChange} required />
                 {errors.city && <p className="text-red-500 text-sm">{errors.city[0]}</p>}
               </div>

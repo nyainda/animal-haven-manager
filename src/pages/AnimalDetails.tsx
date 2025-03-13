@@ -216,7 +216,7 @@ const AnimalDetails = () => {
             <CardContent>
               <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="mb-4">
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="overviews">Overview</TabsTrigger>
                   <TabsTrigger value="details">Details</TabsTrigger>
                   <TabsTrigger value="birth">Birth Info</TabsTrigger>
                   <TabsTrigger value="production">Production</TabsTrigger>

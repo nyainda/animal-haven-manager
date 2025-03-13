@@ -95,7 +95,7 @@ const getAuthHeaders = (): Record<string, string> => {
   };
 };
 
-// Fetch all suppliers for an animal (GET /api/animals/{animal}/suppliers)
+// Fetch all suppliers for an animal )
 export const fetchSuppliers = async (animalId: string): Promise<Supplier[]> => {
   await fetchCsrfToken();
   try {

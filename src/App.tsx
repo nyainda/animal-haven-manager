@@ -114,7 +114,7 @@ const App = () => (
               <Route path="/animals/:id/forms/task" element={<TaskForm />} />
               <Route path="/animals/:id/forms/transaction" element={<TransactionForm />} />
               
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              {/*  ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>
