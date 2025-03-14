@@ -22,7 +22,7 @@ import AnimalBreedings from "./pages/animal/AnimalBreedings";
 import AnimalHealth from "./pages/animal/AnimalHealth";
 import AnimalNotes from "./pages/animal/AnimalNotes";
 import AnimalNoteForm from "./pages/animal/AnimalNoteForm";
-import AnimalProduction from "./pages/animal/AnimalProduction";
+import AnimalProductions from "./pages/animal/AnimalProductions";
 import AnimalProductionForm from "./pages/animal/AnimalProductionForm"; 
 import AnimalSuppliers from "./pages/animal/AnimalSuppliers";
 import AnimalSupplierForm from "./pages/animal/AnimalSupplierForm";
@@ -86,10 +86,12 @@ const App = () => (
               <Route path="/animals/:id/notes/:noteId/edit" element={<AnimalNoteForm />} />
               
               {/* Animal Production */}
-              <Route path="/animals/:id/production" element={<AnimalProduction />} />
+              {/* Animal Production */}
+              <Route path="/animals/:id/production" element={<AnimalProductions />} />
               <Route path="/animals/:id/production/new" element={<AnimalProductionForm />} />
-              <Route path="/animals/:id/production/:productionId" element={<AnimalProductionForm />} /> {/* Optional: View mode */}
+              <Route path="/animals/:id/production/:productionId" element={<AnimalProductionForm />} />
               <Route path="/animals/:id/production/:productionId/edit" element={<AnimalProductionForm />} />
+            
               
               {/* Animal Supplier Routes */}
               <Route path="/animals/:id/suppliers" element={<AnimalSuppliers />} />

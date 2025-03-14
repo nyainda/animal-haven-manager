@@ -16,21 +16,18 @@ import {
   updateProduction,
   fetchProduction,
   ProductionFormData,
-  ProductCategory,
-  ProductGrade,
-  ProductionMethod,
-  Collector,
-  StorageLocation,
 } from '@/services/animalProductionApi';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
+type NestedObjectKeys = 'product_category' | 'product_grade' | 'production_method' | 'collector' | 'storage_location';
+
 interface FormErrors {
-  [key: string]: string;
+  [key: string]: string | string[];
 }
 
 const AnimalProductionForm: React.FC = () => {
-  const { id: animalId, productionId } = useParams<{ id: string; productionId: string }>();
+  const { id: animalId, productionId } = useParams<{ id: string; productionId?: string }>();
   const navigate = useNavigate();
   const isEditing = !!productionId;
   const [isLoading, setIsLoading] = useState(false);
@@ -44,9 +41,12 @@ const AnimalProductionForm: React.FC = () => {
     price_per_unit: '',
     total_price: '',
     production_date: format(new Date(), 'yyyy-MM-dd'),
-    production_time: '00:00',
+    production_time: format(new Date(), 'HH:mm'),
     quality_status: 'Pending',
+    quality_notes: '',
     trace_number: '',
+    weather_conditions: undefined,
+    storage_conditions: undefined,
     is_organic: false,
     certification_number: '',
     additional_attributes: {},
@@ -55,34 +55,59 @@ const AnimalProductionForm: React.FC = () => {
   const [errors, setErrors] = useState<FormErrors>({});
 
   useEffect(() => {
-    if (!isEditing || !animalId || !productionId) return;
+    if (!animalId) {
+      console.error('No animalId provided');
+      toast.error('Missing animal ID');
+      navigate('/animals');
+      return;
+    }
+
+    if (!isEditing || !productionId) return;
+
     setIsLoading(true);
     fetchProduction(animalId, productionId)
       .then((data) => {
+        console.log('Fetched production data:', data);
         setFormData({
-          product_category: data.product_category,
-          product_grade: data.product_grade,
-          production_method: data.production_method,
-          collector: data.collector,
-          storage_location: data.storage_location,
-          quantity: data.quantity,
-          price_per_unit: data.price_per_unit,
-          total_price: data.total_price || (Number(data.quantity) * Number(data.price_per_unit)).toString(),
-          production_date: format(parseISO(data.production_date), 'yyyy-MM-dd'),
-          production_time: data.production_time ? format(parseISO(data.production_time), 'HH:mm') : '00:00',
-          quality_status: data.quality_status,
-          quality_notes: data.quality_notes,
-          trace_number: data.trace_number,
+          product_category: data.product_category || { name: '', description: '', measurement_unit: '' },
+          product_grade: data.product_grade || { name: '', description: '', price_modifier: 1.0 },
+          production_method: data.production_method || {
+            method_name: '',
+            description: '',
+            requires_certification: false,
+            is_active: true,
+          },
+          collector: data.collector || { name: '', contact_info: '' },
+          storage_location: data.storage_location || {
+            name: '',
+            location_code: '',
+            description: '',
+            storage_conditions: [],
+            is_active: true,
+          },
+          quantity: data.quantity || '',
+          price_per_unit: data.price_per_unit || '',
+          total_price: data.total_price || (Number(data.quantity || 0) * Number(data.price_per_unit || 0)).toString(),
+          production_date: data.production_date
+            ? format(parseISO(data.production_date), 'yyyy-MM-dd')
+            : format(new Date(), 'yyyy-MM-dd'),
+          production_time: data.production_time
+            ? format(parseISO(`2000-01-01T${data.production_time}`), 'HH:mm')
+            : format(new Date(), 'HH:mm'),
+          quality_status: data.quality_status || 'Pending',
+          quality_notes: data.quality_notes || '',
+          trace_number: data.trace_number || '',
           weather_conditions: data.weather_conditions,
           storage_conditions: data.storage_conditions,
-          is_organic: data.is_organic,
-          certification_number: data.certification_number,
-          additional_attributes: data.additional_attributes,
-          notes: data.notes,
+          is_organic: data.is_organic || false,
+          certification_number: data.certification_number || '',
+          additional_attributes: data.additional_attributes || {},
+          notes: data.notes || '',
         });
         setErrors({});
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error('Failed to fetch production:', error);
         toast.error('Failed to load production data');
         navigate(`/animals/${animalId}/production`);
       })
@@ -91,18 +116,22 @@ const AnimalProductionForm: React.FC = () => {
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-    nestedField?: keyof ProductionFormData
+    nestedField?: NestedObjectKeys
   ) => {
     const { name, value } = e.target;
-    if (nestedField) {
-      setFormData((prev) => ({
-        ...prev,
-        [nestedField]: { ...prev[nestedField], [name]: value },
-      }));
-    } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
-    }
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
+    setFormData((prev) => {
+      if (nestedField) {
+        return {
+          ...prev,
+          [nestedField]: {
+            ...prev[nestedField],
+            [name]: value,
+          },
+        };
+      }
+      return { ...prev, [name]: value };
+    });
+    setErrors((prev) => ({ ...prev, [name]: '', [`${nestedField}.${name}`]: '' }));
   };
 
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -113,52 +142,45 @@ const AnimalProductionForm: React.FC = () => {
         if (name === 'quantity' || name === 'price_per_unit') {
           updated.total_price =
             updated.quantity && updated.price_per_unit
-              ? (parseFloat(updated.quantity) * parseFloat(updated.price_per_unit)).toString()
-              : '';
+              ? (parseFloat(updated.quantity) * parseFloat(updated.price_per_unit)).toFixed(2)
+              : prev.total_price;
         }
         return updated;
       });
-      if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
+      setErrors((prev) => ({ ...prev, [name]: '' }));
     }
   };
 
-  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>, nestedField?: keyof ProductionFormData) => {
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>, nestedField?: NestedObjectKeys) => {
     const { name, checked } = e.target;
-    if (nestedField) {
-      setFormData((prev) => ({
-        ...prev,
-        [nestedField]: { ...prev[nestedField], [name]: checked },
-      }));
-    } else {
-      setFormData((prev) => ({ ...prev, [name]: checked }));
-    }
+    setFormData((prev) => {
+      if (nestedField) {
+        return {
+          ...prev,
+          [nestedField]: {
+            ...prev[nestedField],
+            [name]: checked,
+          },
+        };
+      }
+      return { ...prev, [name]: checked };
+    });
   };
 
   const handleDateChange = (date: Date | undefined) => {
     if (date) {
       setFormData((prev) => ({ ...prev, production_date: format(date, 'yyyy-MM-dd') }));
-      if (errors.production_date) setErrors((prev) => ({ ...prev, production_date: '' }));
+      setErrors((prev) => ({ ...prev, production_date: '' }));
     }
   };
 
   const handleSelectChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
+    setErrors((prev) => ({ ...prev, [name]: '' }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!animalId) {
-      toast.error('Animal ID is missing');
-      return;
-    }
-
+  const validateForm = (): FormErrors => {
     const requiredFields: (keyof ProductionFormData)[] = [
-      'product_category',
-      'product_grade',
-      'production_method',
-      'collector',
-      'storage_location',
       'quantity',
       'price_per_unit',
       'total_price',
@@ -168,20 +190,18 @@ const AnimalProductionForm: React.FC = () => {
       'trace_number',
     ];
     const newErrors: FormErrors = {};
+
+    if (!formData.product_category.name) newErrors['product_category.name'] = 'Product category name is required';
+    if (!formData.product_category.measurement_unit)
+      newErrors['product_category.measurement_unit'] = 'Measurement unit is required';
+    if (!formData.product_grade.name) newErrors['product_grade.name'] = 'Product grade name is required';
+    if (!formData.production_method.method_name)
+      newErrors['production_method.method_name'] = 'Production method name is required';
+    if (!formData.collector.name) newErrors['collector.name'] = 'Collector name is required';
+    if (!formData.storage_location.name) newErrors['storage_location.name'] = 'Storage location name is required';
+
     requiredFields.forEach((field) => {
-      if (field === 'product_category' && !formData[field].name) {
-        newErrors['product_category.name'] = 'Product category name is required.';
-      } else if (field === 'product_grade' && !formData[field].name) {
-        newErrors['product_grade.name'] = 'Product grade name is required.';
-      } else if (field === 'production_method' && !formData[field].method_name) {
-        newErrors['production_method.method_name'] = 'Production method name is required.';
-      } else if (field === 'collector' && !formData[field].name) {
-        newErrors['collector.name'] = 'Collector name is required.';
-      } else if (field === 'storage_location' && !formData[field].name) {
-        newErrors['storage_location.name'] = 'Storage location name is required.';
-      } else if (!formData[field]) {
-        newErrors[field] = `The ${field.replace('_', ' ')} field is required.`;
-      }
+      if (!formData[field]) newErrors[field] = `${field.replace('_', ' ')} is required`;
     });
 
     if (formData.quantity && !/^\d*\.?\d+$/.test(formData.quantity)) {
@@ -194,6 +214,18 @@ const AnimalProductionForm: React.FC = () => {
       newErrors.total_price = 'Total price must be a valid number';
     }
 
+    return newErrors;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!animalId) {
+      toast.error('Animal ID is missing');
+      navigate('/animals');
+      return;
+    }
+
+    const newErrors = validateForm();
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       toast.error('Please fill in all required fields correctly');
@@ -209,15 +241,14 @@ const AnimalProductionForm: React.FC = () => {
         await createProduction(animalId, formData);
         toast.success('Production created successfully');
       }
-      // Navigate back with a refresh flag
       navigate(`/animals/${animalId}/production`, { state: { refresh: true } });
     } catch (error: any) {
-      console.error('Submission error:', error.message);
-      let errorMessage = 'Failed to save production';
+      console.error('Submission error:', error);
       const apiErrors: FormErrors = {};
+      let errorMessage = 'Failed to save production';
 
       try {
-        const errorData = JSON.parse(error.message);
+        const errorData = JSON.parse(error.message || '{}');
         if (errorData.errors) {
           Object.entries(errorData.errors).forEach(([key, messages]) => {
             apiErrors[key] = Array.isArray(messages) ? messages[0] : messages;
@@ -236,26 +267,35 @@ const AnimalProductionForm: React.FC = () => {
   };
 
   const generatePDF = async () => {
-    const pdf = new jsPDF('p', 'mm', 'a4');
     const content = document.getElementById('production-form-content');
-    if (!content) return;
+    if (!content) {
+      toast.error('Form content not found for PDF generation');
+      return;
+    }
 
-    const canvas = await html2canvas(content, { scale: 2 });
-    const imgData = canvas.toDataURL('image/png');
-    const imgWidth = 190;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    try {
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const canvas = await html2canvas(content, { scale: 2 });
+      const imgData = canvas.toDataURL('image/png');
+      const imgWidth = 190;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-    pdf.setFontSize(18);
-    pdf.setTextColor(0, 102, 204);
-    pdf.text(`${isEditing ? 'Edit' : 'New'} Production Record`, 10, 20);
-    pdf.setFontSize(10);
-    pdf.setTextColor(100);
-    pdf.text(`Generated on: ${format(new Date(), 'PPPp')}`, 10, 28);
-
-    pdf.addImage(imgData, 'PNG', 10, 40, imgWidth, imgHeight);
-    pdf.save(`production_${formData.trace_number || 'new'}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
-    toast.success('PDF generated successfully');
+      pdf.setFontSize(18);
+      pdf.text(`${isEditing ? 'Edit' : 'New'} Production Record`, 10, 20);
+      pdf.setFontSize(10);
+      pdf.text(`Generated on: ${format(new Date(), 'PPPp')}`, 10, 28);
+      pdf.addImage(imgData, 'PNG', 10, 40, imgWidth, imgHeight);
+      pdf.save(`production_${formData.trace_number || 'new'}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+      toast.success('PDF generated successfully');
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      toast.error('Failed to generate PDF');
+    }
   };
+
+  if (!animalId) {
+    return <div className="p-4">Missing animal ID. Redirecting...</div>;
+  }
 
   if (isLoading && isEditing) {
     return (
@@ -283,159 +323,89 @@ const AnimalProductionForm: React.FC = () => {
         </CardHeader>
         <CardContent id="production-form-content">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Product Category */}
             <div className="space-y-2">
-              <Label>Product Category *</Label>
+              <Label>Product Category Name *</Label>
               <Input
                 name="name"
-                placeholder="Name"
                 value={formData.product_category.name}
                 onChange={(e) => handleInputChange(e, 'product_category')}
                 required
               />
+              {errors['product_category.name'] && (
+                <p className="text-red-500 text-sm">{errors['product_category.name']}</p>
+              )}
+              <Label>Measurement Unit *</Label>
               <Input
                 name="measurement_unit"
-                placeholder="Measurement Unit (e.g., Liters)"
                 value={formData.product_category.measurement_unit}
                 onChange={(e) => handleInputChange(e, 'product_category')}
                 required
               />
-              <Textarea
-                name="description"
-                placeholder="Description"
-                value={formData.product_category.description || ''}
-                onChange={(e) => handleInputChange(e, 'product_category')}
-              />
-              {errors['product_category.name'] && (
-                <p className="text-red-500 text-sm">{errors['product_category.name']}</p>
+              {errors['product_category.measurement_unit'] && (
+                <p className="text-red-500 text-sm">{errors['product_category.measurement_unit']}</p>
               )}
             </div>
 
-            {/* Product Grade */}
             <div className="space-y-2">
-              <Label>Product Grade *</Label>
+              <Label>Product Grade Name *</Label>
               <Input
                 name="name"
-                placeholder="Name"
                 value={formData.product_grade.name}
                 onChange={(e) => handleInputChange(e, 'product_grade')}
                 required
-              />
-              <Input
-                name="price_modifier"
-                placeholder="Price Modifier (e.g., 1.2)"
-                value={formData.product_grade.price_modifier}
-                onChange={(e) => handleNumberChange(e)}
-              />
-              <Textarea
-                name="description"
-                placeholder="Description"
-                value={formData.product_grade.description || ''}
-                onChange={(e) => handleInputChange(e, 'product_grade')}
               />
               {errors['product_grade.name'] && (
                 <p className="text-red-500 text-sm">{errors['product_grade.name']}</p>
               )}
             </div>
 
-            {/* Production Method */}
             <div className="space-y-2">
-              <Label>Production Method *</Label>
+              <Label>Production Method Name *</Label>
               <Input
                 name="method_name"
-                placeholder="Method Name"
                 value={formData.production_method.method_name}
                 onChange={(e) => handleInputChange(e, 'production_method')}
                 required
-              />
-              <Label className="flex items-center">
-                <input
-                  type="checkbox"
-                  name="requires_certification"
-                  checked={formData.production_method.requires_certification}
-                  onChange={(e) => handleCheckboxChange(e, 'production_method')}
-                  className="mr-2"
-                />
-                Requires Certification
-              </Label>
-              <Textarea
-                name="description"
-                placeholder="Description"
-                value={formData.production_method.description || ''}
-                onChange={(e) => handleInputChange(e, 'production_method')}
               />
               {errors['production_method.method_name'] && (
                 <p className="text-red-500 text-sm">{errors['production_method.method_name']}</p>
               )}
             </div>
 
-            {/* Collector */}
             <div className="space-y-2">
-              <Label>Collector *</Label>
+              <Label>Collector Name *</Label>
               <Input
                 name="name"
-                placeholder="Name"
                 value={formData.collector.name}
                 onChange={(e) => handleInputChange(e, 'collector')}
                 required
               />
-              <Input
-                name="contact_info"
-                placeholder="Contact Info (e.g., +1 234 567 8901)"
-                value={formData.collector.contact_info || ''}
-                onChange={(e) => handleInputChange(e, 'collector')}
-              />
               {errors['collector.name'] && <p className="text-red-500 text-sm">{errors['collector.name']}</p>}
             </div>
 
-            {/* Storage Location */}
             <div className="space-y-2">
-              <Label>Storage Location *</Label>
+              <Label>Storage Location Name *</Label>
               <Input
                 name="name"
-                placeholder="Name"
                 value={formData.storage_location.name}
                 onChange={(e) => handleInputChange(e, 'storage_location')}
                 required
-              />
-              <Input
-                name="location_code"
-                placeholder="Location Code (e.g., CS-101)"
-                value={formData.storage_location.location_code}
-                onChange={(e) => handleInputChange(e, 'storage_location')}
-                required
-              />
-              <Textarea
-                name="description"
-                placeholder="Description"
-                value={formData.storage_location.description || ''}
-                onChange={(e) => handleInputChange(e, 'storage_location')}
               />
               {errors['storage_location.name'] && (
                 <p className="text-red-500 text-sm">{errors['storage_location.name']}</p>
               )}
             </div>
 
-            {/* Quantity and Pricing */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="quantity">Quantity (Liters) *</Label>
-                <Input
-                  id="quantity"
-                  name="quantity"
-                  type="text"
-                  value={formData.quantity}
-                  onChange={handleNumberChange}
-                  required
-                />
+                <Label>Quantity *</Label>
+                <Input name="quantity" value={formData.quantity} onChange={handleNumberChange} required />
                 {errors.quantity && <p className="text-red-500 text-sm">{errors.quantity}</p>}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="price_per_unit">Price per Unit ($)*</Label>
+                <Label>Price per Unit ($)*</Label>
                 <Input
-                  id="price_per_unit"
                   name="price_per_unit"
-                  type="text"
                   value={formData.price_per_unit}
                   onChange={handleNumberChange}
                   required
@@ -443,23 +413,15 @@ const AnimalProductionForm: React.FC = () => {
                 {errors.price_per_unit && <p className="text-red-500 text-sm">{errors.price_per_unit}</p>}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="total_price">Total Price ($)*</Label>
-                <Input
-                  id="total_price"
-                  name="total_price"
-                  type="text"
-                  value={formData.total_price}
-                  onChange={handleNumberChange}
-                  required
-                />
+                <Label>Total Price ($)*</Label>
+                <Input name="total_price" value={formData.total_price} onChange={handleNumberChange} required />
                 {errors.total_price && <p className="text-red-500 text-sm">{errors.total_price}</p>}
               </div>
             </div>
 
-            {/* Date and Time */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="production_date">Production Date *</Label>
+                <Label>Production Date *</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-start text-left">
@@ -478,9 +440,8 @@ const AnimalProductionForm: React.FC = () => {
                 {errors.production_date && <p className="text-red-500 text-sm">{errors.production_date}</p>}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="production_time">Production Time *</Label>
+                <Label>Production Time *</Label>
                 <Input
-                  id="production_time"
                   name="production_time"
                   type="time"
                   value={formData.production_time}
@@ -491,50 +452,30 @@ const AnimalProductionForm: React.FC = () => {
               </div>
             </div>
 
-            {/* Quality and Trace */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="quality_status">Quality Status *</Label>
-                <Select
-                  value={formData.quality_status}
-                  onValueChange={(value) => handleSelectChange('quality_status', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Pending">Pending</SelectItem>
-                    <SelectItem value="Passed">Passed</SelectItem>
-                    <SelectItem value="Failed">Failed</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.quality_status && <p className="text-red-500 text-sm">{errors.quality_status}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="trace_number">Trace Number *</Label>
-                <Input
-                  id="trace_number"
-                  name="trace_number"
-                  value={formData.trace_number}
-                  onChange={handleInputChange}
-                  required
-                />
-                {errors.trace_number && <p className="text-red-500 text-sm">{errors.trace_number}</p>}
-              </div>
+            <div className="space-y-2">
+              <Label>Quality Status *</Label>
+              <Select
+                value={formData.quality_status}
+                onValueChange={(value) => handleSelectChange('quality_status', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Pending">Pending</SelectItem>
+                  <SelectItem value="Passed">Passed</SelectItem>
+                  <SelectItem value="Failed">Failed</SelectItem>
+                </SelectContent>
+              </Select>
+              {errors.quality_status && <p className="text-red-500 text-sm">{errors.quality_status}</p>}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="quality_notes">Quality Notes</Label>
-              <Textarea
-                id="quality_notes"
-                name="quality_notes"
-                value={formData.quality_notes || ''}
-                onChange={handleInputChange}
-              />
-              {errors.quality_notes && <p className="text-red-500 text-sm">{errors.quality_notes}</p>}
+              <Label>Trace Number *</Label>
+              <Input name="trace_number" value={formData.trace_number} onChange={handleInputChange} required />
+              {errors.trace_number && <p className="text-red-500 text-sm">{errors.trace_number}</p>}
             </div>
 
-            {/* Organic Certification */}
             <div className="space-y-2">
               <Label className="flex items-center">
                 <input
@@ -548,25 +489,19 @@ const AnimalProductionForm: React.FC = () => {
               </Label>
               {formData.is_organic && (
                 <div className="space-y-2">
-                  <Label htmlFor="certification_number">Certification Number</Label>
+                  <Label>Certification Number</Label>
                   <Input
-                    id="certification_number"
                     name="certification_number"
-                    value={formData.certification_number || ''}
+                    value={formData.certification_number}
                     onChange={handleInputChange}
                   />
-                  {errors.certification_number && (
-                    <p className="text-red-500 text-sm">{errors.certification_number}</p>
-                  )}
                 </div>
               )}
             </div>
 
-            {/* Notes */}
             <div className="space-y-2">
-              <Label htmlFor="notes">Additional Notes</Label>
-              <Textarea id="notes" name="notes" value={formData.notes || ''} onChange={handleInputChange} />
-              {errors.notes && <p className="text-red-500 text-sm">{errors.notes}</p>}
+              <Label>Notes</Label>
+              <Textarea name="notes" value={formData.notes} onChange={handleInputChange} />
             </div>
 
             <div className="flex justify-end gap-3">
@@ -579,7 +514,7 @@ const AnimalProductionForm: React.FC = () => {
               </Button>
               <Button type="submit" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isEditing ? 'Update Production' : 'Save Production'}
+                {isEditing ? 'Update' : 'Save'}
               </Button>
             </div>
           </form>
