@@ -88,10 +88,8 @@ const App = () => (
               {/* Animal Production */}
               {/* Animal Production */}
               <Route path="/animals/:id/production" element={<AnimalProductions />} />
-              <Route path="/animals/:id/production/new" element={<AnimalProductionForm />} />
-              <Route path="/animals/:id/production/:productionId" element={<AnimalProductionForm />} />
-              <Route path="/animals/:id/production/:productionId/edit" element={<AnimalProductionForm />} />
-            
+<Route path="/animals/:id/production/new" element={<AnimalProductionForm />} />
+<Route path="/animals/:id/production/:productionId/edit" element={<AnimalProductionForm />} />
               
               {/* Animal Supplier Routes */}
               <Route path="/animals/:id/suppliers" element={<AnimalSuppliers />} />

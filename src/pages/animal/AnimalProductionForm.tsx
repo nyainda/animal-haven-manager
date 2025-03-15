@@ -20,8 +20,6 @@ import {
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-type NestedObjectKeys = 'product_category' | 'product_grade' | 'production_method' | 'collector' | 'storage_location';
-
 interface FormErrors {
   [key: string]: string | string[];
 }
@@ -31,12 +29,19 @@ const AnimalProductionForm: React.FC = () => {
   const navigate = useNavigate();
   const isEditing = !!productionId;
   const [isLoading, setIsLoading] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [formData, setFormData] = useState<ProductionFormData>({
     product_category: { name: '', description: '', measurement_unit: '' },
     product_grade: { name: '', description: '', price_modifier: 1.0 },
     production_method: { method_name: '', description: '', requires_certification: false, is_active: true },
-    collector: { name: '', contact_info: '' },
-    storage_location: { name: '', location_code: '', description: '', storage_conditions: [], is_active: true },
+    collector: { name: '', employee_id: null, contact_number: null, certification_number: null },
+    storage_location: {
+      name: '',
+      location_code: '',
+      description: '',
+      storage_conditions: { temperature: '', humidity: '' },
+      is_active: true,
+    },
     quantity: '',
     price_per_unit: '',
     total_price: '',
@@ -45,18 +50,17 @@ const AnimalProductionForm: React.FC = () => {
     quality_status: 'Pending',
     quality_notes: '',
     trace_number: '',
-    weather_conditions: undefined,
-    storage_conditions: undefined,
+    weather_conditions: { temperature: '', humidity: '' },
+    storage_conditions: { temperature: '', humidity: '' },
     is_organic: false,
     certification_number: '',
-    additional_attributes: {},
+    additional_attributes: { fat_content: '', pasteurized: 'No', homogenized: 'No' },
     notes: '',
   });
   const [errors, setErrors] = useState<FormErrors>({});
 
   useEffect(() => {
     if (!animalId) {
-      console.error('No animalId provided');
       toast.error('Missing animal ID');
       navigate('/animals');
       return;
@@ -67,42 +71,22 @@ const AnimalProductionForm: React.FC = () => {
     setIsLoading(true);
     fetchProduction(animalId, productionId)
       .then((data) => {
-        console.log('Fetched production data:', data);
         setFormData({
-          product_category: data.product_category || { name: '', description: '', measurement_unit: '' },
-          product_grade: data.product_grade || { name: '', description: '', price_modifier: 1.0 },
-          production_method: data.production_method || {
-            method_name: '',
-            description: '',
-            requires_certification: false,
-            is_active: true,
-          },
-          collector: data.collector || { name: '', contact_info: '' },
-          storage_location: data.storage_location || {
-            name: '',
-            location_code: '',
-            description: '',
-            storage_conditions: [],
-            is_active: true,
-          },
-          quantity: data.quantity || '',
-          price_per_unit: data.price_per_unit || '',
-          total_price: data.total_price || (Number(data.quantity || 0) * Number(data.price_per_unit || 0)).toString(),
+          ...data,
           production_date: data.production_date
             ? format(parseISO(data.production_date), 'yyyy-MM-dd')
             : format(new Date(), 'yyyy-MM-dd'),
           production_time: data.production_time
             ? format(parseISO(`2000-01-01T${data.production_time}`), 'HH:mm')
             : format(new Date(), 'HH:mm'),
-          quality_status: data.quality_status || 'Pending',
-          quality_notes: data.quality_notes || '',
-          trace_number: data.trace_number || '',
-          weather_conditions: data.weather_conditions,
-          storage_conditions: data.storage_conditions,
-          is_organic: data.is_organic || false,
-          certification_number: data.certification_number || '',
-          additional_attributes: data.additional_attributes || {},
-          notes: data.notes || '',
+          product_category: { ...data.product_category },
+          product_grade: { ...data.product_grade },
+          production_method: { ...data.production_method },
+          collector: { ...data.collector },
+          storage_location: { ...data.storage_location, storage_conditions: { ...data.storage_location.storage_conditions } },
+          weather_conditions: data.weather_conditions ? { ...data.weather_conditions } : { temperature: '', humidity: '' },
+          storage_conditions: data.storage_conditions ? { ...data.storage_conditions } : { temperature: '', humidity: '' },
+          additional_attributes: data.additional_attributes ? { ...data.additional_attributes } : { fat_content: '', pasteurized: 'No', homogenized: 'No' },
         });
         setErrors({});
       })
@@ -116,28 +100,56 @@ const AnimalProductionForm: React.FC = () => {
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-    nestedField?: NestedObjectKeys
+    field?: keyof ProductionFormData,
+    subField?: keyof StorageLocation
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => {
-      if (nestedField) {
+    setFormData((prev: ProductionFormData) => {
+      if (field === 'storage_location' && subField === 'storage_conditions' && prev.storage_location) {
         return {
           ...prev,
-          [nestedField]: {
-            ...prev[nestedField],
+          storage_location: {
+            ...prev.storage_location,
+            storage_conditions: {
+              ...prev.storage_location.storage_conditions,
+              [name]: value, // Keep as string
+            },
+          },
+        };
+      } else if (field === 'weather_conditions' && prev.weather_conditions) {
+        return {
+          ...prev,
+          weather_conditions: {
+            ...prev.weather_conditions,
+            [name]: value, // Keep as string
+          },
+        };
+      } else if (field === 'additional_attributes' && prev.additional_attributes) {
+        return {
+          ...prev,
+          additional_attributes: {
+            ...prev.additional_attributes,
+            [name]: value,
+          },
+        };
+      } else if (field && prev[field] && typeof prev[field] === 'object') {
+        return {
+          ...prev,
+          [field]: {
+            ...(prev[field] as object),
             [name]: value,
           },
         };
       }
       return { ...prev, [name]: value };
     });
-    setErrors((prev) => ({ ...prev, [name]: '', [`${nestedField}.${name}`]: '' }));
+    setErrors((prev) => ({ ...prev, [field ? `${field}.${name}` : name]: '' }));
   };
 
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
-      setFormData((prev) => {
+      setFormData((prev: ProductionFormData) => {
         const updated = { ...prev, [name]: value };
         if (name === 'quantity' || name === 'price_per_unit') {
           updated.total_price =
@@ -151,32 +163,36 @@ const AnimalProductionForm: React.FC = () => {
     }
   };
 
-  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>, nestedField?: NestedObjectKeys) => {
+  const handleCheckboxChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field?: keyof ProductionFormData
+  ) => {
     const { name, checked } = e.target;
-    setFormData((prev) => {
-      if (nestedField) {
-        return {
-          ...prev,
-          [nestedField]: {
-            ...prev[nestedField],
-            [name]: checked,
-          },
-        };
-      }
-      return { ...prev, [name]: checked };
-    });
+    setFormData((prev: ProductionFormData) =>
+      field && prev[field] && typeof prev[field] === 'object'
+        ? { ...prev, [field]: { ...(prev[field] as object), [name]: checked } }
+        : { ...prev, [name]: checked }
+    );
   };
 
   const handleDateChange = (date: Date | undefined) => {
     if (date) {
-      setFormData((prev) => ({ ...prev, production_date: format(date, 'yyyy-MM-dd') }));
+      setFormData((prev: ProductionFormData) => ({ ...prev, production_date: format(date, 'yyyy-MM-dd') }));
       setErrors((prev) => ({ ...prev, production_date: '' }));
     }
   };
 
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    setErrors((prev) => ({ ...prev, [name]: '' }));
+  const handleSelectChange = (
+    name: string,
+    value: string,
+    field?: keyof ProductionFormData
+  ) => {
+    setFormData((prev: ProductionFormData) =>
+      field && prev[field] && typeof prev[field] === 'object'
+        ? { ...prev, [field]: { ...(prev[field] as object), [name]: value } }
+        : { ...prev, [name]: value }
+    );
+    setErrors((prev) => ({ ...prev, [field ? `${field}.${name}` : name]: '' }));
   };
 
   const validateForm = (): FormErrors => {
@@ -214,16 +230,20 @@ const AnimalProductionForm: React.FC = () => {
       newErrors.total_price = 'Total price must be a valid number';
     }
 
+    // Validate weather_conditions.temperature range
+    if (
+      formData.weather_conditions?.temperature &&
+      (parseFloat(formData.weather_conditions.temperature) < -50 || parseFloat(formData.weather_conditions.temperature) > 60)
+    ) {
+      newErrors['weather_conditions.temperature'] = 'Temperature must be between -50°C and 60°C';
+    }
+
     return newErrors;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!animalId) {
-      toast.error('Animal ID is missing');
-      navigate('/animals');
-      return;
-    }
+    if (!animalId) return;
 
     const newErrors = validateForm();
     if (Object.keys(newErrors).length > 0) {
@@ -246,7 +266,6 @@ const AnimalProductionForm: React.FC = () => {
       console.error('Submission error:', error);
       const apiErrors: FormErrors = {};
       let errorMessage = 'Failed to save production';
-
       try {
         const errorData = JSON.parse(error.message || '{}');
         if (errorData.errors) {
@@ -258,7 +277,6 @@ const AnimalProductionForm: React.FC = () => {
       } catch {
         errorMessage = error.message || errorMessage;
       }
-
       setErrors(apiErrors);
       toast.error(errorMessage);
     } finally {
@@ -273,6 +291,7 @@ const AnimalProductionForm: React.FC = () => {
       return;
     }
 
+    setIsGeneratingPDF(true);
     try {
       const pdf = new jsPDF('p', 'mm', 'a4');
       const canvas = await html2canvas(content, { scale: 2 });
@@ -290,6 +309,8 @@ const AnimalProductionForm: React.FC = () => {
     } catch (error) {
       console.error('PDF generation error:', error);
       toast.error('Failed to generate PDF');
+    } finally {
+      setIsGeneratingPDF(false);
     }
   };
 
@@ -308,202 +329,448 @@ const AnimalProductionForm: React.FC = () => {
 
   return (
     <div className="container mx-auto py-6 px-4 max-w-4xl">
-      <div className="flex justify-between items-center mb-6">
-        <Button variant="ghost" onClick={() => navigate(`/animals/${animalId}/production`)}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Production
+      <div className="flex items-center mb-6">
+        <Button variant="ghost" onClick={() => navigate(`/animals/${animalId}/production`)} className="mr-4">
+          <ArrowLeft className="h-5 w-5" />
         </Button>
-        <Button variant="outline" onClick={generatePDF}>
-          <Download className="mr-2 h-4 w-4" /> Download PDF
-        </Button>
+        <h1 className="text-2xl font-bold">{isEditing ? 'Edit Production Record' : 'Add New Production Record'}</h1>
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>{isEditing ? 'Edit Production Record' : 'Add New Production Record'}</CardTitle>
+          <Button onClick={generatePDF} disabled={isGeneratingPDF}>
+            {isGeneratingPDF ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+            Download PDF
+          </Button>
         </CardHeader>
         <CardContent id="production-form-content">
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <Label>Product Category Name *</Label>
-              <Input
-                name="name"
-                value={formData.product_category.name}
-                onChange={(e) => handleInputChange(e, 'product_category')}
-                required
-              />
-              {errors['product_category.name'] && (
-                <p className="text-red-500 text-sm">{errors['product_category.name']}</p>
-              )}
-              <Label>Measurement Unit *</Label>
-              <Input
-                name="measurement_unit"
-                value={formData.product_category.measurement_unit}
-                onChange={(e) => handleInputChange(e, 'product_category')}
-                required
-              />
-              {errors['product_category.measurement_unit'] && (
-                <p className="text-red-500 text-sm">{errors['product_category.measurement_unit']}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label>Product Grade Name *</Label>
-              <Input
-                name="name"
-                value={formData.product_grade.name}
-                onChange={(e) => handleInputChange(e, 'product_grade')}
-                required
-              />
-              {errors['product_grade.name'] && (
-                <p className="text-red-500 text-sm">{errors['product_grade.name']}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label>Production Method Name *</Label>
-              <Input
-                name="method_name"
-                value={formData.production_method.method_name}
-                onChange={(e) => handleInputChange(e, 'production_method')}
-                required
-              />
-              {errors['production_method.method_name'] && (
-                <p className="text-red-500 text-sm">{errors['production_method.method_name']}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label>Collector Name *</Label>
-              <Input
-                name="name"
-                value={formData.collector.name}
-                onChange={(e) => handleInputChange(e, 'collector')}
-                required
-              />
-              {errors['collector.name'] && <p className="text-red-500 text-sm">{errors['collector.name']}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label>Storage Location Name *</Label>
-              <Input
-                name="name"
-                value={formData.storage_location.name}
-                onChange={(e) => handleInputChange(e, 'storage_location')}
-                required
-              />
-              {errors['storage_location.name'] && (
-                <p className="text-red-500 text-sm">{errors['storage_location.name']}</p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Quantity *</Label>
-                <Input name="quantity" value={formData.quantity} onChange={handleNumberChange} required />
-                {errors.quantity && <p className="text-red-500 text-sm">{errors.quantity}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label>Price per Unit ($)*</Label>
-                <Input
-                  name="price_per_unit"
-                  value={formData.price_per_unit}
-                  onChange={handleNumberChange}
-                  required
-                />
-                {errors.price_per_unit && <p className="text-red-500 text-sm">{errors.price_per_unit}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label>Total Price ($)*</Label>
-                <Input name="total_price" value={formData.total_price} onChange={handleNumberChange} required />
-                {errors.total_price && <p className="text-red-500 text-sm">{errors.total_price}</p>}
+            {/* Product Category */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Product Category</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Category Name *</Label>
+                  <Select
+                    value={formData.product_category.name}
+                    onValueChange={(value) => handleSelectChange('name', value, 'product_category')}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Milk">Milk</SelectItem>
+                      <SelectItem value="Eggs">Eggs</SelectItem>
+                      <SelectItem value="Meat">Meat</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors['product_category.name'] && (
+                    <p className="text-red-500 text-sm">{errors['product_category.name']}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Measurement Unit *</Label>
+                  <Select
+                    value={formData.product_category.measurement_unit}
+                    onValueChange={(value) => handleSelectChange('measurement_unit', value, 'product_category')}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="liters">Liters</SelectItem>
+                      <SelectItem value="count">Count</SelectItem>
+                      <SelectItem value="kg">Kilograms</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors['product_category.measurement_unit'] && (
+                    <p className="text-red-500 text-sm">{errors['product_category.measurement_unit']}</p>
+                  )}
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <Label>Description</Label>
+                  <Textarea
+                    name="description"
+                    value={formData.product_category.description}
+                    onChange={(e) => handleInputChange(e, 'product_category')}
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Production Date *</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left">
-                      <Calendar className="mr-2 h-4 w-4" />
-                      {formData.production_date ? format(parseISO(formData.production_date), 'PPP') : 'Pick a date'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent>
-                    <CalendarComponent
-                      mode="single"
-                      selected={formData.production_date ? parseISO(formData.production_date) : undefined}
-                      onSelect={handleDateChange}
-                    />
-                  </PopoverContent>
-                </Popover>
-                {errors.production_date && <p className="text-red-500 text-sm">{errors.production_date}</p>}
+            {/* Product Grade */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Product Grade</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Grade Name *</Label>
+                  <Select
+                    value={formData.product_grade.name}
+                    onValueChange={(value) => handleSelectChange('name', value, 'product_grade')}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select grade" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Grade A">Grade A</SelectItem>
+                      <SelectItem value="Grade B">Grade B</SelectItem>
+                      <SelectItem value="Premium">Premium</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors['product_grade.name'] && (
+                    <p className="text-red-500 text-sm">{errors['product_grade.name']}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Description</Label>
+                  <Textarea
+                    name="description"
+                    value={formData.product_grade.description}
+                    onChange={(e) => handleInputChange(e, 'product_grade')}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Production Time *</Label>
-                <Input
-                  name="production_time"
-                  type="time"
-                  value={formData.production_time}
-                  onChange={handleInputChange}
-                  required
-                />
-                {errors.production_time && <p className="text-red-500 text-sm">{errors.production_time}</p>}
+            </div>
+
+            {/* Production Method */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Production Method</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Method Name *</Label>
+                  <Select
+                    value={formData.production_method.method_name}
+                    onValueChange={(value) => handleSelectChange('method_name', value, 'production_method')}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Traditional Milking">Traditional Milking</SelectItem>
+                      <SelectItem value="Machine Milking">Machine Milking</SelectItem>
+                      <SelectItem value="Free Range">Free Range</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors['production_method.method_name'] && (
+                    <p className="text-red-500 text-sm">{errors['production_method.method_name']}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Description</Label>
+                  <Textarea
+                    name="description"
+                    value={formData.production_method.description}
+                    onChange={(e) => handleInputChange(e, 'production_method')}
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Quality Status *</Label>
-              <Select
-                value={formData.quality_status}
-                onValueChange={(value) => handleSelectChange('quality_status', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Pending">Pending</SelectItem>
-                  <SelectItem value="Passed">Passed</SelectItem>
-                  <SelectItem value="Failed">Failed</SelectItem>
-                </SelectContent>
-              </Select>
-              {errors.quality_status && <p className="text-red-500 text-sm">{errors.quality_status}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label>Trace Number *</Label>
-              <Input name="trace_number" value={formData.trace_number} onChange={handleInputChange} required />
-              {errors.trace_number && <p className="text-red-500 text-sm">{errors.trace_number}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label className="flex items-center">
-                <input
-                  type="checkbox"
-                  name="is_organic"
-                  checked={formData.is_organic}
-                  onChange={handleCheckboxChange}
-                  className="mr-2"
-                />
-                Organic Product
-              </Label>
-              {formData.is_organic && (
+            {/* Collector */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Collector Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Name *</Label>
+                  <Input
+                    name="name"
+                    value={formData.collector.name}
+                    onChange={(e) => handleInputChange(e, 'collector')}
+                    required
+                  />
+                  {errors['collector.name'] && <p className="text-red-500 text-sm">{errors['collector.name']}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label>Employee ID</Label>
+                  <Input
+                    name="employee_id"
+                    value={formData.collector.employee_id || ''}
+                    onChange={(e) => handleInputChange(e, 'collector')}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Contact Number</Label>
+                  <Input
+                    name="contact_number"
+                    value={formData.collector.contact_number || ''}
+                    onChange={(e) => handleInputChange(e, 'collector')}
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label>Certification Number</Label>
                   <Input
                     name="certification_number"
-                    value={formData.certification_number}
-                    onChange={handleInputChange}
+                    value={formData.collector.certification_number || ''}
+                    onChange={(e) => handleInputChange(e, 'collector')}
                   />
                 </div>
-              )}
+              </div>
             </div>
 
+            {/* Storage Location */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Storage Location</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Name *</Label>
+                  <Input
+                    name="name"
+                    value={formData.storage_location.name}
+                    onChange={(e) => handleInputChange(e, 'storage_location')}
+                    required
+                  />
+                  {errors['storage_location.name'] && (
+                    <p className="text-red-500 text-sm">{errors['storage_location.name']}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Location Code</Label>
+                  <Input
+                    name="location_code"
+                    value={formData.storage_location.location_code}
+                    onChange={(e) => handleInputChange(e, 'storage_location')}
+                  />
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <Label>Description</Label>
+                  <Textarea
+                    name="description"
+                    value={formData.storage_location.description}
+                    onChange={(e) => handleInputChange(e, 'storage_location')}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Storage Temperature (°C)</Label>
+                  <Input
+                    name="temperature"
+                    value={formData.storage_location.storage_conditions.temperature}
+                    onChange={(e) => handleInputChange(e, 'storage_location', 'storage_conditions')}
+                    // Removed type="number" to keep as string
+                    step="0.1"
+                  />
+                  {errors['storage_location.storage_conditions.temperature'] && (
+                    <p className="text-red-500 text-sm">{errors['storage_location.storage_conditions.temperature']}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Storage Humidity (%)</Label>
+                  <Input
+                    name="humidity"
+                    value={formData.storage_location.storage_conditions.humidity}
+                    onChange={(e) => handleInputChange(e, 'storage_location', 'storage_conditions')}
+                    // Removed type="number" to keep as string
+                    step="1"
+                  />
+                  {errors['storage_location.storage_conditions.humidity'] && (
+                    <p className="text-red-500 text-sm">{errors['storage_location.storage_conditions.humidity']}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Production Details */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Production Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Quantity *</Label>
+                  <Input name="quantity" value={formData.quantity} onChange={handleNumberChange} required />
+                  {errors.quantity && <p className="text-red-500 text-sm">{errors.quantity}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label>Price per Unit ($)*</Label>
+                  <Input name="price_per_unit" value={formData.price_per_unit} onChange={handleNumberChange} required />
+                  {errors.price_per_unit && <p className="text-red-500 text-sm">{errors.price_per_unit}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label>Total Price ($)*</Label>
+                  <Input name="total_price" value={formData.total_price} onChange={handleNumberChange} required />
+                  {errors.total_price && <p className="text-red-500 text-sm">{errors.total_price}</p>}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Production Date *</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-start text-left">
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {formData.production_date ? format(parseISO(formData.production_date), 'PPP') : 'Pick a date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent>
+                      <CalendarComponent
+                        mode="single"
+                        selected={formData.production_date ? parseISO(formData.production_date) : undefined}
+                        onSelect={handleDateChange}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {errors.production_date && <p className="text-red-500 text-sm">{errors.production_date}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label>Production Time *</Label>
+                  <Input
+                    name="production_time"
+                    type="time"
+                    value={formData.production_time}
+                    onChange={handleInputChange}
+                    required
+                  />
+                  {errors.production_time && <p className="text-red-500 text-sm">{errors.production_time}</p>}
+                </div>
+              </div>
+            </div>
+
+            {/* Quality and Trace */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Quality and Traceability</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Quality Status *</Label>
+                  <Select
+                    value={formData.quality_status}
+                    onValueChange={(value) => handleSelectChange('quality_status', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Pending">Pending</SelectItem>
+                      <SelectItem value="Passed">Passed</SelectItem>
+                      <SelectItem value="Failed">Failed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.quality_status && <p className="text-red-500 text-sm">{errors.quality_status}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label>Trace Number *</Label>
+                  <Input name="trace_number" value={formData.trace_number} onChange={handleInputChange} required />
+                  {errors.trace_number && <p className="text-red-500 text-sm">{errors.trace_number}</p>}
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <Label>Quality Notes</Label>
+                  <Textarea name="quality_notes" value={formData.quality_notes || ''} onChange={handleInputChange} />
+                </div>
+              </div>
+            </div>
+
+            {/* Weather Conditions */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Weather Conditions</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Temperature (°C)</Label>
+                  <Input
+                    name="temperature"
+                    value={formData.weather_conditions?.temperature || ''}
+                    onChange={(e) => handleInputChange(e, 'weather_conditions')}
+                    type="number"
+                    step="0.1"
+                    min="-50"
+                    max="60"
+                  />
+                  {errors['weather_conditions.temperature'] && (
+                    <p className="text-red-500 text-sm">{errors['weather_conditions.temperature']}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Humidity (%)</Label>
+                  <Input
+                    name="humidity"
+                    value={formData.weather_conditions?.humidity || ''}
+                    onChange={(e) => handleInputChange(e, 'weather_conditions')}
+                    type="number"
+                    step="1"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Organic Certification */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Organic Certification</h3>
+              <div className="space-y-2">
+                <Label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    name="is_organic"
+                    checked={formData.is_organic}
+                    onChange={handleCheckboxChange}
+                    className="mr-2"
+                  />
+                  Organic Product
+                </Label>
+                {formData.is_organic && (
+                  <div className="space-y-2">
+                    <Label>Certification Number</Label>
+                    <Input
+                      name="certification_number"
+                      value={formData.certification_number || ''}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Additional Attributes (Milk-Specific) */}
+            {formData.product_category.name === 'Milk' && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Additional Attributes</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Fat Content (%)</Label>
+                    <Input
+                      name="fat_content"
+                      value={formData.additional_attributes?.fat_content || ''}
+                      onChange={(e) => handleInputChange(e, 'additional_attributes')}
+                      type="number"
+                      step="0.1"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Pasteurized</Label>
+                    <Select
+                      value={formData.additional_attributes?.pasteurized || 'No'}
+                      onValueChange={(value) => handleSelectChange('pasteurized', value, 'additional_attributes')}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Yes">Yes</SelectItem>
+                        <SelectItem value="No">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Homogenized</Label>
+                    <Select
+                      value={formData.additional_attributes?.homogenized || 'No'}
+                      onValueChange={(value) => handleSelectChange('homogenized', value, 'additional_attributes')}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Yes">Yes</SelectItem>
+                        <SelectItem value="No">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Notes */}
             <div className="space-y-2">
               <Label>Notes</Label>
-              <Textarea name="notes" value={formData.notes} onChange={handleInputChange} />
+              <Textarea name="notes" value={formData.notes || ''} onChange={handleInputChange} />
             </div>
 
+            {/* Submit Buttons */}
             <div className="flex justify-end gap-3">
               <Button
                 type="button"
