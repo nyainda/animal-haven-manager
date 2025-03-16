@@ -31,7 +31,7 @@ const Hero: React.FC = () => {
   return (
     <div 
       ref={heroRef}
-      className="relative overflow-hidden min-h-screen flex items-center justify-center pt-24 pb-16"
+      className="relative overflow-hidden min-h-screen flex items-center justify-center pt-24 pb-16 font-serif text-sm"
     >
       {/* Background with subtle parallax */}
       <div className="hero-bg absolute inset-0 transition-transform duration-200 ease-out">

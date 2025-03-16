@@ -19,7 +19,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon: Icon, title, descriptio
         className
       )}
     >
-      <div className="flex flex-col items-start gap-4">
+      <div className="flex flex-col items-start gap-4 font-serif text-sm">
         <div className="p-3 rounded-xl bg-primary/10 text-primary">
           <Icon size={24} strokeWidth={1.5} />
         </div>
