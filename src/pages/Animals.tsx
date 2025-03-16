@@ -11,35 +11,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from '@/components/ui/table';
 import { 
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle
 } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
+  Pagination, PaginationContent, PaginationEllipsis, PaginationItem,
+  PaginationLink, PaginationNext, PaginationPrevious
 } from "@/components/ui/pagination";
 import { fetchAnimals, deleteAnimal, exportAnimalsToCSV } from '@/services/animalService';
-import { Animal } from '@/types/AnimalTypes';
+import { Animal } from '../types/AnimalTypes';
 import { useTheme } from '@/contexts/ThemeContext';
-import AnimalNotes from './animal/AnimalNotes'; 
+import AnimalNotes from './animal/AnimalNotes';
 
 const Animals: React.FC = () => {
   const navigate = useNavigate();
@@ -54,13 +39,13 @@ const Animals: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
-  
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(10);
+  const [totalItems, setTotalItems] = useState<number>(0);
 
   useEffect(() => {
     loadAnimals();
-  }, []);
+  }, [currentPage, itemsPerPage]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -72,6 +57,7 @@ const Animals: React.FC = () => {
     try {
       const data = await fetchAnimals();
       setAnimals(data);
+      setTotalItems(data.length);
     } catch (error) {
       console.error('Error loading animals:', error);
       setError('Failed to load animals. Please try again later.');
@@ -92,6 +78,7 @@ const Animals: React.FC = () => {
     try {
       await deleteAnimal(animalToDelete.id);
       setAnimals(animals.filter(a => a.id !== animalToDelete.id));
+      setTotalItems(prev => prev - 1);
       toast.success(`${animalToDelete.name} has been deleted`);
     } catch (error) {
       console.error('Error deleting animal:', error);
@@ -113,7 +100,6 @@ const Animals: React.FC = () => {
 
   const sortedAnimals = [...animals].sort((a, b) => {
     let comparison = 0;
-    
     switch (sortBy) {
       case 'name':
         comparison = a.name.localeCompare(b.name);
@@ -127,10 +113,18 @@ const Animals: React.FC = () => {
       case 'status':
         comparison = a.status.localeCompare(b.status);
         break;
+      case 'gender':
+        comparison = (a.gender || '').localeCompare(b.gender || '');
+        break;
+      case 'raised_purchased':
+        comparison = a.raised_purchased.localeCompare(b.raised_purchased);
+        break;
+      case 'is_breeding_stock':
+        comparison = Number(a.is_breeding_stock) - Number(b.is_breeding_stock);
+        break;
       default:
         comparison = a.name.localeCompare(b.name);
     }
-    
     return sortDir === 'asc' ? comparison : -comparison;
   });
 
@@ -152,20 +146,20 @@ const Animals: React.FC = () => {
   const filteredAnimals = sortedAnimals.filter(animal => {
     const matchesSearch = 
       animal.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      animal.tag_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (animal.tag_number?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
       animal.internal_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       animal.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      animal.breed.toLowerCase().includes(searchTerm.toLowerCase());
+      animal.breed.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (animal.gender?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+      animal.raised_purchased.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesType = animalTypeFilter === 'all' || animal.type === animalTypeFilter;
-    
     const matchesStatus = statusFilter === 'all' || animal.status === statusFilter;
     
     return matchesSearch && matchesType && matchesStatus;
   });
 
   const animalTypes = ['all', ...new Set(animals.map(animal => animal.type))];
-  
   const statuses = ['all', ...new Set(animals.map(animal => animal.status))];
 
   const totalPages = Math.ceil(filteredAnimals.length / itemsPerPage);
@@ -306,13 +300,13 @@ const Animals: React.FC = () => {
               </div>
             </div>
           </div>
-          
+
           {!loading && !error && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
               <Card className="bg-primary/10">
                 <CardContent className="p-4">
                   <h3 className="text-lg font-medium">Total Animals</h3>
-                  <p className="text-3xl font-bold">{animals.length}</p>
+                  <p className="text-3xl font-bold">{totalItems}</p>
                 </CardContent>
               </Card>
               <Card className="bg-green-500/10">
@@ -331,9 +325,17 @@ const Animals: React.FC = () => {
                   </p>
                 </CardContent>
               </Card>
+              <Card className="bg-purple-500/10">
+                <CardContent className="p-4">
+                  <h3 className="text-lg font-medium">Raised</h3>
+                  <p className="text-3xl font-bold">
+                    {animals.filter(a => a.raised_purchased === 'raised').length}
+                  </p>
+                </CardContent>
+              </Card>
             </div>
           )}
-          
+
           {loading ? (
             <div className="flex justify-center items-center h-64">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -384,40 +386,50 @@ const Animals: React.FC = () => {
             </div>
           ) : (
             <>
-              <div className={`rounded-md border overflow-hidden ${theme === 'dark' ? 'border-gray-800' : 'border-gray-200'}`}>
+              <div className={`rounded-md border overflow-x-auto ${theme === 'dark' ? 'border-gray-800' : 'border-gray-200'}`}>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="font-serif" onClick={() => handleSort('name')}>
-                        <div className="flex items-center cursor-pointer">
-                          Animal
-                          {sortBy === 'name' && (
-                            <ArrowUpDown className={`ml-1 h-4 w-4 ${sortDir === 'asc' ? 'transform rotate-180' : ''}`} />
-                          )}
+                      <TableHead onClick={() => handleSort('name')}>
+                        <div className="flex items-center cursor-pointer font-serif">
+                          Name
+                          {sortBy === 'name' && <ArrowUpDown className={`ml-1 h-4 w-4 ${sortDir === 'asc' ? 'transform rotate-180' : ''}`} />}
                         </div>
                       </TableHead>
-                      <TableHead className="font-serif" onClick={() => handleSort('type')}>
-                        <div className="flex items-center cursor-pointer">
+                      <TableHead onClick={() => handleSort('type')}>
+                        <div className="flex items-center cursor-pointer font-serif">
                           Type
-                          {sortBy === 'type' && (
-                            <ArrowUpDown className={`ml-1 h-4 w-4 ${sortDir === 'asc' ? 'transform rotate-180' : ''}`} />
-                          )}
+                          {sortBy === 'type' && <ArrowUpDown className={`ml-1 h-4 w-4 ${sortDir === 'asc' ? 'transform rotate-180' : ''}`} />}
                         </div>
                       </TableHead>
-                      <TableHead className="font-serif" onClick={() => handleSort('tag')}>
-                        <div className="flex items-center cursor-pointer">
+                      <TableHead onClick={() => handleSort('tag')}>
+                        <div className="flex items-center cursor-pointer font-serif">
                           Tag
-                          {sortBy === 'tag' && (
-                            <ArrowUpDown className={`ml-1 h-4 w-4 ${sortDir === 'asc' ? 'transform rotate-180' : ''}`} />
-                          )}
+                          {sortBy === 'tag' && <ArrowUpDown className={`ml-1 h-4 w-4 ${sortDir === 'asc' ? 'transform rotate-180' : ''}`} />}
                         </div>
                       </TableHead>
-                      <TableHead className="font-serif" onClick={() => handleSort('status')}>
-                        <div className="flex items-center cursor-pointer">
+                      <TableHead onClick={() => handleSort('gender')}>
+                        <div className="flex items-center cursor-pointer font-serif">
+                          Gender
+                          {sortBy === 'gender' && <ArrowUpDown className={`ml-1 h-4 w-4 ${sortDir === 'asc' ? 'transform rotate-180' : ''}`} />}
+                        </div>
+                      </TableHead>
+                      <TableHead onClick={() => handleSort('internal_id')}>
+                        <div className="flex items-center cursor-pointer font-serif">
+                          Animal_id
+                          {sortBy === 'internal_id' && <ArrowUpDown className={`ml-1 h-4 w-4 ${sortDir === 'asc' ? 'transform rotate-180' : ''}`} />}
+                        </div>
+                      </TableHead>
+                      <TableHead onClick={() => handleSort('is_breeding_stock')}>
+                        <div className="flex items-center cursor-pointer font-serif">
+                          Breeding
+                          {sortBy === 'is_breeding_stock' && <ArrowUpDown className={`ml-1 h-4 w-4 ${sortDir === 'asc' ? 'transform rotate-180' : ''}`} />}
+                        </div>
+                      </TableHead>
+                      <TableHead onClick={() => handleSort('status')}>
+                        <div className="flex items-center cursor-pointer font-serif">
                           Status
-                          {sortBy === 'status' && (
-                            <ArrowUpDown className={`ml-1 h-4 w-4 ${sortDir === 'asc' ? 'transform rotate-180' : ''}`} />
-                          )}
+                          {sortBy === 'status' && <ArrowUpDown className={`ml-1 h-4 w-4 ${sortDir === 'asc' ? 'transform rotate-180' : ''}`} />}
                         </div>
                       </TableHead>
                       <TableHead className="text-right font-serif">Actions</TableHead>
@@ -430,20 +442,28 @@ const Animals: React.FC = () => {
                         className="cursor-pointer hover:bg-accent/20 transition-colors"
                         onClick={() => navigate(`/animals/${animal.id}`)}
                       >
-                        <TableCell className="font-medium" onClick={(e) => e.stopPropagation()}>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                           <div 
                             className="font-medium font-serif hover:text-primary cursor-pointer"
                             onClick={() => navigate(`/animals/${animal.id}`)}
                           >
                             {animal.name}
+                           
                           </div>
-                          <div className="text-sm text-muted-foreground font-serif">{animal.internal_id}</div>
+                          
                         </TableCell>
-                        <TableCell>
-                          <div className="capitalize font-serif">{animal.type}</div>
-                          <div className="text-sm text-muted-foreground font-serif">{animal.breed}</div>
+                        <TableCell className="font-serif">{animal.type}
+                        <div className="text-sm text-muted-foreground font-serif">{animal.breed}</div>
                         </TableCell>
                         <TableCell className="font-serif">{animal.tag_number || '-'}</TableCell>
+                        <TableCell className="font-serif capitalize">{animal.gender || '-'}</TableCell>
+                        <TableCell className="font-serif capitalize">{animal.internal_id || '-'}</TableCell>
+
+                        <TableCell className="font-serif">
+                          <Badge className={animal.is_breeding_stock ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'}>
+                            {animal.is_breeding_stock ? 'Yes' : 'No'}
+                          </Badge>
+                        </TableCell>
                         <TableCell>
                           <Badge className={`${getStatusColor(animal.status)} font-serif`}>
                             {animal.status}
@@ -451,15 +471,10 @@ const Animals: React.FC = () => {
                         </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end gap-2">
-                          
-                          
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/animals/${animal.id}`);
-                              }}
+                              onClick={() => navigate(`/animals/${animal.id}`)}
                               title="View details"
                             >
                               <Eye className="h-4 w-4" />
@@ -467,10 +482,7 @@ const Animals: React.FC = () => {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/animals/${animal.id}/edit`);
-                              }}
+                              onClick={() => navigate(`/animals/${animal.id}/edit`)}
                               title="Edit animal"
                             >
                               <Edit className="h-4 w-4" />
@@ -493,7 +505,7 @@ const Animals: React.FC = () => {
                   </TableBody>
                 </Table>
               </div>
-              
+
               {totalPages > 1 && (
                 <div className="mt-6">
                   <Pagination>
@@ -559,27 +571,11 @@ const Animals: React.FC = () => {
                   <div className="text-center mt-2 text-sm text-muted-foreground font-serif">
                     Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredAnimals.length)} of {filteredAnimals.length} animals
                   </div>
-                  
-                  <div className="flex justify-center mt-2">
-                    <select 
-                      className={`rounded-md border border-input px-3 py-2 text-sm font-serif ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'}`}
-                      value={itemsPerPage}
-                      onChange={(e) => {
-                        setItemsPerPage(Number(e.target.value));
-                        setCurrentPage(1);
-                      }}
-                    >
-                      <option value={5}>5 per page</option>
-                      <option value={10}>10 per page</option>
-                      <option value={20}>20 per page</option>
-                      <option value={50}>50 per page</option>
-                    </select>
-                  </div>
                 </div>
               )}
             </>
           )}
-          
+
           {!loading && !error && filteredAnimals.length > 0 && (
             <div className="mt-8">
               <h3 className="text-lg font-medium mb-4 font-serif">Quick Actions</h3>

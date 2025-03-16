@@ -6,7 +6,7 @@ import { fetchProductionStatistics, ProductionStatistics } from '@/services/anim
 import { Animal } from '@/types/AnimalTypes';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Home, CalendarIcon, ActivityIcon, Settings } from 'lucide-react';
+import { Home, CalendarIcon, ActivityIcon, Settings, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { parseISO, differenceInYears } from 'date-fns';
@@ -183,9 +183,9 @@ const Dashboard: React.FC = () => {
   // Authentication guard
   if (authLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-screen bg-background">
         <div className="text-center">
-          <p className="text-muted-foreground">Authenticating...</p>
+          <p className="text-muted-foreground dark:text-muted-foreground">Authenticating...</p>
         </div>
       </div>
     );
@@ -215,7 +215,7 @@ const Dashboard: React.FC = () => {
         />
 
         {/* Mobile Bottom Navigation */}
-        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t">
+        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border">
           <div className="grid grid-cols-4 gap-1 p-2">
             {[
               { tab: 'overview', icon: Home, label: 'Dashboard' },
@@ -228,7 +228,7 @@ const Dashboard: React.FC = () => {
                 variant="ghost"
                 className={cn(
                   'h-14 flex-col gap-1 rounded-none',
-                  activeTab === item.tab && 'bg-muted'
+                  activeTab === item.tab && 'bg-muted dark:bg-muted'
                 )}
                 onClick={() => setActiveTab(item.tab)}
               >
@@ -242,31 +242,37 @@ const Dashboard: React.FC = () => {
         <main className="flex-1 p-4 md:p-6 overflow-y-auto pb-20 md:pb-6">
           {dataLoading && !initialLoadComplete ? (
             <div className="text-center p-6">
-              <p className="text-muted-foreground">Loading dashboard data...</p>
+              <p className="text-muted-foreground dark:text-muted-foreground">Loading dashboard data...</p>
             </div>
           ) : (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="mb-4 md:hidden">
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="activity">Activity</TabsTrigger>
-                <TabsTrigger value="calendar">Calendar</TabsTrigger>
-                <TabsTrigger value="settings">Settings</TabsTrigger>
+              <TabsList className="mb-4 md:hidden bg-muted p-1 rounded-lg">
+                <TabsTrigger value="overview" className="text-xs sm:text-sm font-sans">Overview</TabsTrigger>
+                <TabsTrigger value="activity" className="text-xs sm:text-sm font-sans">Activity</TabsTrigger>
+                <TabsTrigger value="calendar" className="text-xs sm:text-sm font-sans">Calendar</TabsTrigger>
+                <TabsTrigger value="settings" className="text-xs sm:text-sm font-sans">Settings</TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview">
                 {!animalStats || animalStats.totalAnimals === 0 ? (
                   <div className="text-center p-6">
-                    <h2 className="text-2xl font-semibold">Welcome to Your Dashboard!</h2>
-                    <p className="text-muted-foreground mb-4">
+                    <h2 className="text-xl font-serif font-semibold text-foreground dark:text-foreground sm:text-2xl">
+                      Welcome to Your Dashboard!
+                    </h2>
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-4 mt-2 max-w-md mx-auto">
                       It looks like you don’t have any animals yet. Add some animals to start tracking statistics and production data.
                     </p>
-                    <Button onClick={() => navigate('/animals')}>
+                    <Button 
+                      onClick={() => navigate('/animals')}
+                      className="font-serif bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground hover:bg-primary/90 dark:hover:bg-primary/80 h-10 sm:h-12"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
                       Add Your First Animal
                     </Button>
                   </div>
                 ) : (
-                  <>
-                    <ActionCards setActiveTab={setActiveTab} />
+                  <div className="space-y-6">
+                    <ActionCards setActiveTab={setActiveTab} selectedAnimalId={selectedAnimalId} /> {/* Pass selectedAnimalId */}
                     <AnimalStats
                       animalStats={animalStats}
                       animals={animals}
@@ -274,7 +280,7 @@ const Dashboard: React.FC = () => {
                       selectedAnimalId={selectedAnimalId}
                     />
                     <Charts animals={animals} productionStats={productionStats} />
-                  </>
+                  </div>
                 )}
               </TabsContent>
 

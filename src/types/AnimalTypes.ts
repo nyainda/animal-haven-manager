@@ -35,6 +35,7 @@ export interface Animal {
 export interface AnimalFormData {
   name: string;
   type: string;
+  internal_id: string;
   breed: string;
   gender: 'male' | 'female' | 'unknown';
   birth_date: string;

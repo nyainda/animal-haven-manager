@@ -28,7 +28,7 @@ import { Animal } from '@/types/AnimalTypes';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { formatDistanceToNow, format, isPast, parseISO } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -43,38 +43,23 @@ const AnimalProductions: React.FC = () => {
   const [productionToDelete, setProductionToDelete] = useState<Production | null>(null);
   const [activeTab, setActiveTab] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [itemsPerPage] = useState<number>(10); // Default to 10 items per page
+  const [itemsPerPage] = useState<number>(10);
   const pdfContentRef = useRef<HTMLDivElement>(null);
 
   const loadData = async (animalId: string) => {
     setLoading(true);
     try {
-      console.log('Fetching animal data for ID:', animalId);
       const animalData = await fetchAnimal(animalId);
-      if (!animalData) {
-        throw new Error('No animal data returned from fetchAnimal');
-      }
-      console.log('Animal data fetched:', animalData);
+      if (!animalData) throw new Error('No animal data returned');
       setAnimal(animalData);
 
-      console.log('Fetching productions for animal ID:', animalId);
       const productionsData = await fetchProductions(animalId);
-      console.log('Productions data raw:', productionsData);
       const productionList = Array.isArray(productionsData) ? productionsData : productionsData.data || [];
-      if (!productionList.length) {
-        console.warn('No production records found for animal:', animalId);
-        toast.info('No production records found for this animal.');
-      }
-      console.log('Processed production list:', productionList);
+      if (!productionList.length) toast.info('No production records found.');
       setProductions(productionList);
     } catch (error: any) {
-      console.error('Error loading data:', error);
-      const errorMessage = error.message || 'Unknown error occurred';
-      toast.error(`Failed to load production data: ${errorMessage}`);
-      if (!animal) {
-        console.warn('No animal data, redirecting to /animals');
-        navigate('/animals');
-      }
+      toast.error(`Failed to load data: ${error.message || 'Unknown error'}`);
+      if (!animal) navigate('/animals');
     } finally {
       setLoading(false);
     }
@@ -82,42 +67,26 @@ const AnimalProductions: React.FC = () => {
 
   useEffect(() => {
     if (!id) {
-      console.error('No ID provided in URL params');
       toast.error('Missing animal ID');
       navigate('/animals');
       return;
     }
-
-    console.log('Effect triggered with ID:', id, 'Refresh state:', location.state?.refresh);
-    loadData(id).catch((err) => {
-      console.error('Unhandled error in fetchData:', err);
-      toast.error('An unexpected error occurred while loading data');
-    });
+    loadData(id).catch((err) => toast.error('Unexpected error occurred'));
   }, [id, navigate, location.state?.refresh]);
 
-  const handleEditClick = (production: Production) => {
-    console.log('Navigating to edit production:', production.id);
-    navigate(`/animals/${id}/production/${production.id}/edit`, { state: { production } });
-  };
-
+  const handleEditClick = (production: Production) => navigate(`/animals/${id}/production/${production.id}/edit`, { state: { production } });
   const handleDeleteClick = (production: Production) => {
-    console.log('Opening delete confirmation for production:', production.id);
     setProductionToDelete(production);
     setDeleteConfirmOpen(true);
   };
-
   const handleConfirmDelete = async () => {
     if (!productionToDelete || !id) return;
-
     try {
-      console.log('Deleting production:', productionToDelete.id);
       await deleteProduction(id, productionToDelete.id);
       setProductions(productions.filter((p) => p.id !== productionToDelete.id));
-      toast.success('Production record deleted successfully');
+      toast.success('Production record deleted');
     } catch (error: any) {
-      console.error('Error deleting production:', error);
-      const errorMessage = error.message ? `Failed to delete production: ${error.message}` : 'Failed to delete production';
-      toast.error(errorMessage);
+      toast.error(`Failed to delete: ${error.message || 'Unknown error'}`);
     } finally {
       setDeleteConfirmOpen(false);
       setProductionToDelete(null);
@@ -136,32 +105,23 @@ const AnimalProductions: React.FC = () => {
 
   const getQualityColor = (status: string | undefined) => {
     switch (status?.toLowerCase()) {
-      case 'passed':
-        return 'bg-green-500/10 text-green-700 dark:bg-green-500/20 dark:text-green-300 border-green-500/20';
-      case 'failed':
-        return 'bg-red-500/10 text-red-700 dark:bg-red-500/20 dark:text-red-300 border-red-500/20';
-      case 'pending':
-        return 'bg-yellow-500/10 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300 border-yellow-500/20';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-600';
+      case 'passed': return 'bg-green-500/10 text-green-700 dark:bg-green-500/20 dark:text-green-300 border-green-500/20';
+      case 'failed': return 'bg-red-500/10 text-red-700 dark:bg-red-500/20 dark:text-red-300 border-red-500/20';
+      case 'pending': return 'bg-yellow-500/10 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300 border-yellow-500/20';
+      default: return 'bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground border-muted';
     }
   };
 
   const getStatusIcon = (status: string | undefined) => {
     switch (status?.toLowerCase()) {
-      case 'passed':
-        return <CheckCircle2 className="h-4 w-4 mr-1" />;
-      case 'failed':
-        return <XCircle className="h-4 w-4 mr-1" />;
-      case 'pending':
-        return <AlertTriangle className="h-4 w-4 mr-1" />;
-      default:
-        return null;
+      case 'passed': return <CheckCircle2 className="h-4 w-4 mr-1" />;
+      case 'failed': return <XCircle className="h-4 w-4 mr-1" />;
+      case 'pending': return <AlertTriangle className="h-4 w-4 mr-1" />;
+      default: return null;
     }
   };
 
   const isOrganic = (isOrganic: boolean | undefined) => (isOrganic ? 'Organic' : 'Non-Organic');
-
   const isPastDue = (date: string, time: string) => {
     try {
       return isPast(parseISO(`${date.split('T')[0]}T${time}`));
@@ -175,16 +135,12 @@ const AnimalProductions: React.FC = () => {
     if (activeTab === 'passed') return productions.filter((p) => p.quality_status?.toLowerCase() === 'passed');
     if (activeTab === 'failed') return productions.filter((p) => p.quality_status?.toLowerCase() === 'failed');
     if (activeTab === 'pending') return productions.filter((p) => p.quality_status?.toLowerCase() === 'pending');
-    if (activeTab === 'overdue')
-      return productions.filter(
-        (p) => isPastDue(p.production_date, p.production_time) && p.quality_status?.toLowerCase() !== 'passed'
-      );
+    if (activeTab === 'overdue') return productions.filter((p) => isPastDue(p.production_date, p.production_time) && p.quality_status?.toLowerCase() !== 'passed');
     return productions;
   };
 
   const generatePDF = async () => {
     if (!pdfContentRef.current || !animal) return;
-
     try {
       const pdf = new jsPDF('p', 'mm', 'a4');
       const canvas = await html2canvas(pdfContentRef.current, { scale: 2 });
@@ -200,55 +156,55 @@ const AnimalProductions: React.FC = () => {
       pdf.setFontSize(10);
       pdf.addImage(imgData, 'PNG', 10, 50, imgWidth, imgHeight);
       pdf.save(`${animal.name}_productions_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
-      toast.success('PDF report generated successfully');
+      toast.success('PDF report generated');
     } catch (error) {
-      console.error('Error generating PDF:', error);
       toast.error('Failed to generate PDF');
     }
   };
 
-  // Pagination Logic
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredProductions().slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredProductions().length / itemsPerPage);
 
-  const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
-
-  const handlePrevPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
+  const handleNextPage = () => currentPage < totalPages && setCurrentPage(currentPage + 1);
+  const handlePrevPage = () => currentPage > 1 && setCurrentPage(currentPage - 1);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="flex items-center space-x-3">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-500 dark:text-blue-400" />
-          <span className="text-lg font-medium text-gray-700 dark:text-gray-200">Loading Production Data...</span>
-        </div>
+      <div className="bg-background min-h-screen flex items-center justify-center py-6 px-4">
+        <Card className="border-border shadow-md w-full max-w-md">
+          <CardContent className="flex flex-col items-center gap-4 py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-primary sm:h-8 sm:w-8" />
+            <p className="text-base font-sans text-foreground dark:text-foreground sm:text-lg">
+              Loading production data...
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   if (!animal) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <Card className="shadow-lg max-w-md w-full bg-white dark:bg-gray-800 border-none">
-          <CardContent className="p-6 text-center">
-            <AlertTriangle className="h-12 w-12 text-red-500 dark:text-red-400 mx-auto mb-4" />
-            <p className="text-lg font-medium text-gray-700 dark:text-gray-200 mb-4">Animal not found</p>
+      <div className="bg-background min-h-screen flex items-center justify-center py-6 px-4">
+        <Card className="border-border shadow-md w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-lg font-serif text-destructive dark:text-destructive sm:text-xl">
+              Oops!
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground sm:text-base">
+              Animal not found.
+            </p>
             <Button
               variant="outline"
+              className="w-full font-serif text-primary dark:text-primary border-primary dark:border-primary hover:bg-primary/10 dark:hover:bg-primary/20 h-10 sm:h-12"
               onClick={() => navigate('/animals')}
-              className="text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" /> Back to Animals
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Animals
             </Button>
           </CardContent>
         </Card>
@@ -257,67 +213,68 @@ const AnimalProductions: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
-      <div className="container mx-auto px-4 max-w-5xl">
+    <div className="bg-background min-h-screen py-6 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
-          <div className="flex items-center space-x-4">
+        <header className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3 flex-wrap">
             <Button
               variant="ghost"
+              size="icon"
               onClick={() => navigate(`/animals/${id}`)}
-              className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+              className="text-primary dark:text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded-full h-10 w-10"
             >
-              <ArrowLeft className="h-5 w-5 mr-2" /> Back to Animal
+              <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              {animal.name}'s Production
+            <h1 className="text-xl font-serif font-semibold text-foreground dark:text-foreground sm:text-2xl">
+              <span className="text-primary dark:text-primary">{animal.name}</span>’s Production
             </h1>
           </div>
-          <div className="flex items-center space-x-3">
+          <div className="flex gap-3 flex-wrap">
             <Button
               onClick={() => navigate(`/animals/${id}/production/new`)}
-              className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white"
+              className="font-serif bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground hover:bg-primary/90 dark:hover:bg-primary/80 h-10 w-full sm:w-auto sm:h-12"
             >
-              <Plus className="h-4 w-4 mr-2" /> Add Production
+              <Plus className="mr-2 h-4 w-4" />
+              Add Production
             </Button>
             <Button
               variant="outline"
               onClick={generatePDF}
-              className="text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+              className="font-serif text-foreground dark:text-foreground border-muted-foreground dark:border-muted-foreground hover:bg-muted/10 dark:hover:bg-muted/20 h-10 w-full sm:w-auto sm:h-12"
             >
-              <Download className="h-4 w-4 mr-2" /> Export PDF
+              <Download className="mr-2 h-4 w-4" />
+              Export PDF
             </Button>
           </div>
         </header>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-          <TabsList className="grid w-full grid-cols-5 bg-white dark:bg-gray-800 p-1 rounded-lg shadow-sm">
-            <TabsTrigger value="all" className="text-sm font-medium">All</TabsTrigger>
-            <TabsTrigger value="passed" className="text-sm font-medium">Passed</TabsTrigger>
-            <TabsTrigger value="failed" className="text-sm font-medium">Failed</TabsTrigger>
-            <TabsTrigger value="pending" className="text-sm font-medium">Pending</TabsTrigger>
-            <TabsTrigger value="overdue" className="text-sm font-medium">Overdue</TabsTrigger>
+          <TabsList className="grid grid-cols-3 gap-2 sm:grid-cols-5 bg-muted p-1 rounded-lg">
+            <TabsTrigger value="all" className="text-xs sm:text-sm font-sans">All</TabsTrigger>
+            <TabsTrigger value="passed" className="text-xs sm:text-sm font-sans">Passed</TabsTrigger>
+            <TabsTrigger value="failed" className="text-xs sm:text-sm font-sans">Failed</TabsTrigger>
+            <TabsTrigger value="pending" className="text-xs sm:text-sm font-sans">Pending</TabsTrigger>
+            <TabsTrigger value="overdue" className="text-xs sm:text-sm font-sans">Overdue</TabsTrigger>
           </TabsList>
-
           <TabsContent value={activeTab}>
             {currentItems.length === 0 ? (
-              <Card className="shadow-md border-none bg-white dark:bg-gray-800">
-                <CardContent className="pt-10 pb-8 text-center">
-                  <Tag className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-2">
+              <Card className="border-border shadow-md">
+                <CardContent className="py-8 text-center">
+                  <Tag className="h-8 w-8 text-muted-foreground dark:text-muted-foreground mx-auto mb-4 sm:h-10 sm:w-10" />
+                  <h3 className="text-base font-sans font-medium text-foreground dark:text-foreground mb-2 sm:text-lg">
                     No {activeTab !== 'all' ? activeTab : 'Production'} Records
                   </h3>
-                  <p className="text-gray-500 dark:text-gray-400 mb-6">
-                    {activeTab === 'all'
-                      ? 'Get started by adding a production record.'
-                      : `No ${activeTab} production records found.`}
+                  <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-6 max-w-md mx-auto">
+                    {activeTab === 'all' ? `Add a production record for ${animal.name}.` : `No ${activeTab} records found.`}
                   </p>
                   <Button
                     onClick={() => navigate(`/animals/${id}/production/new`)}
-                    className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white"
+                    className="font-serif bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground hover:bg-primary/90 dark:hover:bg-primary/80 h-10 w-full max-w-xs mx-auto sm:h-12"
                   >
-                    <Plus className="h-4 w-4 mr-2" /> Add Production
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Production
                   </Button>
                 </CardContent>
               </Card>
@@ -326,97 +283,87 @@ const AnimalProductions: React.FC = () => {
                 {currentItems.map((production) => (
                   <Card
                     key={production.id}
-                    className={`shadow-md border ${
-                      isPastDue(production.production_date, production.production_time)
-                        ? 'border-red-200 dark:border-red-700/50'
-                        : 'border-gray-200 dark:border-gray-700'
-                    } bg-white dark:bg-gray-800 hover:shadow-lg transition-shadow duration-200`}
+                    className={`border-border shadow-md ${isPastDue(production.production_date, production.production_time) ? 'border-destructive/50' : ''}`}
                   >
                     {isPastDue(production.production_date, production.production_time) && (
-                      <div className="bg-red-50 dark:bg-red-900/30 border-b border-red-200 dark:border-red-700/50 px-4 py-2 flex items-center">
-                        <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 mr-2" />
-                        <span className="text-sm font-medium text-red-600 dark:text-red-400">Past Due</span>
+                      <div className="bg-destructive/10 dark:bg-destructive/20 border-b border-destructive/50 px-4 py-2 flex items-center">
+                        <AlertTriangle className="h-4 w-4 text-destructive dark:text-destructive mr-2" />
+                        <span className="text-sm font-sans text-destructive dark:text-destructive">Past Due</span>
                       </div>
                     )}
-                    <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4">
-                      <div className="space-y-2">
-                        <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white">
+                    <CardHeader className="flex flex-col gap-3 pb-4 border-b border-border sm:flex-row sm:items-start sm:justify-between">
+                      <div className="space-y-1">
+                        <CardTitle className="text-base font-serif text-foreground dark:text-foreground sm:text-lg">
                           {production.product_category.name} - {production.trace_number}
                         </CardTitle>
-                        <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                          <Calendar className="h-4 w-4 mr-1" />
-                          {getFormattedDateTime(production.production_date, production.production_time)}
-                          <Clock className="h-4 w-4 ml-3 mr-1" />
-                          Created {formatDistanceToNow(parseISO(production.created_at), { addSuffix: true })}
+                        <div className="flex flex-col gap-1 text-xs text-muted-foreground dark:text-muted-foreground sm:text-sm sm:flex-row sm:gap-4">
+                          <span className="flex items-center">
+                            <Calendar className="h-3 w-3 mr-1 sm:h-4 sm:w-4" />
+                            {getFormattedDateTime(production.production_date, production.production_time)}
+                          </span>
+                          <span className="flex items-center">
+                            <Clock className="h-3 w-3 mr-1 sm:h-4 sm:w-4" />
+                            Created {formatDistanceToNow(parseISO(production.created_at), { addSuffix: true })}
+                          </span>
                         </div>
                       </div>
-                      <div className="flex space-x-2 mt-3 sm:mt-0">
+                      <div className="flex gap-2 flex-wrap">
                         <Button
-                          variant="ghost"
-                          size="icon"
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleEditClick(production)}
-                          className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
+                          className="font-sans text-primary dark:text-primary border-primary dark:border-primary hover:bg-primary/10 dark:hover:bg-primary/20 h-9 w-full sm:w-auto sm:h-10"
                         >
-                          <Edit className="h-4 w-4" />
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit
                         </Button>
                         <Button
-                          variant="ghost"
-                          size="icon"
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleDeleteClick(production)}
-                          className="text-gray-600 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400"
+                          className="font-sans text-destructive dark:text-destructive border-destructive dark:border-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 h-9 w-full sm:w-auto sm:h-10"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Delete
                         </Button>
                       </div>
                     </CardHeader>
-                    <CardContent className="pt-0">
-                      <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                    <CardContent className="pt-4">
+                      <p className="text-sm text-foreground dark:text-foreground font-sans mb-4">
                         {production.notes || `${production.quantity} ${production.product_category.measurement_unit}`}
                       </p>
                       <div className="flex flex-wrap gap-2 mb-4">
-                        <Badge variant="outline" className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200">
-                          {production.product_grade.name}
-                        </Badge>
-                        <Badge variant="outline" className={getQualityColor(production.quality_status)}>
+                        <Badge variant="outline" className="text-xs font-sans">{production.product_grade.name}</Badge>
+                        <Badge variant="outline" className={`${getQualityColor(production.quality_status)} text-xs font-sans`}>
                           {getStatusIcon(production.quality_status)}
                           {production.quality_status}
                         </Badge>
-                        <Badge variant="outline" className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200">
+                        <Badge variant="outline" className="text-xs font-sans">
                           <BarChart3 className="h-3 w-3 mr-1" />
                           {isOrganic(production.is_organic)}
                         </Badge>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-300">
+                      <div className="grid grid-cols-1 gap-3 text-sm text-foreground dark:text-foreground sm:grid-cols-2">
                         <div className="flex items-center">
-                          <User className="h-4 w-4 mr-2 text-gray-500 dark:text-gray-400" />
-                          <span>
-                            <strong>Collector:</strong> {production.collector.name}
-                          </span>
+                          <User className="h-4 w-4 mr-2 text-muted-foreground dark:text-muted-foreground" />
+                          <span><strong>Collector:</strong> {production.collector.name}</span>
                         </div>
                         <div className="flex items-center">
-                          <DollarSign className="h-4 w-4 mr-2 text-gray-500 dark:text-gray-400" />
-                          <span>
-                            <strong>Total:</strong> ${production.total_price} <span className="text-xs">(${production.price_per_unit}/unit)</span>
-                          </span>
+                          <DollarSign className="h-4 w-4 mr-2 text-muted-foreground dark:text-muted-foreground" />
+                          <span><strong>Total:</strong> ${production.total_price} <span className="text-xs">(${production.price_per_unit}/unit)</span></span>
                         </div>
                         <div className="flex items-center">
-                          <Tag className="h-4 w-4 mr-2 text-gray-500 dark:text-gray-400" />
-                          <span>
-                            <strong>Method:</strong> {production.production_method.method_name}
-                          </span>
+                          <Tag className="h-4 w-4 mr-2 text-muted-foreground dark:text-muted-foreground" />
+                          <span><strong>Method:</strong> {production.production_method.method_name}</span>
                         </div>
                         <div className="flex items-center">
-                          <BarChart3 className="h-4 w-4 mr-2 text-gray-500 dark:text-gray-400" />
-                          <span>
-                            <strong>Storage:</strong> {production.storage_location.name}
-                          </span>
+                          <BarChart3 className="h-4 w-4 mr-2 text-muted-foreground dark:text-muted-foreground" />
+                          <span><strong>Storage:</strong> {production.storage_location.name}</span>
                         </div>
                         {production.weather_conditions && (
                           <div className="flex items-center">
-                            <Tag className="h-4 w-4 mr-2 text-gray-500 dark:text-gray-400" />
-                            <span>
-                              <strong>Weather:</strong> {production.weather_conditions.temperature}°C, {production.weather_conditions.humidity}%
-                            </span>
+                            <Tag className="h-4 w-4 mr-2 text-muted-foreground dark:text-muted-foreground" />
+                            <span><strong>Weather:</strong> {production.weather_conditions.temperature}°C, {production.weather_conditions.humidity}%</span>
                           </div>
                         )}
                       </div>
@@ -428,53 +375,57 @@ const AnimalProductions: React.FC = () => {
           </TabsContent>
         </Tabs>
 
-        {/* Pagination Controls */}
-        <div className="flex justify-between items-center mt-6">
+        {/* Pagination */}
+        <div className="flex flex-col items-center gap-4 mt-6 sm:flex-row sm:justify-between">
           <Button
             variant="outline"
             onClick={handlePrevPage}
             disabled={currentPage === 1}
-            className="text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+            className="font-sans text-foreground dark:text-foreground border-muted-foreground dark:border-muted-foreground hover:bg-muted/10 dark:hover:bg-muted/20 h-10 w-full sm:w-auto max-w-xs"
           >
             <ChevronLeft className="h-4 w-4 mr-2" /> Previous
           </Button>
-          <span className="text-sm text-gray-700 dark:text-gray-300">
+          <span className="text-sm text-muted-foreground dark:text-muted-foreground">
             Page {currentPage} of {totalPages} ({filteredProductions().length} records)
           </span>
           <Button
             variant="outline"
             onClick={handleNextPage}
             disabled={currentPage === totalPages}
-            className="text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+            className="font-sans text-foreground dark:text-foreground border-muted-foreground dark:border-muted-foreground hover:bg-muted/10 dark:hover:bg-muted/20 h-10 w-full sm:w-auto max-w-xs"
           >
             Next <ChevronRight className="h-4 w-4 ml-2" />
           </Button>
         </div>
 
-        {/* Delete Confirmation Dialog */}
+        {/* Delete Dialog */}
         <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-          <DialogContent className="sm:max-w-md bg-white dark:bg-gray-800">
+          <DialogContent className="bg-background border-border shadow-md w-[90vw] max-w-md sm:max-w-md">
             <DialogHeader>
-              <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">Confirm Deletion</DialogTitle>
-            </DialogHeader>
-            <div className="py-4">
-              <p className="text-gray-600 dark:text-gray-300">
+              <DialogTitle className="text-lg font-serif text-foreground dark:text-foreground sm:text-xl">
+                Confirm Deletion
+              </DialogTitle>
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                 Are you sure you want to delete{' '}
                 <span className="font-medium">
                   {productionToDelete?.product_category.name} - {productionToDelete?.trace_number}
                 </span>
                 ? This action cannot be undone.
               </p>
-            </div>
-            <DialogFooter>
+            </DialogHeader>
+            <DialogFooter className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
               <Button
                 variant="outline"
                 onClick={() => setDeleteConfirmOpen(false)}
-                className="text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="font-serif w-full text-foreground dark:text-foreground border-muted-foreground dark:border-muted-foreground hover:bg-muted/10 dark:hover:bg-muted/20 h-10 sm:w-auto"
               >
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={handleConfirmDelete}>
+              <Button
+                variant="destructive"
+                onClick={handleConfirmDelete}
+                className="font-serif w-full bg-destructive text-destructive-foreground dark:bg-destructive dark:text-destructive-foreground hover:bg-destructive/90 dark:hover:bg-destructive/80 h-10 sm:w-auto"
+              >
                 Delete
               </Button>
             </DialogFooter>
