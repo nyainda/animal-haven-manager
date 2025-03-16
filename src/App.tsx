@@ -12,6 +12,7 @@ import Profile from "./pages/Profile";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import VerifyEmail from "./pages/VerifyEmail";
+import { Analytics } from "@vercel/analytics/react";
 import Animals from "./pages/Animals";
 import AnimalForm from "./components/AnimalForm";
 import AnimalDetails from "./pages/AnimalDetails";
@@ -40,6 +41,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <Analytics />
       <BrowserRouter>
         <ThemeProvider>
           <AuthProvider>
