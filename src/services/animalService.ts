@@ -1,14 +1,8 @@
 import { toast } from "sonner";
 import { Animal, AnimalFormData } from "../types/AnimalTypes";
 
-// Base API URLs
-//const API_URL = "http://127.0.0.1:8000/api/animals";
-//const CSRF_URL = "http://127.0.0.1:8000/sanctum/csrf-cookie";
-
 const API_URL = "https://animal-management-master-wyohh0.laravel.cloud/api/animals";
 const CSRF_URL = "https://animal-management-master-wyohh0.laravel.cloud/sanctum/csrf-cookie";
-
-
 
 interface PaginatedResponse {
   current_page: number;
@@ -25,22 +19,32 @@ interface PaginatedResponse {
   total: number;
 }
 
-// Helper to fetch CSRF token
-const fetchCsrfToken = async () => {
+// Fetch CSRF token with retry logic
+const fetchCsrfToken = async (retryCount = 0): Promise<void> => {
+  const maxRetries = 2;
+  if (retryCount > maxRetries) {
+    throw new Error('Failed to fetch CSRF token after multiple attempts');
+  }
+
   try {
     const response = await fetch(CSRF_URL, {
       method: 'GET',
-      credentials: 'include', // Include cookies for Sanctum
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' },
     });
-    if (!response.ok) throw new Error(`Failed to fetch CSRF token: ${response.status}`);
+    if (!response.ok) throw new Error(`CSRF fetch failed: ${response.status}`);
     console.log('[ANIMAL] CSRF token fetched successfully');
   } catch (error) {
-    console.warn('[ANIMAL] CSRF fetch failed, proceeding anyway:', error);
-    // Proceed anyway, as some setups might not require CSRF for GET
+    console.warn(`[ANIMAL] CSRF fetch attempt ${retryCount + 1} failed:`, error);
+    if (retryCount < maxRetries) {
+      await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 1000));
+      return fetchCsrfToken(retryCount + 1);
+    }
+    throw error;
   }
 };
 
-// Helper to get authentication headers
+// Get authentication headers
 const getAuthHeaders = (): Record<string, string> => {
   const token = localStorage.getItem('auth_token');
   const xsrfToken = document.cookie
@@ -56,195 +60,164 @@ const getAuthHeaders = (): Record<string, string> => {
   };
 };
 
-// Fetch all animals (handles paginated response)
-export const fetchAnimals = async (): Promise<Animal[]> => {
-  await fetchCsrfToken();
+// API fetch utility specific to animal service
+const apiFetch = async (url: string, options: RequestInit = {}): Promise<any> => {
   try {
-    const response = await fetch(API_URL, {
-      headers: getAuthHeaders(),
+    await fetchCsrfToken();
+    const response = await fetch(url, {
+      ...options,
+      headers: { ...getAuthHeaders(), ...options.headers },
       credentials: 'include',
     });
 
-    console.log('[ANIMAL] Fetch Animals Status:', response.status);
-    const rawData = await response.json();
-    console.log('[ANIMAL] Raw Fetch Animals Response:', rawData);
+    const data = await response.json();
+    console.log('[ANIMAL] API Response:', { status: response.status, data });
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
+      if (response.status === 401) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
+        throw new Error('Authentication required');
+      }
+      throw new Error(data.message || `API error: ${response.status}`);
     }
 
-    // Extract animals from paginated response
-    const animals = rawData.data && Array.isArray(rawData.data.data)
-      ? rawData.data.data
-      : [];
-    console.log('[ANIMAL] Processed Animals:', animals);
+    return data;
+  } catch (error) {
+    console.error('[ANIMAL] API Error:', error);
+    throw error;
+  }
+};
+
+export const fetchAnimals = async (): Promise<Animal[]> => {
+  try {
+    const response = await apiFetch(API_URL);
+    const animals = response.data && Array.isArray(response.data.data)
+      ? response.data.data
+      : Array.isArray(response.data) ? response.data : [];
+    
+    // Cache animals
+    localStorage.setItem('dashboard_animals', JSON.stringify(animals));
     return animals;
   } catch (error) {
     console.error('[ANIMAL] Error fetching animals:', error);
+    const cached = localStorage.getItem('dashboard_animals');
+    if (cached) {
+      toast.info('Loaded cached animals due to fetch error');
+      return JSON.parse(cached);
+    }
     toast.error(`Failed to fetch animals: ${error instanceof Error ? error.message : 'Unknown error'}`);
     throw error;
   }
 };
 
-// Fetch a single animal by ID
 export const fetchAnimal = async (id: string): Promise<Animal> => {
-  await fetchCsrfToken();
   try {
-    const response = await fetch(`${API_URL}/${id}`, {
-      headers: getAuthHeaders(),
-      credentials: 'include',
-    });
-
-    console.log('[ANIMAL] Fetch Animal Status:', response.status);
-    const rawData = await response.json();
-    console.log('[ANIMAL] Raw Fetch Animal Response:', rawData);
-
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
-    }
-
-    // Handle potential wrapping in 'data'
-    const animal = rawData.data || rawData;
-    console.log('[ANIMAL] Processed Animal:', animal);
+    const response = await apiFetch(`${API_URL}/${id}`);
+    const animal = response.data || response;
+    localStorage.setItem(`animal_${id}`, JSON.stringify(animal));
     return animal;
   } catch (error) {
     console.error(`[ANIMAL] Error fetching animal ${id}:`, error);
+    const cached = localStorage.getItem(`animal_${id}`);
+    if (cached) {
+      toast.info('Loaded cached animal due to fetch error');
+      return JSON.parse(cached);
+    }
     toast.error(`Failed to fetch animal: ${error instanceof Error ? error.message : 'Unknown error'}`);
     throw error;
   }
 };
 
-// Create a new animal
 export const createAnimal = async (animalData: AnimalFormData): Promise<Animal> => {
-  await fetchCsrfToken();
   try {
-    const response = await fetch(API_URL, {
+    const response = await apiFetch(API_URL, {
       method: 'POST',
-      headers: getAuthHeaders(),
-      credentials: 'include',
       body: JSON.stringify(animalData),
     });
-
-    console.log('[ANIMAL] Create Animal Status:', response.status);
-    const rawData = await response.json();
-    console.log('[ANIMAL] Raw Create Animal Response:', rawData);
-
-    if (!response.ok) {
-      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
-      throw new Error(errorMessage);
-    }
-
-    const newAnimal = rawData.data || rawData;
+    const newAnimal = response.data || response;
     toast.success(`Animal ${newAnimal.name} created successfully`);
-    console.log('[ANIMAL] Created Animal:', newAnimal);
+    
+    // Update cached animals list
+    const cachedAnimals = JSON.parse(localStorage.getItem('dashboard_animals') || '[]');
+    cachedAnimals.push(newAnimal);
+    localStorage.setItem('dashboard_animals', JSON.stringify(cachedAnimals));
+    
     return newAnimal;
   } catch (error) {
-    console.error('[ANIMAL] Error creating animal:', error);
     toast.error(`Failed to create animal: ${error instanceof Error ? error.message : 'Unknown error'}`);
     throw error;
   }
 };
 
-// Update an existing animal
 export const updateAnimal = async (id: string, animalData: Partial<AnimalFormData>): Promise<Animal> => {
-  await fetchCsrfToken();
   try {
-    const url = `${API_URL}/${id}`;
-    const response = await fetch(url, {
+    const response = await apiFetch(`${API_URL}/${id}`, {
       method: 'PUT',
-      headers: getAuthHeaders(),
-      credentials: 'include',
       body: JSON.stringify(animalData),
     });
-
-    console.log('[ANIMAL] Update Animal Status:', response.status);
-    const rawData = await response.json();
-    console.log('[ANIMAL] Raw Update Animal Response:', rawData);
-
-    if (!response.ok) {
-      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
-      throw new Error(errorMessage);
-    }
-
-    const updatedAnimal = rawData.data || rawData;
+    const updatedAnimal = response.data || response;
     toast.success(`Animal ${updatedAnimal.name} updated successfully`);
-    console.log('[ANIMAL] Updated Animal:', updatedAnimal);
+    
+    // Update cached animals list
+    const cachedAnimals = JSON.parse(localStorage.getItem('dashboard_animals') || '[]');
+    const updatedAnimals = cachedAnimals.map((animal: Animal) =>
+      animal.id === id ? updatedAnimal : animal
+    );
+    localStorage.setItem('dashboard_animals', JSON.stringify(updatedAnimals));
+    
     return updatedAnimal;
   } catch (error) {
-    console.error(`[ANIMAL] Error updating animal ${id}:`, error);
     toast.error(`Failed to update animal: ${error instanceof Error ? error.message : 'Unknown error'}`);
     throw error;
   }
 };
 
-// Delete an animal
 export const deleteAnimal = async (id: string): Promise<void> => {
-  await fetchCsrfToken();
   try {
-    const response = await fetch(`${API_URL}/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-      credentials: 'include',
-    });
-
-    console.log('[ANIMAL] Delete Animal Status:', response.status);
-    const rawData = await response.json();
-    console.log('[ANIMAL] Raw Delete Animal Response:', rawData);
-
-    if (!response.ok) {
-      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
-      throw new Error(errorMessage);
-    }
-
+    await apiFetch(`${API_URL}/${id}`, { method: 'DELETE' });
     toast.success('Animal deleted successfully');
+    
+    // Update cached animals list
+    const cachedAnimals = JSON.parse(localStorage.getItem('dashboard_animals') || '[]');
+    const updatedAnimals = cachedAnimals.filter((animal: Animal) => animal.id !== id);
+    localStorage.setItem('dashboard_animals', JSON.stringify(updatedAnimals));
   } catch (error) {
-    console.error(`[ANIMAL] Error deleting animal ${id}:`, error);
     toast.error(`Failed to delete animal: ${error instanceof Error ? error.message : 'Unknown error'}`);
     throw error;
   }
 };
 
-// Export animals to CSV
 export const exportAnimalsToCSV = async (): Promise<void> => {
   try {
     const animals = await fetchAnimals();
-
-    // Define fields to export based on your Animal type
     const fields = [
       'id', 'name', 'type', 'breed', 'gender', 'birth_date', 'tag_number',
       'status', 'is_breeding_stock', 'age', 'is_deceased',
     ];
 
     const header = fields.join(',');
-
-    const rows = animals.map(animal => {
-      return fields.map(field => {
+    const rows = animals.map(animal =>
+      fields.map(field => {
         if (field === 'is_breeding_stock' || field === 'is_deceased') {
           return animal[field] ? 'Yes' : 'No';
         }
-        const value = animal[field] !== null && animal[field] !== undefined
-          ? String(animal[field]).replace(/,/g, ' ')
-          : '';
-        return value.includes(' ') ? `"${value}"` : value;
-      }).join(',');
-    });
+        const value = animal[field] ?? '';
+        return String(value).includes(',') ? `"${value}"` : value;
+      }).join(',')
+    );
 
     const csv = [header, ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-
-    link.setAttribute('href', url);
-    link.setAttribute('download', `animal_export_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-
+    link.href = URL.createObjectURL(blob);
+    link.download = `animal_export_${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 
     toast.success('Animals exported to CSV successfully');
   } catch (error) {
-    console.error('[ANIMAL] Error exporting animals to CSV:', error);
     toast.error(`Failed to export animals: ${error instanceof Error ? error.message : 'Unknown error'}`);
     throw error;
   }

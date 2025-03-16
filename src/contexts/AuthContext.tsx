@@ -25,6 +25,8 @@ interface AuthContextType {
   resetPassword: (token: string, email: string, password: string, password_confirmation: string) => Promise<void>;
   verifyEmail: (id: string, hash: string) => Promise<void>;
   resendVerificationEmail: () => Promise<void>;
+  refreshAuth: () => Promise<void>;
+  updateProfile: (data: FormData) => Promise<void>;
 }
 
 // Logging helpers
@@ -44,7 +46,7 @@ const logError = (endpoint: string, error: any) => {
 const fetchCsrfToken = async (retryCount = 0): Promise<void> => {
   const maxRetries = 2;
   if (retryCount > maxRetries) {
-    throw new Error('Failed to fetch CSRF token after multiple attempts. Please check your network or server status.');
+    throw new Error('Failed to fetch CSRF token after multiple attempts.');
   }
 
   try {
@@ -59,26 +61,22 @@ const fetchCsrfToken = async (retryCount = 0): Promise<void> => {
     });
 
     if (!response.ok) {
-      throw new Error(`CSRF token fetch failed: ${response.status} ${response.statusText}`);
+      throw new Error(`CSRF token fetch failed: ${response.status}`);
     }
-
     console.log('[AUTH] CSRF token fetched successfully');
   } catch (error) {
     console.warn(`[AUTH] CSRF fetch attempt ${retryCount + 1} failed:`, error);
     if (retryCount < maxRetries) {
-      const delay = (retryCount + 1) * 1000;
-      console.log(`[AUTH] Retrying CSRF fetch in ${delay}ms...`);
-      await new Promise(resolve => setTimeout(resolve, delay));
+      await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 1000));
       return fetchCsrfToken(retryCount + 1);
     }
     throw error;
   }
 };
 
-// Updated apiFetch with TypeScript fixes
+// API fetch utility
 const apiFetch = async (endpoint: string, options: RequestInit = {}): Promise<any> => {
   const token = localStorage.getItem('auth_token');
-
   const defaultHeaders: HeadersInit = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -92,9 +90,6 @@ const apiFetch = async (endpoint: string, options: RequestInit = {}): Promise<an
 
   if (xsrfToken) {
     defaultHeaders['X-XSRF-TOKEN'] = decodeURIComponent(xsrfToken);
-    console.log('[AUTH] X-XSRF-TOKEN set:', defaultHeaders['X-XSRF-TOKEN']);
-  } else if (options.method && options.method !== 'GET') {
-    console.warn('[AUTH] X-XSRF-TOKEN missing for non-GET request');
   }
 
   const requestOptions: RequestInit = {
@@ -116,81 +111,79 @@ const apiFetch = async (endpoint: string, options: RequestInit = {}): Promise<an
     logResponse(endpoint, { status: response.status, data: responseData });
 
     if (!response.ok) {
-      if (response.status === 419) {
-        throw new Error('CSRF token mismatch. Please refresh the page and try again.');
-      }
-      if (response.status === 422) {
-        throw new Error(responseData.message || 'Validation error occurred.');
-      }
-      throw { status: response.status, data: responseData };
+      if (response.status === 401) throw new Error('Unauthorized');
+      if (response.status === 419) throw new Error('CSRF token mismatch');
+      if (response.status === 422) throw new Error(responseData.message || 'Validation error');
+      throw new Error(responseData.message || `Request failed: ${response.status}`);
     }
 
     return responseData;
   } catch (error: any) {
-    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-      throw new Error('Network error: Unable to connect to the server. Please check your internet connection.');
-    }
     logError(endpoint, error);
-    throw error instanceof Error ? error : new Error(error.data?.message || 'Request failed');
+    throw error;
   }
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    const storedUser = localStorage.getItem('user');
+    return storedUser ? JSON.parse(storedUser) : null;
+  });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const fetchCurrentUser = async () => {
+  const fetchCurrentUser = async (): Promise<User | null> => {
     try {
       const userData = await apiFetch('/user');
       return userData.data || userData;
     } catch (error: any) {
-      if (error.status === 401) {
-        console.log('[AUTH] User not authenticated');
-        return null;
-      }
+      if (error.message === 'Unauthorized') return null;
       throw error;
     }
   };
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        console.log('[AUTH] No token found');
-        setLoading(false);
-        return;
-      }
+  const checkAuth = async () => {
+    const token = localStorage.getItem('auth_token');
+    const storedUser = localStorage.getItem('user');
 
-      try {
-        await fetchCsrfToken();
-        const userData = await fetchCurrentUser();
-        if (userData) {
-          setUser(userData);
-          localStorage.setItem('user', JSON.stringify(userData));
-        } else {
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('user');
-        }
-      } catch (err) {
-        console.error('[AUTH] Auth check failed:', err);
+    if (!token) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      if (storedUser) setUser(JSON.parse(storedUser));
+      await fetchCsrfToken();
+      const userData = await fetchCurrentUser();
+      if (userData) {
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+      } else {
+        setUser(null);
         localStorage.removeItem('auth_token');
         localStorage.removeItem('user');
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (err) {
+      console.error('[AUTH] Auth check failed:', err);
+      setUser(null);
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     checkAuth();
   }, []);
 
   const login = async (email: string, password: string) => {
     setLoading(true);
     setError(null);
-
     try {
       await fetchCsrfToken();
       const response = await apiFetch('/login', {
@@ -198,16 +191,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         body: JSON.stringify({ email, password }),
       });
 
-      const token = response.access_token || response.token || response.data?.token;
+      const token = response.data.token;
       if (!token) throw new Error('No authentication token received');
 
       localStorage.setItem('auth_token', token);
-      const userData = response.data?.user || response.user || {
-        id: '1',
-        name: email.split('@')[0],
-        email,
-        avatar: null,
-      };
+      const userData = response.data.user;
 
       setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
@@ -217,28 +205,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const errorMessage = err.message || 'Login failed. Please check your credentials.';
       setError(errorMessage);
       toast.error(errorMessage);
+      throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  const register = async (name: string, email: string, password: string, password_confirmation: string) => {
+  const updateProfile = async (data: FormData) => {
     setLoading(true);
     setError(null);
-
     try {
       await fetchCsrfToken();
-      await apiFetch('/register', {
+      const response = await fetch(`${API_BASE_URL}/profile`, {
         method: 'POST',
-        body: JSON.stringify({ name, email, password, password_confirmation }),
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Accept': 'application/json',
+        },
+        credentials: 'include',
+        body: data, // FormData for multipart/form-data
       });
 
-      toast.success('Registration successful! Please check your email for verification.');
-      navigate('/login');
+      const responseData = await response.json();
+      if (!response.ok) throw new Error(responseData.message || 'Failed to update profile');
+
+      const updatedUser = responseData.data;
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      toast.success('Profile updated successfully!');
     } catch (err: any) {
-      const errorMessage = err.message || err.data?.errors?.email?.[0] || 'Registration failed';
+      const errorMessage = err.message || 'Failed to update profile';
       setError(errorMessage);
       toast.error(errorMessage);
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -253,10 +252,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('[AUTH] Logout error:', error);
     } finally {
       setUser(null);
-      localStorage.removeItem('user');
-      localStorage.removeItem('auth_token');
+      localStorage.clear();
       toast.success('Successfully logged out');
       navigate('/login');
+      setLoading(false);
+    }
+  };
+
+  const refreshAuth = async () => {
+    setLoading(true);
+    await checkAuth();
+  };
+
+  const register = async (name: string, email: string, password: string, password_confirmation: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      await fetchCsrfToken();
+      await apiFetch('/register', {
+        method: 'POST',
+        body: JSON.stringify({ name, email, password, password_confirmation }),
+      });
+      toast.success('Registration successful! Please check your email for verification.');
+      navigate('/login');
+    } catch (err: any) {
+      const errorMessage = err.message || 'Registration failed';
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
       setLoading(false);
     }
   };
@@ -264,14 +287,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const forgotPassword = async (email: string) => {
     setLoading(true);
     setError(null);
-
     try {
       await fetchCsrfToken();
       await apiFetch('/forgot-password', {
         method: 'POST',
         body: JSON.stringify({ email }),
       });
-
       toast.success('Password reset link sent to your email!');
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to send reset link';
@@ -285,14 +306,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const resetPassword = async (token: string, email: string, password: string, password_confirmation: string) => {
     setLoading(true);
     setError(null);
-
     try {
       await fetchCsrfToken();
       await apiFetch('/reset-password', {
         method: 'POST',
         body: JSON.stringify({ token, email, password, password_confirmation }),
       });
-
       toast.success('Password reset successfully!');
       navigate('/login');
     } catch (err: any) {
@@ -307,7 +326,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const verifyEmail = async (id: string, hash: string) => {
     setLoading(true);
     setError(null);
-
     try {
       await apiFetch(`/verify-email/${id}/${hash}`, { method: 'GET' });
       toast.success('Email verified successfully!');
@@ -324,7 +342,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const resendVerificationEmail = async () => {
     setLoading(true);
     setError(null);
-
     try {
       await fetchCsrfToken();
       await apiFetch('/email/verification-notification', { method: 'POST' });
@@ -350,6 +367,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     resetPassword,
     verifyEmail,
     resendVerificationEmail,
+    refreshAuth,
+    updateProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
