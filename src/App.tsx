@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useParams } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
@@ -15,10 +15,11 @@ import VerifyEmail from "./pages/VerifyEmail";
 import { Analytics } from "@vercel/analytics/react";
 import Animals from "./pages/Animals";
 import AnimalForm from "./components/AnimalForm";
+import { ActivityForm } from './pages/animal/ActivityForm';
 import AnimalDetails from "./pages/AnimalDetails";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import AnimalActivities from "./pages/animal/AnimalActivities";
+import { ActivityManagement } from "./pages/animal/AnimalActivities";
 import AnimalBreedings from "./pages/animal/AnimalBreedings";
 import AnimalHealth from "./pages/animal/AnimalHealth";
 import AnimalNotes from "./pages/animal/AnimalNotes";
@@ -33,6 +34,25 @@ import TaskForm from "./components/forms/TaskForm";
 import TransactionForm from "./components/forms/TransactionForm";
 import AnimalTasks from './pages/animal/AnimalTasks';
 import AnimalTaskForm from './pages/animal/AnimalTaskForm';
+import { HealthRecordForm } from "./pages/animal/HealthRecordForm"; // Import the new form component
+
+// Wrapper component for ActivityManagement
+const ActivityManagementWrapper = () => {
+  const { id } = useParams<{ id: string }>();
+  if (!id) {
+    return <div>Error: Animal ID not found</div>;
+  }
+  return <ActivityManagement animalId={id} />;
+};
+
+// Wrapper component for HealthRecordForm
+const HealthRecordFormWrapper = () => {
+  const { id } = useParams<{ id: string }>();
+  if (!id) {
+    return <div>Error: Animal ID not found</div>;
+  }
+  return <HealthRecordForm animalId={id} />;
+};
 
 const queryClient = new QueryClient();
 
@@ -66,8 +86,9 @@ const App = () => (
               <Route path="/animals/:id/tasks/:taskId/edit" element={<AnimalTaskForm />} />
               
               {/* Animal Activities */}
-              <Route path="/animals/:id/activities" element={<AnimalActivities />} />
-              <Route path="/animals/:id/activities/new" element={<AnimalActivities />} />
+              <Route path="/animals/:id/activities" element={<ActivityManagementWrapper />} />
+              <Route path="/animals/:animalId/activities/new" element={<ActivityForm />} />
+              <Route path="/animals/:animalId/activities/:activityId/edit" element={<ActivityForm />} />
               
               {/* Animal Breedings */}
               <Route path="/animals/:id/breedings" element={<AnimalBreedings />} />
@@ -77,9 +98,9 @@ const App = () => (
               
               {/* Animal Health */}
               <Route path="/animals/:id/health" element={<AnimalHealth />} />
-              <Route path="/animals/:id/health/new" element={<AnimalHealth />} />
+              <Route path="/animals/:id/health/new" element={<HealthRecordFormWrapper />} />
               <Route path="/animals/:id/health/:healthId" element={<AnimalHealth />} />
-              <Route path="/animals/:id/health/:healthId/edit" element={<AnimalHealth />} />
+              <Route path="/animals/:id/health/:healthId/edit" element={<HealthRecordFormWrapper />} />
               
               {/* Animal Notes */}
               <Route path="/animals/:id/notes" element={<AnimalNotes />} />
@@ -88,10 +109,9 @@ const App = () => (
               <Route path="/animals/:id/notes/:noteId/edit" element={<AnimalNoteForm />} />
               
               {/* Animal Production */}
-              {/* Animal Production */}
               <Route path="/animals/:id/production" element={<AnimalProductions />} />
-<Route path="/animals/:id/production/new" element={<AnimalProductionForm />} />
-<Route path="/animals/:id/production/:productionId/edit" element={<AnimalProductionForm />} />
+              <Route path="/animals/:id/production/new" element={<AnimalProductionForm />} />
+              <Route path="/animals/:id/production/:productionId/edit" element={<AnimalProductionForm />} />
               
               {/* Animal Supplier Routes */}
               <Route path="/animals/:id/suppliers" element={<AnimalSuppliers />} />

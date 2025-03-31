@@ -1,170 +1,177 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useParams, useNavigate, NavigateFunction } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { 
-  CalendarIcon, ArrowLeft, Edit, Trash2, AlertTriangle, MoreHorizontal, 
-  FileText, Activity, Heart, FileEdit, PiggyBank, CheckSquare, Tag
+  ArrowLeft, Edit, Trash2, AlertTriangle, MoreHorizontal, 
+  FileText, Activity, Heart, PiggyBank, CheckSquare, Tag,
+  LucideProps
 } from 'lucide-react';
 import { 
-  Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle 
+  Card, CardContent, CardHeader, CardTitle 
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, 
+  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { fetchAnimal } from '@/services/animalService';
 import { fetchSuppliers, Supplier } from '@/services/supplierApi';
-import { fetchProductions, Production } from '@/services/animalProductionApi'; // Import production API
+import { fetchProductions, Production } from '@/services/animalProductionApi';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Animal } from '@/types/AnimalTypes';
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, 
-  DropdownMenuSeparator, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
-const AnimalDetails = () => {
+interface QuickAction {
+  label: string;
+  href: string;
+  icon: React.ForwardRefExoticComponent<Omit<LucideProps, "ref"> & React.RefAttributes<SVGSVGElement>>;
+}
+
+interface QuickActionsProps {
+  actions: QuickAction[];
+  navigate: NavigateFunction;
+}
+
+const QuickActions = React.memo(({ actions, navigate }: QuickActionsProps) => (
+  <div className="grid grid-cols-1 gap-2">
+    {actions.map((action) => (
+      <Button 
+        key={action.label} 
+        variant="outline" 
+        size="sm"
+        className="w-full justify-start h-10 px-3 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors border border-input rounded-md"
+        onClick={() => navigate(action.href)}
+      >
+        <action.icon className="h-4 w-4 mr-2" />
+        {action.label}
+      </Button>
+    ))}
+  </div>
+));
+
+const AnimalDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [animal, setAnimal] = useState<Animal | null>(null);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [productions, setProductions] = useState<Production[]>([]); // Add state for productions
-  const [loading, setLoading] = useState(true);
-  const [productionsLoading, setProductionsLoading] = useState(false); // Loading state for productions
+
+  interface DataState {
+    animal: Animal | null;
+    suppliers: Supplier[];
+    productions: Production[];
+    upcomingTasks: any[];
+  }
+
+  interface LoadingStates {
+    main: boolean;
+    productions: boolean;
+    suppliers: boolean;
+    tasks: boolean;
+  }
+
+  const [data, setData] = useState<DataState>({
+    animal: null,
+    suppliers: [],
+    productions: [],
+    upcomingTasks: []
+  });
+  const [loadingStates, setLoadingStates] = useState<LoadingStates>({
+    main: true,
+    productions: false,
+    suppliers: false,
+    tasks: false
+  });
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [upcomingTasks, setUpcomingTasks] = useState([]);
-  const [tasksLoading, setTasksLoading] = useState(false);
-  const [suppliersLoading, setSuppliersLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('overview');
 
   useEffect(() => {
-    const getAnimalDetails = async () => {
-      if (!id) return;
-      
+    if (!id) return;
+
+    const controller = new AbortController();
+    
+    const fetchData = async () => {
       try {
-        setLoading(true);
-        const animalData = await fetchAnimal(id);
-        setAnimal(animalData);
+        setLoadingStates(prev => ({ ...prev, main: true }));
+        const [animalData, suppliersData, productionsData] = await Promise.all([
+          fetchAnimal(id),
+          fetchSuppliers(id),
+          fetchProductions(id)
+        ]);
+
+        setData(prev => ({
+          ...prev,
+          animal: animalData,
+          suppliers: suppliersData,
+          productions: productionsData
+        }));
         setError(null);
-
-        setSuppliersLoading(true);
-        const suppliersData = await fetchSuppliers(id);
-        setSuppliers(suppliersData);
-
-        setProductionsLoading(true);
-        const productionsData = await fetchProductions(id); // Fetch production records
-        setProductions(productionsData);
       } catch (err) {
-        console.error('Failed to fetch animal details, suppliers, or productions:', err);
-        setError('Failed to load animal details, suppliers, or production data. Please try again later.');
-        toast.error('Could not load animal details, suppliers, or production data');
+        if (!controller.signal.aborted) {
+          setError('Failed to load data');
+          toast.error('Error loading animal details');
+        }
       } finally {
-        setLoading(false);
-        setSuppliersLoading(false);
-        setProductionsLoading(false);
+        setLoadingStates(prev => ({ ...prev, main: false }));
       }
     };
 
-    getAnimalDetails();
+    const fetchTasks = async () => {
+      try {
+        setLoadingStates(prev => ({ ...prev, tasks: true }));
+        const response = await fetch(`/api/animals/${id}/tasks?status=pending&limit=3`, {
+          signal: controller.signal
+        });
+        if (!response.ok) throw new Error('Failed to fetch tasks');
+        const taskData = await response.json();
+        setData(prev => ({
+          ...prev,
+          upcomingTasks: taskData.data || []
+        }));
+      } catch (err) {
+        console.error('Failed to fetch tasks:', err);
+      } finally {
+        setLoadingStates(prev => ({ ...prev, tasks: false }));
+      }
+    };
+
+    fetchData();
+    fetchTasks();
+
+    return () => controller.abort();
   }, [id]);
 
-  useEffect(() => {
-    const fetchUpcomingTasks = async () => {
-      if (!id) return;
-      
-      try {
-        setTasksLoading(true);
-        const response = await fetch(`/api/animals/${id}/tasks?status=pending&limit=3`);
-        if (!response.ok) throw new Error('Failed to fetch tasks');
-        const data = await response.json();
-        setUpcomingTasks(data.data || []);
-      } catch (err) {
-        console.error('Failed to fetch upcoming tasks:', err);
-      } finally {
-        setTasksLoading(false);
-      }
-    };
+  const formatDate = useCallback((dateString?: string | null): string => {
+    return dateString ? format(parseISO(dateString), 'PPP') : 'Not specified';
+  }, []);
 
-    if (animal) fetchUpcomingTasks();
-  }, [id, animal]);
+  const getStatusColor = useCallback((status?: string): string => ({
+    active: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100',
+    inactive: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100',
+    sold: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100',
+    deceased: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
+  }[status?.toLowerCase()] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'), []);
 
-  const handleEdit = () => navigate(`/animals/${id}/edit`);
+  const getTaskPriorityColor = useCallback((priority?: string): string => ({
+    high: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100',
+    medium: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100',
+    low: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100'
+  }[priority?.toLowerCase()] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'), []);
+
+  const getSupplierImportanceColor = useCallback((importance?: string): string => ({
+    high: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100',
+    medium: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100',
+    low: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
+  }[importance?.toLowerCase()] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'), []);
+
+  const getQualityStatusColor = useCallback((status?: string): string => ({
+    passed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100',
+    failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100',
+    pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100'
+  }[status?.toLowerCase()] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'), []);
+
   const handleDelete = () => toast.error('Delete functionality not implemented yet');
 
-  const getFormattedDate = (dateString: string | null | undefined) => {
-    if (!dateString) return 'Not specified';
-    try {
-      return format(parseISO(dateString), 'PPP');
-    } catch {
-      return dateString;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'active': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100';
-      case 'inactive': return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100';
-      case 'sold': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100';
-      case 'deceased': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100';
-    }
-  };
-
-  const getTaskPriorityColor = (priority) => {
-    switch (priority?.toLowerCase()) {
-      case 'high': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100';
-      case 'medium': return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100';
-      case 'low': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100';
-    }
-  };
-
-  const getSupplierImportanceColor = (importance: string) => {
-    switch (importance?.toLowerCase()) {
-      case 'high': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100';
-      case 'medium': return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100';
-      case 'low': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100';
-    }
-  };
-
-  const getQualityStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'passed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100';
-      case 'failed': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100';
-      case 'pending': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100';
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-[80vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (error || !animal) {
-    return (
-      <div className="max-w-4xl mx-auto p-4 md:p-6">
-        <Card className="border-destructive/50">
-          <CardHeader>
-            <CardTitle className="flex items-center text-destructive">
-              <AlertTriangle className="mr-2 h-5 w-5" />
-              Error
-            </CardTitle>
-            <CardDescription>{error || 'Animal not found'}</CardDescription>
-          </CardHeader>
-          <CardFooter>
-            <Button onClick={() => navigate('/animals')}>Return to Animals</Button>
-          </CardFooter>
-        </Card>
-      </div>
-    );
-  }
-
-  const quickActions = [
+  const quickActions: QuickAction[] = [
     { label: 'Activities', href: `/animals/${id}/activities`, icon: Activity },
     { label: 'Health', href: `/animals/${id}/health`, icon: Heart },
     { label: 'Notes', href: `/animals/${id}/notes`, icon: FileText },
@@ -173,22 +180,49 @@ const AnimalDetails = () => {
     { label: 'Suppliers', href: `/animals/${id}/suppliers`, icon: Tag },
   ];
 
+  if (loadingStates.main) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  if (error || !data.animal) {
+    return (
+      <Card className="max-w-4xl mx-auto mt-6 border-destructive/50">
+        <CardHeader>
+          <CardTitle className="flex items-center text-destructive">
+            <AlertTriangle className="mr-2 h-5 w-5" />
+            Error
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>{error || 'Animal not found'}</p>
+          <Button onClick={() => navigate('/animals')} className="mt-4">
+            Return to Animals
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-        <div className="flex items-center mb-4 md:mb-0">
-          <Button variant="ghost" size="sm" className="mr-2" onClick={() => navigate('/animals')}>
-            <ArrowLeft className="h-4 w-4 mr-1" />
+    <div className="max-w-7xl mx-auto px-4 py-6 md:px-6">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/animals')}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <h1 className="text-2xl font-bold">{animal.name}</h1>
-          <Badge variant="secondary" className={cn("ml-3", getStatusColor(animal.status))}>
-            {animal.status}
+          <h1 className="text-2xl font-bold tracking-tight">{data.animal.name}</h1>
+          <Badge className={cn("ml-2", getStatusColor(data.animal.status))}>
+            {data.animal.status}
           </Badge>
         </div>
-        
-        <div className="flex space-x-2">
-          <Button variant="outline" size="sm" onClick={handleEdit}>
+
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate(`/animals/${id}/edit`)}>
             <Edit className="h-4 w-4 mr-2" />
             Edit
           </Button>
@@ -222,431 +256,231 @@ const AnimalDetails = () => {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Animal Information</CardTitle>
+      </header>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <Card className="shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader className="bg-muted/50">
+              <CardTitle className="text-xl">Animal Information</CardTitle>
             </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="mb-4">
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
-                  <TabsTrigger value="details">Details</TabsTrigger>
-                  <TabsTrigger value="birth">Birth Info</TabsTrigger>
-                  <TabsTrigger value="production">Production</TabsTrigger>
-                  <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
+            <CardContent className="pt-6">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-6 rounded-lg bg-muted p-1">
+                  {['overview', 'details', 'birth', 'production', 'suppliers'].map(tab => (
+                    <TabsTrigger 
+                      key={tab}
+                      value={tab}
+                      className="capitalize transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm text-sm"
+                    >
+                      {tab}
+                    </TabsTrigger>
+                  ))}
                 </TabsList>
-                
-                <TabsContent value="overview">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Animal Type</h3>
-                      <p className="text-base font-medium mt-1">{animal.type}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Breed</h3>
-                      <p className="text-base font-medium mt-1">{animal.breed}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Gender</h3>
-                      <p className="text-base font-medium mt-1">{animal.gender}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Tag Number</h3>
-                      <p className="text-base font-medium mt-1">{animal.tag_number || 'None'}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Birth Date</h3>
-                      <p className="text-base font-medium mt-1">{getFormattedDate(animal.birth_date)}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Status</h3>
-                      <Badge variant="secondary" className={cn("mt-1", getStatusColor(animal.status))}>
-                        {animal.status}
-                      </Badge>
-                    </div>
+
+                <TabsContent value="overview" className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[
+                      { label: 'Animal Type', value: data.animal.type },
+                      { label: 'Breed', value: data.animal.breed },
+                      { label: 'Gender', value: data.animal.gender },
+                      { label: 'Tag Number', value: data.animal.tag_number || 'None' },
+                      { label: 'Birth Date', value: formatDate(data.animal.birth_date) },
+                      { label: 'Status', value: (
+                        <Badge className={getStatusColor(data.animal.status)}>
+                          {data.animal.status}
+                        </Badge>
+                      )},
+                      { label: 'Age', value: `${data.animal.age} years` }, // Added
+                      { label: 'Internal ID', value: data.animal.internal_id }, // Added
+                      { label: 'Animal ID', value: data.animal.animal_id }, // Added
+                    ].map((item, idx) => (
+                      <div key={idx} className="min-w-0">
+                        <h3 className="text-sm text-muted-foreground font-medium truncate">{item.label}</h3>
+                        <p className="mt-1 text-base font-medium truncate">{item.value}</p>
+                      </div>
+                    ))}
                   </div>
-                  <Separator className="my-4" />
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground mb-2">Quick Actions</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                      {quickActions.map((action) => (
-                        <Button 
-                          key={action.label} 
-                          variant="outline" 
-                          size="sm"
-                          className="w-full justify-start"
-                          onClick={() => navigate(action.href)}
-                        >
-                          <action.icon className="h-4 w-4 mr-2" />
-                          {action.label}
-                        </Button>
+                    <h3 className="text-sm text-muted-foreground font-medium mb-3">Quick Actions</h3>
+                    <QuickActions actions={quickActions} navigate={navigate} />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="details" className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[
+                      { label: 'Breeding Stock', value: data.animal.is_breeding_stock ? 'Yes' : 'No' }, // Added
+                      { label: 'Deceased', value: data.animal.is_deceased ? 'Yes' : 'No' }, // Added
+                      { label: 'Origin', value: data.animal.raised_purchased || 'Not specified' },
+                      { label: 'Next Checkup', value: formatDate(data.animal.next_checkup_date) },
+                      { label: 'Breeder Info', value: data.animal.breeder_info || 'Not specified' }, // Added
+                    ].map((item, idx) => (
+                      <div key={idx} className="min-w-0">
+                        <h3 className="text-sm text-muted-foreground font-medium truncate">{item.label}</h3>
+                        <p className="mt-1 text-base font-medium truncate">{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="birth" className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[
+                      { label: 'Birth Date', value: formatDate(data.animal.birth_date) },
+                      { label: 'Birth Time', value: data.animal.birth_time || 'Not recorded' },
+                      { label: 'Birth Weight', value: data.animal.birth_weight ? `${data.animal.birth_weight} ${data.animal.weight_unit}` : 'Not recorded' },
+                      { label: 'Birth Status', value: data.animal.birth_status || 'Not specified' },
+                      { label: 'Health at Birth', value: data.animal.health_at_birth || 'Not specified' }, // Added
+                      { label: 'Multiple Birth', value: data.animal.multiple_birth ? 'Yes' : 'No' }, // Added
+                    ].map((item, idx) => (
+                      <div key={idx} className="min-w-0">
+                        <h3 className="text-sm text-muted-foreground font-medium truncate">{item.label}</h3>
+                        <p className="mt-1 text-base font-medium truncate">{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="production" className="space-y-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <h3 className="text-base font-medium">Production Records</h3>
+                    <Button size="sm" onClick={() => navigate(`/animals/${id}/production`)}>
+                      <PiggyBank className="h-4 w-4 mr-2" />
+                      Manage Production
+                    </Button>
+                  </div>
+                  {data.productions.length > 0 ? (
+                    <div className="space-y-3">
+                      {data.productions.slice(0, 3).map((production) => (
+                        <div key={production.id} className="border rounded-lg p-3 bg-background">
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{production.product_category.name}</p>
+                              <p className="text-xs text-muted-foreground mt-1 truncate">
+                                {formatDate(production.production_date)} - {production.quantity}{' '}
+                                {production.product_category.measurement_unit}
+                              </p>
+                            </div>
+                            <Badge className={getQualityStatusColor(production.quality_status)}>
+                              {production.quality_status}
+                            </Badge>
+                          </div>
+                        </div>
                       ))}
                     </div>
-                  </div>
-                </TabsContent>
-                
-                <TabsContent value="details">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Internal ID</h3>
-                      <p className="text-base font-medium mt-1">{animal.id}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Origin</h3>
-                      <p className="text-base font-medium mt-1 capitalize">{animal.raised_purchased || 'Not specified'}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Breeding Stock</h3>
-                      <p className="text-base font-medium mt-1">{animal.is_breeding_stock ? 'Yes' : 'No'}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Next Checkup</h3>
-                      <p className="text-base font-medium mt-1">{getFormattedDate(animal.next_checkup_date)}</p>
-                    </div>
-                  </div>
-                  <Separator className="my-4" />
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground mb-2">Physical Traits</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {animal.physical_traits && animal.physical_traits.length > 0 ? (
-                        animal.physical_traits.map((trait, idx) => (
-                          <Badge key={idx} variant="secondary" className="px-3 py-1">
-                            {trait}
-                          </Badge>
-                        ))
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No physical traits specified</p>
-                      )}
-                    </div>
-                  </div>
-                  <Separator className="my-4" />
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground mb-2">Keywords</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {animal.keywords && animal.keywords.length > 0 ? (
-                        animal.keywords.map((keyword, idx) => (
-                          <Badge key={idx} variant="outline" className="px-3 py-1">
-                            {keyword}
-                          </Badge>
-                        ))
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No keywords specified</p>
-                      )}
-                    </div>
-                  </div>
-                </TabsContent>
-                
-                <TabsContent value="birth">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Birth Date</h3>
-                      <p className="text-base font-medium mt-1">{getFormattedDate(animal.birth_date)}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Birth Time</h3>
-                      <p className="text-base font-medium mt-1">{animal.birth_time || 'Not recorded'}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Birth Weight</h3>
-                      <p className="text-base font-medium mt-1">
-                        {animal.birth_weight ? `${animal.birth_weight} ${animal.weight_unit}` : 'Not recorded'}
-                      </p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Birth Status</h3>
-                      <p className="text-base font-medium mt-1 capitalize">{animal.birth_status}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Multiple Birth</h3>
-                      <p className="text-base font-medium mt-1">{animal.multiple_birth ? 'Yes' : 'No'}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Birth Order</h3>
-                      <p className="text-base font-medium mt-1">{animal.birth_order || 'Not applicable'}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Gestation Length</h3>
-                      <p className="text-base font-medium mt-1">
-                        {animal.gestation_length ? `${animal.gestation_length} days` : 'Not recorded'}
-                      </p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Health at Birth</h3>
-                      <p className="text-base font-medium mt-1 capitalize">{animal.health_at_birth}</p>
-                    </div>
-                  </div>
-                  <Separator className="my-4" />
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground mb-2">Vaccinations</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {animal.vaccinations && animal.vaccinations.length > 0 ? (
-                        animal.vaccinations.map((vaccination, idx) => (
-                          <Badge key={idx} variant="secondary" className="px-3 py-1">
-                            {vaccination}
-                          </Badge>
-                        ))
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No vaccinations recorded</p>
-                      )}
-                    </div>
-                  </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No production records available</p>
+                  )}
                 </TabsContent>
 
-                <TabsContent value="production">
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-base font-medium">Production Records</h3>
-                      <Button size="sm" onClick={() => navigate(`/animals/${id}/production`)}>
-                        <PiggyBank className="h-4 w-4 mr-2" />
-                        Manage Production
-                      </Button>
-                    </div>
-                    {productionsLoading ? (
-                      <div className="py-4 flex justify-center">
-                        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary"></div>
-                      </div>
-                    ) : productions.length > 0 ? (
-                      <div className="space-y-3">
-                        {productions.slice(0, 3).map((production) => (
-                          <div key={production.id} className="border rounded-lg p-3">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="text-sm font-medium">{production.product_category.name}</p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {getFormattedDate(production.production_date)} - {production.quantity}{' '}
-                                  {production.product_category.measurement_unit}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  Total: ${(parseFloat(production.quantity) * parseFloat(production.price_per_unit)).toFixed(2)}
-                                </p>
-                              </div>
-                              <Badge
-                                variant="secondary"
-                                className={getQualityStatusColor(production.quality_status)}
-                              >
-                                {production.quality_status}
-                              </Badge>
-                            </div>
-                          </div>
-                        ))}
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="w-full mt-2"
-                          onClick={() => navigate(`/animals/${id}/production`)}
-                        >
-                          View all production records
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="py-3 text-center">
-                        <p className="text-sm text-muted-foreground">No production records available</p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="mt-2"
-                          onClick={() => navigate(`/animals/${id}/production/new`)}
-                        >
-                          <PiggyBank className="h-4 w-4 mr-2" />
-                          Add Production Record
-                        </Button>
-                      </div>
-                    )}
-                    <div>
-                      <h3 className="text-base font-medium mb-2">Quick Actions</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/animals/${id}/production/new`)}
-                        >
-                          Add Production Record
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/animals/${id}/production-statistics`)}
-                        >
-                          Production Statistics
-                        </Button>
-                      </div>
-                    </div>
+                <TabsContent value="suppliers" className="space-y-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <h3 className="text-base font-medium">Suppliers</h3>
+                    <Button size="sm" onClick={() => navigate(`/animals/${id}/suppliers`)}>
+                      <Tag className="h-4 w-4 mr-2" />
+                      Manage Suppliers
+                    </Button>
                   </div>
-                </TabsContent>
-
-                <TabsContent value="suppliers">
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-base font-medium">Suppliers</h3>
-                      <Button size="sm" onClick={() => navigate(`/animals/${id}/suppliers/new`)}>
-                        <Tag className="h-4 w-4 mr-2" />
-                        Add Supplier
-                      </Button>
-                    </div>
-                    {suppliersLoading ? (
-                      <div className="py-4 flex justify-center">
-                        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary"></div>
-                      </div>
-                    ) : suppliers.length > 0 ? (
-                      <div className="space-y-3">
-                        {suppliers.slice(0, 3).map((supplier) => (
-                          <div key={supplier.id} className="border rounded-lg p-3">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="text-sm font-medium">{supplier.name}</p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Contract Ends: {getFormattedDate(supplier.contract_end_date)}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {supplier.shop_name} - {supplier.product_type}
-                                </p>
-                              </div>
-                              <Badge variant="secondary" className={getSupplierImportanceColor(supplier.supplier_importance)}>
-                                {supplier.supplier_importance}
-                              </Badge>
+                  {data.suppliers.length > 0 ? (
+                    <div className="space-y-3">
+                      {data.suppliers.slice(0, 3).map((supplier) => (
+                        <div key={supplier.id} className="border rounded-lg p-3 bg-background">
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{supplier.name}</p>
+                              <p className="text-xs text-muted-foreground mt-1 truncate">
+                                Ends: {formatDate(supplier.contract_end_date)}
+                              </p>
                             </div>
+                            <Badge className={getSupplierImportanceColor(supplier.supplier_importance)}>
+                              {supplier.supplier_importance}
+                            </Badge>
                           </div>
-                        ))}
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="w-full mt-2"
-                          onClick={() => navigate(`/animals/${id}/suppliers`)}
-                        >
-                          View all suppliers
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="py-3 text-center">
-                        <p className="text-sm text-muted-foreground">No suppliers recorded</p>
-                        <Button variant="outline" size="sm" className="mt-2" onClick={() => navigate(`/animals/${id}/suppliers/new`)}>
-                          <Tag className="h-4 w-4 mr-2" />
-                          Add Supplier
-                        </Button>
-                      </div>
-                    )}
-                  </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No suppliers available</p>
+                  )}
                 </TabsContent>
               </Tabs>
             </CardContent>
           </Card>
         </div>
-        
-        <div>
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Access</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {quickActions.map((action) => (
-                    <Button 
-                      key={action.label} 
-                      variant="outline" 
-                      className="w-full justify-start"
-                      onClick={() => navigate(action.href)}
-                    >
-                      <action.icon className="h-4 w-4 mr-2" />
-                      {action.label}
-                    </Button>
-                  ))}
+
+        <aside className="space-y-6">
+          <Card className="shadow-sm border border-input">
+            <CardHeader className="bg-muted/50 border-b border-input">
+              <CardTitle className="text-lg font-semibold text-foreground">Quick Access</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4">
+              <QuickActions actions={quickActions} navigate={navigate} />
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm border border-input">
+            <CardHeader className="bg-muted/50 border-b border-input">
+              <CardTitle className="text-lg font-semibold text-foreground">Upcoming Tasks</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4">
+              {loadingStates.tasks ? (
+                <div className="flex justify-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary" />
                 </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle>Upcoming Tasks</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {tasksLoading ? (
-                  <div className="py-4 flex justify-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary"></div>
-                  </div>
-                ) : upcomingTasks.length > 0 ? (
-                  <div className="space-y-3">
-                    {upcomingTasks.map((task) => (
-                      <div key={task.id} className="border rounded-lg p-3">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="text-sm font-medium">{task.title}</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Due: {getFormattedDate(task.due_date)}
-                            </p>
-                          </div>
-                          <Badge variant="secondary" className={getTaskPriorityColor(task.priority)}>
-                            {task.priority}
-                          </Badge>
-                        </div>
-                        {task.description && (
-                          <p className="text-xs mt-2 line-clamp-2">{task.description}</p>
-                        )}
-                      </div>
-                    ))}
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="w-full mt-2"
-                      onClick={() => navigate(`/animals/${id}/tasks`)}
+              ) : data.upcomingTasks.length > 0 ? (
+                <div className="space-y-3">
+                  {data.upcomingTasks.map((task) => (
+                    <div 
+                      key={task.id} 
+                      className="border border-input rounded-md p-3 bg-background hover:bg-muted/50 transition-colors"
                     >
-                      View all tasks
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="py-3 text-center">
-                    <p className="text-sm text-muted-foreground">No upcoming tasks</p>
-                    <Button variant="outline" size="sm" className="mt-2" onClick={() => navigate(`/animals/${id}/tasks/new`)}>
-                      <CheckSquare className="h-4 w-4 mr-2" />
-                      Create Task
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>Activity History</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="border-l-2 border-muted pl-4 pb-2 relative">
-                    <div className="absolute w-3 h-3 bg-primary rounded-full -left-[7px] top-1"></div>
-                    <p className="text-sm font-medium">Record created</p>
-                    <p className="text-xs text-muted-foreground">
-                      {getFormattedDate(animal.birth_date)}
-                    </p>
-                  </div>
-                  {animal.health_at_birth !== 'healthy' && (
-                    <div className="border-l-2 border-muted pl-4 pb-2 relative">
-                      <div className="absolute w-3 h-3 bg-amber-500 rounded-full -left-[7px] top-1"></div>
-                      <p className="text-sm font-medium">Health issue at birth</p>
-                      <p className="text-xs text-muted-foreground">
-                        {animal.health_at_birth}
-                      </p>
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <div className="space-y-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{task.title}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            Due: {formatDate(task.due_date)}
+                          </p>
+                        </div>
+                        <Badge 
+                          className={cn(
+                            getTaskPriorityColor(task.priority),
+                            "text-xs font-medium px-2 py-0.5"
+                          )}
+                        >
+                          {task.priority}
+                        </Badge>
+                      </div>
                     </div>
-                  )}
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="w-full mt-2"
-                    onClick={() => navigate(`/animals/${id}/activities`)}
+                  ))}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full mt-2 text-muted-foreground hover:text-foreground"
+                    onClick={() => navigate(`/animals/${id}/tasks`)}
                   >
-                    View full history
+                    View All Tasks
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-sm text-muted-foreground mb-2">No upcoming tasks</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/animals/${id}/tasks/new`)}
+                  >
+                    <CheckSquare className="h-4 w-4 mr-2" />
+                    Add Task
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </aside>
       </div>
     </div>
   );
 };
 
-export default AnimalDetails;
+export default React.memo(AnimalDetails);

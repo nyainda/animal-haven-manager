@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { fetchAnimals } from '@/services/animalService';
 import { fetchProductionStatistics, ProductionStatistics } from '@/services/animalProductionApi';
+import { fetchActivities, Activity } from '@/services/ActivityApi'; // Import fetchActivities and Activity type
 import { Animal } from '@/types/AnimalTypes';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -27,12 +28,18 @@ interface CalendarEvent {
   type: 'appointment' | 'event' | 'meeting' | 'production';
 }
 
+// Updated Activity interface to match ActivityApi
 interface Activity {
   id: string;
-  type: 'add' | 'update' | 'adoption' | 'medical' | 'production';
-  content: string;
-  time: string;
-  user: string;
+  animal_id: string;
+  activity_type: string;
+  activity_date: string;
+  description: string;
+  notes: string;
+  breeding_date?: string;
+  breeding_notes?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 interface Notification {
@@ -62,7 +69,7 @@ const Dashboard: React.FC = () => {
   // Data states
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]); // Updated to use Activity type from ActivityApi
   const [productionStats, setProductionStats] = useState<ProductionStatistics | null>(null);
   const [animalStats, setAnimalStats] = useState<AnimalStatsData | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -72,7 +79,7 @@ const Dashboard: React.FC = () => {
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [selectedAnimalId, setSelectedAnimalId] = useState<string | null>(null);
 
-  // Load initial data with error handling and persistence
+  // Load initial data (animals and activities)
   useEffect(() => {
     const loadInitialData = async () => {
       if (!isAuthenticated || authLoading) return;
@@ -116,6 +123,11 @@ const Dashboard: React.FC = () => {
             averageAge,
             breedingStockCount,
           }));
+
+          // Fetch activities for the first animal
+          const initialActivities = await fetchActivities(animalList[0].id);
+          setActivities(initialActivities);
+          localStorage.setItem(`dashboard_activities_${animalList[0].id}`, JSON.stringify(initialActivities));
         } else {
           setAnimalStats({
             totalAnimals: 0,
@@ -137,6 +149,8 @@ const Dashboard: React.FC = () => {
         const cachedStats = localStorage.getItem('dashboard_animalStats');
         if (cachedAnimals) setAnimals(JSON.parse(cachedAnimals));
         if (cachedStats) setAnimalStats(JSON.parse(cachedStats));
+        const cachedActivities = localStorage.getItem(`dashboard_activities_${selectedAnimalId}`);
+        if (cachedActivities) setActivities(JSON.parse(cachedActivities));
       } finally {
         setDataLoading(false);
         setInitialLoadComplete(true);
@@ -146,28 +160,38 @@ const Dashboard: React.FC = () => {
     loadInitialData();
   }, [isAuthenticated, authLoading]);
 
-  // Fetch production stats
+  // Fetch production stats and activities when selectedAnimalId changes
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchData = async () => {
       if (!selectedAnimalId || !isAuthenticated || authLoading) {
         setProductionStats(null);
+        setActivities([]);
         return;
       }
 
       try {
+        // Fetch production stats
         const stats = await fetchProductionStatistics(selectedAnimalId);
         setProductionStats(stats);
         localStorage.setItem(`productionStats_${selectedAnimalId}`, JSON.stringify(stats));
+
+        // Fetch activities
+        const animalActivities = await fetchActivities(selectedAnimalId);
+        setActivities(animalActivities);
+        localStorage.setItem(`dashboard_activities_${selectedAnimalId}`, JSON.stringify(animalActivities));
       } catch (error: any) {
-        console.error(`Failed to fetch stats for animal ${selectedAnimalId}:`, error);
-        toast.error(error.message || 'Failed to load production statistics');
+        console.error(`Failed to fetch data for animal ${selectedAnimalId}:`, error);
+        toast.error(error.message || 'Failed to load data');
         setProductionStats(null);
+        setActivities([]);
         const cachedStats = localStorage.getItem(`productionStats_${selectedAnimalId}`);
+        const cachedActivities = localStorage.getItem(`dashboard_activities_${selectedAnimalId}`);
         if (cachedStats) setProductionStats(JSON.parse(cachedStats));
+        if (cachedActivities) setActivities(JSON.parse(cachedActivities));
       }
     };
 
-    fetchStats();
+    fetchData();
   }, [selectedAnimalId, isAuthenticated, authLoading]);
 
   // Handle logout
@@ -264,7 +288,7 @@ const Dashboard: React.FC = () => {
                     </p>
                     <Button 
                       onClick={() => navigate('/animals')}
-                      className="font-serif bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground hover:bg-primary/90 dark:hover:bg-primary/80 h-10 sm:h-12"
+                      className="font-serif bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground hover:bg-primary/90 dark:hover:bg-primary/80 h-10 sm:h-12.costom"
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Add Your First Animal
@@ -272,7 +296,7 @@ const Dashboard: React.FC = () => {
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    <ActionCards setActiveTab={setActiveTab} selectedAnimalId={selectedAnimalId} /> {/* Pass selectedAnimalId */}
+                    <ActionCards setActiveTab={setActiveTab} selectedAnimalId={selectedAnimalId} />
                     <AnimalStats
                       animalStats={animalStats}
                       animals={animals}
@@ -284,12 +308,19 @@ const Dashboard: React.FC = () => {
                 )}
               </TabsContent>
 
-              <TabsContent value="activity">
+              <TabsContent value="activity" className="font-serif"> {/* Applied font-serif here */}
                 <ActivityFeed
                   activities={activities}
                   notifications={notifications}
                   setNotifications={setNotifications}
                 />
+                <Button
+                  onClick={() => navigate(`/animals/${selectedAnimalId}/activities`)}
+                  className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 shadow-md"
+                >
+                  <ActivityIcon className="h-4 w-4 mr-2" />
+                  View All Activities
+                </Button>
               </TabsContent>
 
               <TabsContent value="calendar">
