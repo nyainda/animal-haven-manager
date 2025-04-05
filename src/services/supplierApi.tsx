@@ -1,8 +1,8 @@
 import { toast } from 'sonner';
 
 // Base API URL and CSRF endpoint
-const API_URL = 'https://animal-management-master-wyohh0.laravel.cloud/api/animals';
-const CSRF_URL = 'https://animal-management-master-wyohh0.laravel.cloud/sanctum/csrf-cookie';
+const API_URL = 'https://animal-management-system-backend-master-fugzaz.laravel.cloud/api/animals';
+const CSRF_URL = 'https://animal-management-system-backend-master-fugzaz.laravel.cloud/sanctum/csrf-cookie';
 
 // Interface for form data (what we send to the API)
 export interface SupplierFormData {

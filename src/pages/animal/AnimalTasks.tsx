@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { formatDistanceToNow, format, isPast } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 const AnimalTasks: React.FC = () => {
@@ -129,7 +129,7 @@ const AnimalTasks: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="bg-background min-h-screen flex items-center justify-center py-6 px-4">
+      <div className="bg-background min-h-screen flex items-center justify-center py-6 px-4 sm:px-6">
         <Card className="border-border shadow-md w-full max-w-md">
           <CardContent className="flex flex-col items-center gap-4 py-8">
             <Loader2 className="h-6 w-6 animate-spin text-primary sm:h-8 sm:w-8" />
@@ -144,7 +144,7 @@ const AnimalTasks: React.FC = () => {
 
   if (!animal) {
     return (
-      <div className="bg-background min-h-screen flex items-center justify-center py-6 px-4">
+      <div className="bg-background min-h-screen flex items-center justify-center py-6 px-4 sm:px-6">
         <Card className="border-border shadow-md w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-lg font-serif text-destructive dark:text-destructive sm:text-xl">
@@ -173,43 +173,43 @@ const AnimalTasks: React.FC = () => {
     <div className="bg-background min-h-screen py-6 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <header className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3 flex-wrap">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate(`/animals/${id}`)}
-              className="text-primary dark:text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded-full h-10 w-10"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="flex items-center gap-3">
-              <Avatar className="h-10 w-10 sm:h-12 sm:w-12">
-                <AvatarFallback className="bg-muted text-foreground dark:bg-muted dark:text-foreground">
-                  {animal.name.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <h1 className="text-xl font-serif font-semibold text-foreground dark:text-foreground sm:text-2xl">
-                <span className="text-primary dark:text-primary">{animal.name}</span>’s Tasks
-              </h1>
-            </div>
-          </div>
-          <Button
-            onClick={() => navigate(`/animals/${id}/tasks/new`)}
-            className="font-serif bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground hover:bg-primary/90 dark:hover:bg-primary/80 h-10 w-full sm:w-auto sm:h-12"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Task
-          </Button>
-        </header>
-
+        <header className="flex flex-col gap-4 mb-8 sm:flex-row sm:items-center sm:justify-between">
+  <div className="flex items-center gap-3 flex-wrap">
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => navigate(`/animals/${id}`)}
+      className="text-primary dark:text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded-full h-9 w-9 sm:h-10 sm:w-10"
+    >
+      <ArrowLeft className="h-5 w-5" />
+    </Button>
+    <div className="flex items-center gap-3">
+      <Avatar className="h-10 w-10 sm:h-12 sm:w-12">
+        <AvatarFallback className="bg-muted text-foreground dark:bg-muted dark:text-foreground">
+          {animal.name.charAt(0).toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
+      <h1 className="text-xl font-serif font-semibold text-foreground dark:text-foreground sm:text-2xl">
+        <span className="text-primary dark:text-primary">{animal.name}</span>’s Tasks
+      </h1>
+    </div>
+  </div>
+  <Button
+    onClick={() => navigate(`/animals/${id}/tasks/new`)}
+    className="font-serif bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground hover:bg-primary/90 dark:hover:bg-primary/80 h-10 w-full sm:w-auto sm:h-11"
+  >
+    <Plus className="mr-2 h-4 w-4" />
+    Add Task
+  </Button>
+</header>
+<div className="mt-8">
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-          <TabsList className="grid grid-cols-2 gap-2 sm:grid-cols-4 bg-muted p-1 rounded-lg">
-            <TabsTrigger value="all" className="text-xs sm:text-sm font-sans">All</TabsTrigger>
-            <TabsTrigger value="pending" className="text-xs sm:text-sm font-sans">Pending</TabsTrigger>
-            <TabsTrigger value="completed" className="text-xs sm:text-sm font-sans">Completed</TabsTrigger>
-            <TabsTrigger value="overdue" className="text-xs sm:text-sm font-sans">Overdue</TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6 mt-6">
+          <TabsList className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 bg-muted p-1.5 rounded-lg w-full">
+            <TabsTrigger value="all" className="text-xs sm:text-sm font-sans py-2">All</TabsTrigger>
+            <TabsTrigger value="pending" className="text-xs sm:text-sm font-sans py-2">Pending</TabsTrigger>
+            <TabsTrigger value="completed" className="text-xs sm:text-sm font-sans py-2">Completed</TabsTrigger>
+            <TabsTrigger value="overdue" className="text-xs sm:text-sm font-sans py-2">Overdue</TabsTrigger>
           </TabsList>
           <TabsContent value={activeTab}>
             {filteredTasks().length === 0 ? (
@@ -224,7 +224,7 @@ const AnimalTasks: React.FC = () => {
                   </p>
                   <Button
                     onClick={() => navigate(`/animals/${id}/tasks/new`)}
-                    className="font-serif bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground hover:bg-primary/90 dark:hover:bg-primary/80 h-10 w-full max-w-xs mx-auto sm:h-12"
+                    className="font-serif bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground hover:bg-primary/90 dark:hover:bg-primary/80 h-10 w-full max-w-xs mx-auto sm:h-11"
                   >
                     <Plus className="mr-2 h-4 w-4" />
                     Add Task
@@ -232,7 +232,7 @@ const AnimalTasks: React.FC = () => {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 {filteredTasks().map((task) => {
                   const isPastDueTask = isPastDue(task.start_date, task.start_time) && task.status?.toLowerCase() !== 'completed';
                   return (
@@ -246,12 +246,12 @@ const AnimalTasks: React.FC = () => {
                           <span className="text-sm font-sans text-destructive dark:text-destructive">Past Due</span>
                         </div>
                       )}
-                      <CardHeader className="flex flex-col gap-3 pb-4 border-b border-border sm:flex-row sm:items-start sm:justify-between">
-                        <div className="space-y-1">
+                      <CardHeader className="flex flex-col gap-3 pb-3 border-b border-border px-4 sm:px-6 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="space-y-1.5">
                           <CardTitle className="text-base font-serif text-foreground dark:text-foreground sm:text-lg">
                             {task.title}
                           </CardTitle>
-                          <div className="flex flex-col gap-1 text-xs text-muted-foreground dark:text-muted-foreground sm:text-sm sm:flex-row sm:gap-4">
+                          <div className="flex flex-col gap-1.5 text-xs text-muted-foreground dark:text-muted-foreground sm:text-sm sm:flex-row sm:gap-3">
                             <span className="flex items-center">
                               <Calendar className="h-3 w-3 mr-1 sm:h-4 sm:w-4" />
                               Created {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
@@ -267,7 +267,7 @@ const AnimalTasks: React.FC = () => {
                             variant="outline"
                             size="sm"
                             onClick={() => task.task_id ? navigate(`/animals/${id}/tasks/${task.task_id}/edit`) : toast.error('Task ID missing')}
-                            className="font-sans text-primary dark:text-primary border-primary dark:border-primary hover:bg-primary/10 dark:hover:bg-primary/20 h-9 w-full sm:w-auto sm:h-10"
+                            className="font-sans text-primary dark:text-primary border-primary dark:border-primary hover:bg-primary/10 dark:hover:bg-primary/20 h-9 w-full sm:w-auto"
                           >
                             <Edit className="h-4 w-4 mr-1" />
                             Edit
@@ -276,15 +276,15 @@ const AnimalTasks: React.FC = () => {
                             variant="outline"
                             size="sm"
                             onClick={() => handleDeleteClick(task)}
-                            className="font-sans text-destructive dark:text-destructive border-destructive dark:border-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 h-9 w-full sm:w-auto sm:h-10"
+                            className="font-sans text-destructive dark:text-destructive border-destructive dark:border-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 h-9 w-full sm:w-auto"
                           >
                             <Trash2 className="h-4 w-4 mr-1" />
                             Delete
                           </Button>
                         </div>
                       </CardHeader>
-                      <CardContent className="pt-4">
-                        <p className="text-sm text-foreground dark:text-foreground font-sans mb-4 whitespace-pre-line">
+                      <CardContent className="pt-4 px-4 sm:px-6">
+                        <p className="text-sm text-foreground dark:text-foreground font-sans mb-3 whitespace-pre-line">
                           {task.description || 'No description provided'}
                         </p>
                         <div className="flex flex-wrap gap-2">
@@ -315,10 +315,10 @@ const AnimalTasks: React.FC = () => {
             )}
           </TabsContent>
         </Tabs>
-
+        </div>
         {/* Delete Dialog */}
         <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-          <DialogContent className="bg-background border-border shadow-md w-[90vw] max-w-md sm:max-w-md">
+          <DialogContent className="bg-background border-border shadow-md w-[90vw] max-w-md">
             <DialogHeader>
               <DialogTitle className="text-lg font-serif text-foreground dark:text-foreground sm:text-xl">
                 Confirm Deletion

@@ -33,8 +33,8 @@ export interface NoteFormData {
 // const API_URL = 'http://127.0.0.1:8000/api/animals';
 // const CSRF_URL = 'http://127.0.0.1:8000/sanctum/csrf-cookie';
 
-const API_URL = 'https://animal-management-master-wyohh0.laravel.cloud/api/animals';
-const CSRF_URL = 'https://animal-management-master-wyohh0.laravel.cloud/sanctum/csrf-cookie';
+const API_URL = 'https://animal-management-system-backend-master-fugzaz.laravel.cloud/api/animals';
+const CSRF_URL = 'https://animal-management-system-backend-master-fugzaz.laravel.cloud/sanctum/csrf-cookie';
 
 // Helper to fetch CSRF token
 const fetchCsrfToken = async () => {

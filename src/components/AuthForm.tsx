@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import Button from './Button';
@@ -56,34 +55,40 @@ export const AuthInput: React.FC<AuthInputProps> = ({
 
 interface AuthFormProps {
   type: 'login' | 'register' | 'forgot-password';
-  onSubmit: (data: any) => void;
+  onSubmit: (data: any) => Promise<void>;
   loading?: boolean;
   error?: string;
-  children?: React.ReactNode;
+  serverErrors?: Record<string, string>;
+  setServerErrors?: (errors: Record<string, string>) => void;
+  children?: React.ReactNode; // Fixed: Added children to interface
 }
 
 const AuthForm: React.FC<AuthFormProps> = ({ 
-  type, onSubmit, loading = false, error, children 
+  type, onSubmit, loading = false, error, serverErrors = {}, setServerErrors, children 
 }) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  
+
+  // Merge server errors into form errors when they change
+  useEffect(() => {
+    setFormErrors(prev => ({ ...prev, ...serverErrors }));
+  }, [serverErrors]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     
-    // Clear specific error when field is edited
-    if (formErrors[name]) {
+    if (formErrors[name] || serverErrors[name]) {
       setFormErrors(prev => ({ ...prev, [name]: '' }));
+      if (setServerErrors) setServerErrors({ ...serverErrors, [name]: '' });
     }
   };
-  
+
   const validate = () => {
     const errors: Record<string, string> = {};
     
     if (type === 'register' || type === 'login' || type === 'forgot-password') {
-      // Email validation
       if (!formData.email) {
         errors.email = 'Email is required';
       } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
@@ -92,13 +97,11 @@ const AuthForm: React.FC<AuthFormProps> = ({
     }
     
     if (type === 'register' || type === 'login') {
-      // Password validation for login and register
       if (!formData.password) {
         errors.password = 'Password is required';
       } 
       
       if (type === 'register') {
-        // Additional validations for register
         if (!formData.name) {
           errors.name = 'Full name is required';
         }
@@ -122,15 +125,23 @@ const AuthForm: React.FC<AuthFormProps> = ({
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
-  
-  const handleSubmit = (e: React.FormEvent) => {
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (validate()) {
-      onSubmit(formData);
+      try {
+        await onSubmit(formData);
+        // Clear form data and errors on success
+        setFormData({});
+        setFormErrors({});
+        if (setServerErrors) setServerErrors({});
+      } catch (err: any) {
+        // Errors are handled by the parent component
+      }
     }
   };
-  
+
   return (
     <div className="w-full max-w-md">
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -159,53 +170,53 @@ const AuthForm: React.FC<AuthFormProps> = ({
           name="email"
           placeholder="you@example.com"
           value={formData.email || ''}
-          onChange={handleChange}
-          error={formErrors.email}
-          required
-        />
-        
-        {(type === 'login' || type === 'register') && (
-          <AuthInput
-            label="Password"
-            type="password"
-            name="password"
-            placeholder={type === 'register' ? "Min. 8 characters" : "Your password"}
-            value={formData.password || ''}
             onChange={handleChange}
-            error={formErrors.password}
+            error={formErrors.email}
             required
           />
-        )}
-        
-        {type === 'register' && (
-          <AuthInput
-            label="Confirm Password"
-            type="password"
-            name="confirmPassword"
-            placeholder="Confirm your password"
-            value={formData.confirmPassword || ''}
-            onChange={handleChange}
-            error={formErrors.confirmPassword}
-            required
-          />
-        )}
-        
-        <div className="pt-2">
-          <Button
-            type="submit"
-            className="w-full"
-            loading={loading}
-          >
-            {type === 'login' && 'Sign In'}
-            {type === 'register' && 'Create Account'}
-            {type === 'forgot-password' && 'Send Reset Link'}
-          </Button>
-        </div>
-        
-        {children}
-      </form>
-    </div>
-  );
-};
-
-export default AuthForm;
+          
+          {(type === 'login' || type === 'register') && (
+            <AuthInput
+              label="Password"
+              type="password"
+              name="password"
+              placeholder={type === 'register' ? "Min. 8 characters" : "Your password"}
+              value={formData.password || ''}
+              onChange={handleChange}
+              error={formErrors.password}
+              required
+            />
+          )}
+          
+          {type === 'register' && (
+            <AuthInput
+              label="Confirm Password"
+              type="password"
+              name="confirmPassword"
+              placeholder="Confirm your password"
+              value={formData.confirmPassword || ''}
+              onChange={handleChange}
+              error={formErrors.confirmPassword}
+              required
+            />
+          )}
+          
+          <div className="pt-2">
+            <Button
+              type="submit"
+              className="w-full"
+              loading={loading}
+            >
+              {type === 'login' && 'Sign In'}
+              {type === 'register' && 'Create Account'}
+              {type === 'forgot-password' && 'Send Reset Link'}
+            </Button>
+          </div>
+          
+          {children}
+        </form>
+      </div>
+    );
+  };
+  
+  export default AuthForm;

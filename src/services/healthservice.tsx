@@ -10,14 +10,14 @@ export interface Health {
   medical_history: Record<string, string> | null;
   dietary_restrictions: string | null;
   neutered_spayed: boolean;
-  regular_medication: string[] | null; // Changed to string[] | null
+  regular_medication: string[] | null; 
   last_vet_visit: string | null;
   insurance_details: string | null;
-  exercise_requirements: string[] | null; // Changed to string[] | null
-  parasite_prevention: string[] | null; // Changed to string[] | null
+  exercise_requirements: string[] | null; 
+  parasite_prevention: string[] | null; 
   vaccinations: string | null;
-  allergies: string[] | null; // Changed to string[] | null
-  notes: string[] | null; // Changed to string[] | null
+  allergies: string[] | null; 
+  notes: string[] | null; 
   created_at: string;
   updated_at: string;
 }
@@ -30,19 +30,18 @@ export interface HealthFormData {
   medical_history?: Record<string, string> | null;
   dietary_restrictions?: string | null;
   neutered_spayed: boolean;
-  regular_medication?: string[] | null; // Changed to string[] | null
+  regular_medication?: string[] | null; 
   last_vet_visit?: string | null;
   insurance_details?: string | null;
-  exercise_requirements?: string[] | null; // Changed to string[] | null
-  parasite_prevention?: string[] | null; // Changed to string[] | null
+  exercise_requirements?: string[] | null; 
+  parasite_prevention?: string[] | null; 
   vaccinations?: string | null;
-  allergies?: string[] | null; // Changed to string[] | null
-  notes?: string[] | null; // Changed to string[] | null
+  allergies?: string[] | null; 
+  notes?: string[] | null; 
 }
 
-const API_URL = 'https://animal-management-master-wyohh0.laravel.cloud/api/animals';
-const CSRF_URL = 'https://animal-management-master-wyohh0.laravel.cloud/sanctum/csrf-cookie';
-
+const API_URL = 'https://animal-management-system-backend-master-fugzaz.laravel.cloud/api/animals';
+const CSRF_URL = 'https://animal-management-system-backend-master-fugzaz.laravel.cloud/sanctum/csrf-cookie';
 // Helper to fetch CSRF token (reusing from notes service)
 const fetchCsrfToken = async () => {
   try {

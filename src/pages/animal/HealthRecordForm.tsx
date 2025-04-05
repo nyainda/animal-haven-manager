@@ -16,20 +16,26 @@ import {
   createHealthRecord, 
   updateHealthRecord, 
   fetchHealthRecord 
-} from '@/services/healthservice'; // Adjust path as needed
+} from '@/services/healthservice';
+
+// Utility function to format ISO date to yyyy-MM-dd
+const formatDateToYMD = (isoDate: string): string => {
+  if (!isoDate) return '';
+  return isoDate.split('T')[0]; // Extracts "2022-04-04" from "2022-04-04T00:00:00.000000Z"
+};
 
 interface HealthRecordFormProps {
   animalId: string;
   onSuccess?: () => void;
 }
 
-// Assuming HealthFormData has these fields as arrays
 interface UpdatedHealthFormData extends Omit<HealthFormData, 'allergies' | 'exercise_requirements' | 'notes' | 'parasite_prevention' | 'regular_medication'> {
   allergies: string[];
   exercise_requirements: string[];
   notes: string[];
   parasite_prevention: string[];
   regular_medication: string[];
+  medical_history: Record<string, string>;
 }
 
 export const HealthRecordForm: React.FC<HealthRecordFormProps> = ({ animalId, onSuccess }) => {
@@ -65,7 +71,6 @@ export const HealthRecordForm: React.FC<HealthRecordFormProps> = ({ animalId, on
     notes: '',
   });
 
-  // Fetch existing health record if editing
   useEffect(() => {
     if (healthId && animalId) {
       const loadHealthRecord = async () => {
@@ -73,20 +78,14 @@ export const HealthRecordForm: React.FC<HealthRecordFormProps> = ({ animalId, on
         try {
           const healthData = await fetchHealthRecord(animalId, healthId);
           setFormData({
-            health_status: healthData.health_status || 'Healthy',
-            vaccination_status: healthData.vaccination_status || 'Up-to-date',
-            vet_contact_id: healthData.vet_contact_id || null,
-            medical_history: healthData.medical_history || {},
-            dietary_restrictions: healthData.dietary_restrictions || '',
-            neutered_spayed: healthData.neutered_spayed || false,
+            ...healthData,
             regular_medication: healthData.regular_medication || [],
-            last_vet_visit: healthData.last_vet_visit || '',
-            insurance_details: healthData.insurance_details || '',
             exercise_requirements: healthData.exercise_requirements || [],
             parasite_prevention: healthData.parasite_prevention || [],
-            vaccinations: healthData.vaccinations || '',
             allergies: healthData.allergies || [],
             notes: healthData.notes || [],
+            medical_history: healthData.medical_history || {},
+            last_vet_visit: formatDateToYMD(healthData.last_vet_visit), // Normalize date
           });
         } catch (error) {
           console.error('Error loading health record:', error);
@@ -99,51 +98,39 @@ export const HealthRecordForm: React.FC<HealthRecordFormProps> = ({ animalId, on
     }
   }, [healthId, animalId]);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
-    const checked = (e.target as HTMLInputElement).checked;
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
     }));
   };
 
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [name]: value }));
+  const handleSelectChange = (name: keyof UpdatedHealthFormData) => (value: string) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSwitchChange = (checked: boolean) => {
-    setFormData((prev) => ({ ...prev, neutered_spayed: checked }));
-  };
-
-  const handleArrayInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setInputValues((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const addArrayItem = (field: keyof typeof inputValues) => {
+  const handleArrayInput = (field: keyof typeof inputValues) => {
     const value = inputValues[field].trim();
     if (value && !formData[field].includes(value)) {
-      setFormData((prev) => ({
+      setFormData(prev => ({
         ...prev,
         [field]: [...prev[field], value],
       }));
-      setInputValues((prev) => ({ ...prev, [field]: '' }));
+      setInputValues(prev => ({ ...prev, [field]: '' }));
     }
   };
 
   const removeArrayItem = (field: keyof UpdatedHealthFormData, item: string) => {
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
-      [field]: (prev[field] as string[]).filter((i) => i !== item),
+      [field]: (prev[field] as string[]).filter(i => i !== item),
     }));
   };
 
   const addMedicalHistory = () => {
     if (medicalHistoryDate && medicalHistoryNote) {
-      setFormData((prev) => ({
+      setFormData(prev => ({
         ...prev,
         medical_history: {
           ...prev.medical_history,
@@ -156,7 +143,7 @@ export const HealthRecordForm: React.FC<HealthRecordFormProps> = ({ animalId, on
   };
 
   const removeMedicalHistory = (date: string) => {
-    setFormData((prev) => {
+    setFormData(prev => {
       const { [date]: _, ...rest } = prev.medical_history;
       return { ...prev, medical_history: rest };
     });
@@ -166,18 +153,16 @@ export const HealthRecordForm: React.FC<HealthRecordFormProps> = ({ animalId, on
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      if (healthId) {
-        await updateHealthRecord(animalId, healthId, formData);
-        toast.success('Health record updated successfully');
-      } else {
-        await createHealthRecord(animalId, formData);
-        toast.success('Health record created successfully');
-      }
-      if (onSuccess) onSuccess();
+      const action = isEditing 
+        ? updateHealthRecord(animalId, healthId!, formData)
+        : createHealthRecord(animalId, formData);
+      await action;
+      toast.success(`Health record ${isEditing ? 'updated' : 'created'} successfully`);
+      onSuccess?.();
       navigate(`/animals/${animalId}/health`);
     } catch (error) {
       console.error('Failed to submit health record:', error);
-      toast.error(`Failed to ${healthId ? 'update' : 'create'} health record`);
+      toast.error(`Failed to ${isEditing ? 'update' : 'create'} health record`);
     } finally {
       setIsSubmitting(false);
     }
@@ -185,105 +170,123 @@ export const HealthRecordForm: React.FC<HealthRecordFormProps> = ({ animalId, on
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-6 px-4 max-w-4xl flex items-center justify-center h-64">
+      <div className="flex items-center justify-center min-h-[50vh]">
         <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
-        <span>Loading health record...</span>
+        <span className="text-muted-foreground">Loading health record...</span>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto py-6 px-4 max-w-4xl">
-      <div className="mb-6">
-        <Button variant="ghost" onClick={() => navigate(`/animals/${animalId}/health`)}>
+    <div className="container mx-auto py-8 px-4 max-w-3xl">
+      <div className="flex items-center justify-between mb-6">
+        <Button 
+          variant="ghost" 
+          onClick={() => navigate(`/animals/${animalId}/health`)}
+          className="hover:bg-accent"
+        >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Health Records
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{isEditing ? 'Edit Health Record' : 'Add New Health Record'}</CardTitle>
+      <Card className="shadow-lg">
+        <CardHeader className="border-b bg-muted/50">
+          <CardTitle className="text-2xl font-semibold">
+            {isEditing ? 'Edit Health Record' : 'New Health Record'}
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <CardContent className="p-6">
+          <form onSubmit={handleSubmit} className="space-y-8">
+            {/* Status Section */}
+            <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="health_status">Health Status</Label>
-                <Select
-                  value={formData.health_status}
-                  onValueChange={(value) => handleSelectChange('health_status', value)}
+                <Label className="text-sm font-medium">Health Status</Label>
+                <Select 
+                  value={formData.health_status} 
+                  onValueChange={handleSelectChange('health_status')}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select health status" />
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Healthy">Healthy</SelectItem>
-                    <SelectItem value="Sick">Sick</SelectItem>
-                    <SelectItem value="Recovering">Recovering</SelectItem>
-                    <SelectItem value="Critical">Critical</SelectItem>
+                    {['Healthy', 'Sick', 'Recovering', 'Critical'].map(status => (
+                      <SelectItem key={status} value={status}>{status}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="vaccination_status">Vaccination Status</Label>
-                <Select
-                  value={formData.vaccination_status}
-                  onValueChange={(value) => handleSelectChange('vaccination_status', value)}
+                <Label className="text-sm font-medium">Vaccination Status</Label>
+                <Select 
+                  value={formData.vaccination_status} 
+                  onValueChange={handleSelectChange('vaccination_status')}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select vaccination status" />
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Up-to-date">Up-to-date</SelectItem>
-                    <SelectItem value="Pending">Pending</SelectItem>
-                    <SelectItem value="Overdue">Overdue</SelectItem>
-                    <SelectItem value="Not Applicable">Not Applicable</SelectItem>
+                    {['Up-to-date', 'Pending', 'Overdue', 'Not Applicable'].map(status => (
+                      <SelectItem key={status} value={status}>{status}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-            </div>
+            </section>
 
-            <div className="space-y-2">
-              <Label>Medical History</Label>
-              <div className="flex items-center space-x-2">
+            {/* Medical History Section */}
+            <section className="space-y-4">
+              <Label className="text-sm font-medium">Medical History</Label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Input
                   type="date"
                   value={medicalHistoryDate}
-                  onChange={(e) => setMedicalHistoryDate(e.target.value)}
+                  onChange={e => setMedicalHistoryDate(e.target.value)}
+                  className="md:col-span-1"
                 />
                 <Input
                   value={medicalHistoryNote}
-                  onChange={(e) => setMedicalHistoryNote(e.target.value)}
-                  placeholder="Enter medical note"
+                  onChange={e => setMedicalHistoryNote(e.target.value)}
+                  placeholder="Medical note"
+                  className="md:col-span-1"
                 />
-                <Button type="button" onClick={addMedicalHistory}>Add</Button>
+                <Button 
+                  type="button" 
+                  onClick={addMedicalHistory}
+                  variant="outline"
+                  className="md:col-span-1"
+                >
+                  Add Entry
+                </Button>
               </div>
-              {Object.entries(formData.medical_history).length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
+              {Object.keys(formData.medical_history).length > 0 && (
+                <div className="mt-2 space-y-2">
                   {Object.entries(formData.medical_history).map(([date, note]) => (
-                    <div
-                      key={date}
-                      className="bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-sm flex items-center"
+                    <div 
+                      key={date} 
+                      className="flex items-center justify-between p-3 bg-muted rounded-lg"
                     >
-                      {date}: {note}
-                      <button
-                        type="button"
+                      <span className="text-sm">
+                        <strong>{date}:</strong> {note}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => removeMedicalHistory(date)}
-                        className="ml-1 text-secondary-foreground/70 hover:text-secondary-foreground"
+                        className="text-destructive hover:text-destructive/80"
                       >
-                        ×
-                      </button>
+                        Remove
+                      </Button>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
+            </section>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Basic Info Section */}
+            <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="last_vet_visit">Last Vet Visit</Label>
+                <Label className="text-sm font-medium">Last Vet Visit</Label>
                 <Input
                   type="date"
                   name="last_vet_visit"
@@ -291,101 +294,86 @@ export const HealthRecordForm: React.FC<HealthRecordFormProps> = ({ animalId, on
                   onChange={handleChange}
                 />
               </div>
-
-              <div className="flex items-center space-x-2">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Neutered/Spayed</Label>
                 <Switch
-                  id="neutered_spayed"
                   checked={formData.neutered_spayed}
-                  onCheckedChange={handleSwitchChange}
+                  onCheckedChange={checked => setFormData(prev => ({ ...prev, neutered_spayed: checked }))}
                 />
-                <Label htmlFor="neutered_spayed">Neutered/Spayed</Label>
               </div>
-            </div>
+            </section>
 
-            <div className="space-y-2">
-              <Label htmlFor="dietary_restrictions">Dietary Restrictions</Label>
-              <Textarea
-                id="dietary_restrictions"
-                name="dietary_restrictions"
-                value={formData.dietary_restrictions}
-                onChange={handleChange}
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="insurance_details">Insurance Details</Label>
-              <Textarea
-                id="insurance_details"
-                name="insurance_details"
-                value={formData.insurance_details}
-                onChange={handleChange}
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="vaccinations">Vaccinations</Label>
-              <Textarea
-                id="vaccinations"
-                name="vaccinations"
-                value={formData.vaccinations}
-                onChange={handleChange}
-                rows={2}
-              />
-            </div>
-
-            {/* Array Fields */}
-            {[
-              { name: 'regular_medication', label: 'Regular Medication' },
-              { name: 'exercise_requirements', label: 'Exercise Requirements' },
-              { name: 'parasite_prevention', label: 'Parasite Prevention' },
-              { name: 'allergies', label: 'Allergies' },
-              { name: 'notes', label: 'Additional Notes' },
-            ].map((field) => (
-              <div key={field.name} className="space-y-2">
-                <Label htmlFor={field.name}>{field.label}</Label>
-                <div className="flex items-center space-x-2">
-                  <Input
-                    id={field.name}
+            {/* Text Areas Section */}
+            <section className="space-y-6">
+              {[
+                { name: 'dietary_restrictions', label: 'Dietary Restrictions' },
+                { name: 'insurance_details', label: 'Insurance Details' },
+                { name: 'vaccinations', label: 'Vaccinations' },
+              ].map(field => (
+                <div key={field.name} className="space-y-2">
+                  <Label className="text-sm font-medium">{field.label}</Label>
+                  <Textarea
                     name={field.name}
-                    value={inputValues[field.name as keyof typeof inputValues]}
-                    onChange={handleArrayInputChange}
-                    placeholder={`Enter ${field.label.toLowerCase()}`}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addArrayItem(field.name as keyof typeof inputValues);
-                      }
-                    }}
+                    value={formData[field.name as keyof UpdatedHealthFormData] as string}
+                    onChange={handleChange}
+                    rows={3}
+                    className="resize-none"
                   />
-                  <Button type="button" onClick={() => addArrayItem(field.name as keyof typeof inputValues)}>
-                    Add
-                  </Button>
                 </div>
-                {formData[field.name as keyof UpdatedHealthFormData].length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {(formData[field.name as keyof UpdatedHealthFormData] as string[]).map((item, index) => (
-                      <div
-                        key={index}
-                        className="bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-sm flex items-center"
-                      >
-                        {item}
-                        <button
-                          type="button"
-                          onClick={() => removeArrayItem(field.name as keyof UpdatedHealthFormData, item)}
-                          className="ml-1 text-secondary-foreground/70 hover:text-secondary-foreground"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
+              ))}
+            </section>
 
-            <div className="flex justify-end gap-3">
+            {/* Array Fields Section */}
+            <section className="space-y-.Fetching6">
+              {[
+                { name: 'regular_medication', label: 'Regular Medication' },
+                { name: 'exercise_requirements', label: 'Exercise Requirements' },
+                { name: 'parasite_prevention', label: 'Parasite Prevention' },
+                { name: 'allergies', label: 'Allergies' },
+                { name: 'notes', label: 'Additional Notes' },
+              ].map(field => (
+                <div key={field.name} className="space-y-2">
+                  <Label className="text-sm font-medium">{field.label}</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={inputValues[field.name as keyof typeof inputValues]}
+                      onChange={e => setInputValues(prev => ({ ...prev, [field.name]: e.target.value }))}
+                      placeholder={`Add ${field.label.toLowerCase()}`}
+                      onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleArrayInput(field.name as keyof typeof inputValues))}
+                    />
+                    <Button 
+                      type="button" 
+                      onClick={() => handleArrayInput(field.name as keyof typeof inputValues)}
+                      variant="outline"
+                    >
+                      Add
+                    </Button>
+                  </div>
+                  {(formData[field.name as keyof UpdatedHealthFormData] as string[]).length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {(formData[field.name as keyof UpdatedHealthFormData] as string[]).map((item, idx) => (
+                        <span 
+                          key={idx} 
+                          className="inline-flex items-center px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
+                        >
+                          {item}
+                          <button
+                            type="button"
+                            onClick={() => removeArrayItem(field.name as keyof UpdatedHealthFormData, item)}
+                            className="ml-2 text-primary/70 hover:text-primary"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </section>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-3 pt-6 border-t">
               <Button
                 type="button"
                 variant="outline"
@@ -393,9 +381,13 @@ export const HealthRecordForm: React.FC<HealthRecordFormProps> = ({ animalId, on
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button 
+                type="submit" 
+                disabled={isSubmitting}
+                className="min-w-[120px]"
+              >
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isEditing ? 'Update Health Record' : 'Save Health Record'}
+                {isEditing ? 'Update' : 'Save'}
               </Button>
             </div>
           </form>

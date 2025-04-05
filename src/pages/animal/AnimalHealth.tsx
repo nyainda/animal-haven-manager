@@ -2,31 +2,31 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { 
-  ArrowLeft, Plus, FileText, Calendar, Edit, Trash2
+  ArrowLeft, Plus, FileText, Calendar, Edit, Trash2, Heart
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { fetchAnimal } from '@/services/animalService';
 import { fetchHealthRecords, deleteHealthRecord, Health } from '@/services/healthservice'; 
 import { Animal } from '@/types/AnimalTypes';
 import { 
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, isValid } from 'date-fns';
 
 const AnimalHealth: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [animal, setAnimal] = useState<Animal | null>(null);
   const [healthRecords, setHealthRecords] = useState<Health[]>([]);
-  const [isFetching, setIsFetching] = useState<boolean>(true); // Changed from 'loading' to 'isFetching'
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
+  const [isFetching, setIsFetching] = useState<boolean>(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
   const [healthToDelete, setHealthToDelete] = useState<Health | null>(null);
 
   useEffect(() => {
@@ -38,9 +38,11 @@ const AnimalHealth: React.FC = () => {
     const loadData = async () => {
       setIsFetching(true);
       try {
-        const animalData = await fetchAnimal(id);
+        const [animalData, healthData] = await Promise.all([
+          fetchAnimal(id),
+          fetchHealthRecords(id)
+        ]);
         setAnimal(animalData);
-        const healthData = await fetchHealthRecords(id);
         setHealthRecords(healthData);
       } catch (error) {
         console.error('Error loading data:', error);
@@ -55,7 +57,7 @@ const AnimalHealth: React.FC = () => {
 
   const handleDeleteClick = (health: Health) => {
     setHealthToDelete(health);
-    setDeleteConfirmOpen(true);
+    setDeleteDialogOpen(true);
   };
 
   const handleConfirmDelete = async () => {
@@ -63,38 +65,57 @@ const AnimalHealth: React.FC = () => {
 
     try {
       await deleteHealthRecord(id, healthToDelete.Health_id);
-      setHealthRecords(healthRecords.filter(h => h.Health_id !== healthToDelete.Health_id));
+      setHealthRecords(prev => prev.filter(h => h.Health_id !== healthToDelete.Health_id));
       toast.success('Health record deleted successfully');
     } catch (error) {
       console.error('Error deleting health record:', error);
       toast.error('Failed to delete health record');
     } finally {
-      setDeleteConfirmOpen(false);
+      setDeleteDialogOpen(false);
       setHealthToDelete(null);
     }
   };
 
-  // Skeleton component for health records
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      if (!isValid(date)) throw new Error('Invalid date');
+      return format(date, 'MMMM d, yyyy');
+    } catch {
+      return 'Not specified';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'healthy':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'sick':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'recovering':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'critical':
+        return 'bg-orange-100 text-orange-800 border-orange-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
   const HealthRecordSkeleton = () => (
-    <Card className="border-border shadow-md animate-pulse">
-      <CardHeader className="flex flex-col gap-3 pb-4 border-b border-border sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="h-5 w-24 bg-muted rounded" />
-            <div className="h-4 w-16 bg-muted rounded" />
-            <div className="h-4 w-20 bg-muted rounded" />
+    <Card className="shadow-sm border border-border animate-pulse">
+      <CardHeader className="bg-muted/20 p-4">
+        <div className="flex justify-between items-center">
+          <div className="space-y-2">
+            <div className="h-5 w-32 bg-muted rounded" />
+            <div className="h-3 w-24 bg-muted rounded" />
           </div>
-          <div className="flex items-center text-xs text-muted-foreground dark:text-muted-foreground sm:text-sm">
-            <Calendar className="h-3 w-3 mr-1 sm:h-4 sm:w-4" />
-            <div className="h-3 w-32 bg-muted rounded" />
+          <div className="flex gap-2">
+            <div className="h-8 w-16 bg-muted rounded" />
+            <div className="h-8 w-16 bg-muted rounded" />
           </div>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <div className="h-9 w-20 bg-muted rounded" />
-          <div className="h-9 w-20 bg-muted rounded" />
         </div>
       </CardHeader>
-      <CardContent className="pt-4 space-y-2">
+      <CardContent className="p-4 space-y-3">
         <div className="h-4 w-3/4 bg-muted rounded" />
         <div className="h-4 w-1/2 bg-muted rounded" />
         <div className="h-4 w-2/3 bg-muted rounded" />
@@ -102,192 +123,195 @@ const AnimalHealth: React.FC = () => {
     </Card>
   );
 
-  // Render immediately without waiting for loading
   return (
-    <div className="bg-background min-h-screen py-6 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
-          <div className="flex items-center gap-3 flex-wrap">
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-4">
             <Button
-              variant="ghost"
+              variant="outline"
               size="icon"
               onClick={() => navigate(`/animals/${id}`)}
-              className="text-primary dark:text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded-full h-10 w-10"
+              className="rounded-full border-border hover:bg-muted"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-xl font-serif font-semibold text-foreground dark:text-foreground sm:text-2xl">
-              Health Records for{' '}
-              <span className="text-primary dark:text-primary">
-                {animal ? animal.name : 'Loading...'}
-              </span>
+            <h1 className="text-3xl font-bold text-foreground">
+              {animal?.name || 'Loading...'}'s Health Records
             </h1>
           </div>
           <Button
             onClick={() => navigate(`/animals/${id}/health/new`)}
-            className="font-serif bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground hover:bg-primary/90 dark:hover:bg-primary/80 h-10 w-full sm:w-auto sm:h-12"
+            className="bg-primary hover:bg-primary/90 transition-colors"
             disabled={isFetching}
           >
             <Plus className="mr-2 h-4 w-4" />
-            Add Health Record
+            New Health Record
           </Button>
         </div>
 
-        {/* Health Records Section */}
-        {!animal && !isFetching ? (
-          <Card className="border-border shadow-md w-full max-w-md mx-auto">
-            <CardHeader>
-              <CardTitle className="text-lg font-serif text-destructive dark:text-destructive sm:text-xl">
-                Oops!
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground sm:text-base">
-                Animal not found.
-              </p>
+        {/* Main Content */}
+        {isFetching ? (
+          <div className="space-y-6">
+            <HealthRecordSkeleton />
+            <HealthRecordSkeleton />
+          </div>
+        ) : !animal ? (
+          <Card className="shadow-lg border-border">
+            <CardContent className="p-6 text-center">
+              <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-foreground mb-2">Animal Not Found</h3>
+              <p className="text-muted-foreground mb-6">The requested animal could not be found.</p>
               <Button
                 variant="outline"
-                className="w-full font-serif text-primary dark:text-primary border-primary dark:border-primary hover:bg-primary/10 dark:hover:bg-primary/20 h-10 sm:h-12"
                 onClick={() => navigate('/animals')}
+                className="border-primary text-primary hover:bg-primary/10"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Animals
               </Button>
             </CardContent>
           </Card>
-        ) : healthRecords.length === 0 && !isFetching ? (
-          <Card className="border-border shadow-md">
-            <CardHeader className="border-b border-border">
-              <CardTitle className="text-lg font-serif text-foreground dark:text-foreground sm:text-xl">
-                Health Records
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="py-8 text-center">
-              <FileText className="h-8 w-8 text-muted-foreground dark:text-muted-foreground mx-auto mb-4 sm:h-10 sm:w-10" />
-              <h3 className="text-base font-sans font-medium text-foreground dark:text-foreground mb-2 sm:text-lg">
-                No Health Records Found
-              </h3>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-6 max-w-md mx-auto">
-                Start tracking {animal?.name || 'this animal'}’s health by adding a record.
+        ) : healthRecords.length === 0 ? (
+          <Card className="shadow-lg border-border">
+            <CardContent className="p-8 text-center">
+              <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-foreground mb-2">No Health Records</h3>
+              <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                Start tracking {animal.name}'s health by adding a new record.
               </p>
               <Button
                 onClick={() => navigate(`/animals/${id}/health/new`)}
-                className="font-serif bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground hover:bg-primary/90 dark:hover:bg-primary/80 h-10 w-full max-w-xs mx-auto sm:h-12"
+                className="bg-primary hover:bg-primary/90"
               >
                 <Plus className="mr-2 h-4 w-4" />
-                Add a Health Record
+                Add Health Record
               </Button>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-6">
-            {isFetching ? (
-              // Show skeleton while fetching
-              <>
-                <HealthRecordSkeleton />
-                <HealthRecordSkeleton />
-              </>
-            ) : (
-              healthRecords.map((health) => (
-                <Card key={health.Health_id} className="border-border shadow-md">
-                  <CardHeader className="flex flex-col gap-3 pb-4 border-b border-border sm:flex-row sm:items-start sm:justify-between">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <CardTitle className="text-base font-serif text-foreground dark:text-foreground sm:text-lg">
-                          Health Record
-                        </CardTitle>
-                        <Badge variant="secondary" className="text-xs font-sans bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground">
+            {healthRecords.map((health) => (
+              <Card key={health.Health_id} className="shadow-md border-border hover:shadow-lg transition-shadow">
+                <CardHeader className="bg-muted/20 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className={`p-2 rounded-full ${getStatusColor(health.health_status)}`}>
+                      <Heart className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <Badge 
+                          className={`text-sm font-medium ${getStatusColor(health.health_status)}`}
+                        >
                           {health.health_status}
                         </Badge>
                         {health.vaccination_status && (
-                          <Badge variant="outline" className="text-xs font-sans">
+                          <Badge variant="outline" className="text-xs border-muted-foreground">
                             {health.vaccination_status}
                           </Badge>
                         )}
                       </div>
-                      <div className="flex items-center text-xs text-muted-foreground dark:text-muted-foreground sm:text-sm">
-                        <Calendar className="h-3 w-3 mr-1 sm:h-4 sm:w-4" />
-                        {formatDistanceToNow(new Date(health.created_at), { addSuffix: true })}
+                      <div className="flex items-center text-sm text-muted-foreground mt-1">
+                        <Calendar className="h-4 w-4 mr-2" />
+                        Created {formatDistanceToNow(new Date(health.created_at), { addSuffix: true })}
                       </div>
                     </div>
-                    <div className="flex gap-2 flex-wrap">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(`/animals/${id}/health/${health.Health_id}/edit`)}
-                        className="font-sans text-primary dark:text-primary border-primary dark:border-primary hover:bg-primary/10 dark:hover:bg-primary/20 h-9 w-full sm:w-auto sm:h-10"
-                      >
-                        <Edit className="h-4 w-4 mr-1" />
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteClick(health)}
-                        className="font-sans text-destructive dark:text-destructive border-destructive dark:border-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 h-9 w-full sm:w-auto sm:h-10"
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
-                      </Button>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/animals/${id}/health/${health.Health_id}/edit`)}
+                      className="border-primary text-primary hover:bg-primary/10"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteClick(health)}
+                      className="border-destructive text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-semibold text-foreground">Basic Information</h4>
+                      <ul className="mt-2 text-sm text-muted-foreground space-y-1">
+                        <li>
+                          <span className="font-medium">Neutered/Spayed:</span> {health.neutered_spayed ? 'Yes' : 'No'}
+                        </li>
+                        {health.last_vet_visit && (
+                          <li>
+                            <span className="font-medium">Last Vet Visit:</span> {formatDate(health.last_vet_visit)}
+                          </li>
+                        )}
+                      </ul>
                     </div>
-                  </CardHeader>
-                  <CardContent className="pt-4">
-                    <div className="space-y-2 text-sm text-foreground font-sans dark:text-foreground">
-                      <p><strong>Neutered/Spayed:</strong> {health.neutered_spayed ? 'Yes' : 'No'}</p>
-                      {health.medical_history && Object.keys(health.medical_history).length > 0 && (
-                        <div>
-                          <strong>Medical History:</strong>
-                          <ul className="list-disc pl-5">
-                            {Object.entries(health.medical_history).map(([date, note]) => (
-                              <li key={date}>{date}: {note}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      {health.dietary_restrictions && (
-                        <p><strong>Dietary Restrictions:</strong> {health.dietary_restrictions}</p>
-                      )}
-                      {health.regular_medication && (
-                        <p><strong>Regular Medication:</strong> {health.regular_medication}</p>
-                      )}
-                      {health.last_vet_visit && (
-                        <p><strong>Last Vet Visit:</strong> {health.last_vet_visit}</p>
-                      )}
-                      {health.notes && (
-                        <p><strong>Notes:</strong> {health.notes}</p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
+                    {health.dietary_restrictions && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground">Dietary Restrictions</h4>
+                        <p className="mt-2 text-sm text-muted-foreground">{health.dietary_restrictions}</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-4">
+                    {health.medical_history && Object.keys(health.medical_history).length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground">Medical History</h4>
+                        <ul className="mt-2 text-sm text-muted-foreground space-y-1 list-disc pl-4">
+                          {Object.entries(health.medical_history).map(([date, note]) => (
+                            <li key={date}>{formatDate(date)}: {note}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {health.regular_medication?.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground">Regular Medication</h4>
+                        <p className="mt-2 text-sm text-muted-foreground">{health.regular_medication.join(', ')}</p>
+                      </div>
+                    )}
+                    {health.notes?.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground">Notes</h4>
+                        <p className="mt-2 text-sm text-muted-foreground">{health.notes.join(', ')}</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
 
         {/* Delete Confirmation Dialog */}
-        <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-          <DialogContent className="bg-background border-border shadow-md w-[90vw] max-w-md sm:max-w-md">
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle className="text-lg font-serif text-foreground dark:text-foreground sm:text-xl">
-                Confirm Deletion
-              </DialogTitle>
-              <DialogDescription className="text-sm text-muted-foreground dark:text-muted-foreground">
+              <DialogTitle className="text-xl font-semibold">Confirm Deletion</DialogTitle>
+              <DialogDescription className="text-muted-foreground">
                 Are you sure you want to delete this health record? This action cannot be undone.
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <DialogFooter className="mt-4 flex flex-col sm:flex-row gap-2 sm:gap-0 sm:justify-end">
               <Button
                 variant="outline"
-                onClick={() => setDeleteConfirmOpen(false)}
-                className="font-serif w-full text-foreground dark:text-foreground border-muted-foreground dark:border-muted-foreground hover:bg-muted/10 dark:hover:bg-muted/20 h-10 sm:w-auto"
+                onClick={() => setDeleteDialogOpen(false)}
+                className="w-full sm:w-auto"
               >
                 Cancel
               </Button>
               <Button
                 variant="destructive"
                 onClick={handleConfirmDelete}
-                className="font-serif w-full bg-destructive text-destructive-foreground dark:bg-destructive dark:text-destructive-foreground hover:bg-destructive/90 dark:hover:bg-destructive/80 h-10 sm:w-auto"
+                className="w-full sm:w-auto"
               >
                 Delete
               </Button>

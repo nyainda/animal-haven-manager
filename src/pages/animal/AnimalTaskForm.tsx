@@ -18,7 +18,6 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { createTask, updateTask, fetchTask, TaskFormData } from '@/services/taskApi';
 
-// Define error state type
 interface FormErrors {
   [key: string]: string[];
 }
@@ -42,9 +41,8 @@ const AnimalTaskForm: React.FC = () => {
   });
   const [errors, setErrors] = useState<FormErrors>({});
 
-  // Normalize time to HH:mm format (e.g., "09:00")
   const normalizeTime = (time: string): string => {
-    if (!time) return '00:00'; // Fallback for invalid time
+    if (!time) return '00:00';
     const [hours, minutes] = time.split(':');
     return `${hours.padStart(2, '0')}:${minutes.slice(0, 2)}`;
   };
@@ -70,7 +68,7 @@ const AnimalTaskForm: React.FC = () => {
           end_time: normalizeTime(task.end_time),
           end_repeat_date: task.end_repeat_date ? format(parseISO(task.end_repeat_date), 'yyyy-MM-dd') : undefined,
         });
-        setErrors({}); // Clear errors on successful load
+        setErrors({});
       } catch (error) {
         toast.error('Failed to load task data');
         navigate(`/animals/${id}/tasks`);
@@ -89,7 +87,6 @@ const AnimalTaskForm: React.FC = () => {
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
-    // Clear error for this field when user starts typing
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: [] }));
     }
@@ -153,7 +150,7 @@ const AnimalTaskForm: React.FC = () => {
     };
 
     setIsLoading(true);
-    setErrors({}); // Clear previous errors
+    setErrors({});
 
     try {
       if (isEditing && taskId) {
@@ -168,7 +165,7 @@ const AnimalTaskForm: React.FC = () => {
       if (error.message && error.message.includes('API error')) {
         const errorData = JSON.parse(error.message.replace('API error: ', ''));
         if (errorData.errors) {
-          setErrors(errorData.errors); // Set field-specific errors
+          setErrors(errorData.errors);
           toast.error(errorData.message || 'Failed to save task');
         } else {
           toast.error(errorData.message || 'Failed to save task');
@@ -191,19 +188,19 @@ const AnimalTaskForm: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto py-6 px-4 max-w-4xl">
+    <div className="container mx-auto py-6 px-4 sm:px-6 max-w-4xl">
       <Button variant="ghost" onClick={() => navigate(`/animals/${id}/tasks`)}>
         <ArrowLeft className="mr-2 h-4 w-4" />
         Back to Tasks
       </Button>
 
       <Card className="mt-6">
-        <CardHeader>
+        <CardHeader className="px-4 sm:px-6">
           <CardTitle>{isEditing ? 'Edit Task' : 'Add New Task'}</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 sm:px-6">
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
               <div className="space-y-2">
                 <Label htmlFor="title">Title</Label>
                 <Input
@@ -228,15 +225,33 @@ const AnimalTaskForm: React.FC = () => {
                     <SelectItem value="feeding">Feeding</SelectItem>
                     <SelectItem value="vaccination">Vaccination</SelectItem>
                     <SelectItem value="milking">Milking</SelectItem>
-                    <SelectItem value="health_check">Health check</SelectItem>
+                    <SelectItem value="health_check">Health Check</SelectItem>
                     <SelectItem value="cleaning">Cleaning</SelectItem>
+                    <SelectItem value="breeding">Breeding</SelectItem>
+                    <SelectItem value="shearing">Shearing/Wool Collection</SelectItem>
+                    <SelectItem value="egg_collection">Egg Collection</SelectItem>
+                    <SelectItem value="grooming">Grooming</SelectItem>
+                    <SelectItem value="hoof_care">Hoof/Claw Care</SelectItem>
+                    <SelectItem value="training">Training</SelectItem>
+                    <SelectItem value="weighing">Weighing</SelectItem>
+                    <SelectItem value="medication">Medication</SelectItem>
+                    <SelectItem value="deworming">Deworming</SelectItem>
+                    <SelectItem value="parasite_control">Parasite Control</SelectItem>
+                    <SelectItem value="pen_rotation">Pen/Pasture Rotation</SelectItem>
+                    <SelectItem value="transport">Transport</SelectItem>
+                    <SelectItem value="slaughter">Slaughter/Processing</SelectItem>
+                    <SelectItem value="fiber_collection">Fiber Collection</SelectItem>
+                    <SelectItem value="water_maintenance">Water Maintenance</SelectItem>
+                    <SelectItem value="identification">Tagging/Identification</SelectItem>
+                    <SelectItem value="feather_collection">Feather Collection</SelectItem>
+                    <SelectItem value="custom">Custom Task</SelectItem>
                   </SelectContent>
                 </Select>
                 {errors.task_type && <p className="text-red-500 text-sm">{errors.task_type[0]}</p>}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
               <div className="space-y-2">
                 <Label htmlFor="start_date">Start Date</Label>
                 <Popover>
@@ -271,7 +286,7 @@ const AnimalTaskForm: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
               <div className="space-y-2">
                 <Label htmlFor="end_date">End Date</Label>
                 <Popover>
@@ -306,7 +321,7 @@ const AnimalTaskForm: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
               <div className="space-y-2">
                 <Label htmlFor="duration">Duration (minutes)</Label>
                 <Input
@@ -333,7 +348,7 @@ const AnimalTaskForm: React.FC = () => {
               {errors.description && <p className="text-red-500 text-sm">{errors.description[0]}</p>}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 sm:gap-6">
               <div className="space-y-2">
                 <Label htmlFor="priority">Priority</Label>
                 <Select
@@ -381,7 +396,7 @@ const AnimalTaskForm: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 sm:gap-6">
               <div className="space-y-2">
                 <Label htmlFor="repeats">Repeats</Label>
                 <Select
@@ -436,7 +451,7 @@ const AnimalTaskForm: React.FC = () => {
               )}
             </div>
 
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-3 pt-4">
               <Button
                 type="button"
                 variant="outline"

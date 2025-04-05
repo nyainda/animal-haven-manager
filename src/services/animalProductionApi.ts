@@ -1,7 +1,7 @@
 import { toast } from 'sonner';
 
-const API_URL = 'https://animal-management-master-wyohh0.laravel.cloud/api/animals';
-const CSRF_URL = 'https://animal-management-master-wyohh0.laravel.cloud/sanctum/csrf-cookie';
+const API_URL = 'https://animal-management-system-backend-master-fugzaz.laravel.cloud/api/animals';
+const CSRF_URL = 'https://animal-management-system-backend-master-fugzaz.laravel.cloud/sanctum/csrf-cookie';
 
 export interface ProductCategory {
   id?: string;

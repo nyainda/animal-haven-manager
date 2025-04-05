@@ -33,6 +33,46 @@ import {
 } from '@/types/AnimalTypes';
 import { createAnimal, fetchAnimal, updateAnimal } from '@/services/animalService';
 
+// Define which fields should be shown for each animal type
+const fieldVisibilityByType = {
+  common: [
+    'name', 'type', 'breed', 'gender', 'birth_date', 'status',
+    'tag_number', 'keywords', 'physical_traits', 'birth_weight', 'weight_unit'
+  ],
+  cattle: ['is_breeding_stock', 'colostrum_intake', 'raised_purchased', 'multiple_birth', 'birth_order', 'gestation_length', 'breeder_info', 'vaccinations', 'birth_status', 'health_at_birth', 'birth_photos'],
+  sheep: ['is_breeding_stock', 'colostrum_intake', 'raised_purchased', 'multiple_birth', 'birth_order', 'vaccinations', 'birth_status', 'health_at_birth'],
+  goat: ['is_breeding_stock', 'colostrum_intake', 'raised_purchased', 'multiple_birth', 'birth_order', 'vaccinations', 'birth_status', 'health_at_birth', 'milk_feeding'],
+  pig: ['is_breeding_stock', 'multiple_birth', 'birth_order', 'birth_status', 'health_at_birth', 'raised_purchased'],
+  horse: ['is_breeding_stock', 'birth_status', 'health_at_birth', 'vaccinations', 'breeder_info', 'raised_purchased', 'gestation_length'],
+  chicken: ['raised_purchased', 'health_at_birth'],
+  duck: ['raised_purchased', 'health_at_birth'],
+  rabbit: ['is_breeding_stock', 'multiple_birth', 'birth_order', 'raised_purchased'],
+  turkey: ['raised_purchased', 'health_at_birth'],
+  alpaca: ['is_breeding_stock', 'vaccinations', 'breeder_info'],
+  llama: ['is_breeding_stock', 'vaccinations', 'breeder_info'],
+  buffalo: ['is_breeding_stock', 'colostrum_intake', 'raised_purchased', 'multiple_birth', 'birth_order', 'gestation_length', 'breeder_info', 'vaccinations', 'birth_status', 'health_at_birth'],
+  deer: ['is_breeding_stock', 'raised_purchased', 'breeder_info', 'vaccinations'],
+  emu: ['raised_purchased', 'health_at_birth'],
+  ostrich: ['raised_purchased', 'health_at_birth'],
+  quail: ['raised_purchased', 'health_at_birth'],
+  pheasant: ['raised_purchased', 'health_at_birth'],
+  geese: ['raised_purchased', 'health_at_birth'],
+  bison: ['is_breeding_stock', 'raised_purchased', 'vaccinations', 'breeder_info'],
+  donkey: ['is_breeding_stock', 'raised_purchased', 'vaccinations', 'breeder_info', 'gestation_length'],
+  mule: ['raised_purchased', 'vaccinations', 'breeder_info'],
+  camel: ['is_breeding_stock', 'raised_purchased', 'vaccinations', 'breeder_info', 'milk_feeding', 'gestation_length'],
+  fish: ['raised_purchased'],
+  'guinea fowl': ['raised_purchased', 'health_at_birth'],
+  other: ['is_breeding_stock', 'multiple_birth', 'birth_order', 'birth_status', 'health_at_birth', 'milk_feeding', 'vaccinations', 'raised_purchased', 'colostrum_intake', 'gestation_length', 'breeder_info', 'birth_photos']
+};
+
+// Field groupings for organization
+const fieldGroups = {
+  birthDetails: ['birth_status', 'health_at_birth', 'multiple_birth', 'birth_order', 'gestation_length', 'birth_photos'],
+  nutrition: ['colostrum_intake', 'milk_feeding'],
+  management: ['is_breeding_stock', 'vaccinations', 'raised_purchased', 'breeder_info'],
+};
+
 const AnimalForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -76,6 +116,14 @@ const AnimalForm: React.FC = () => {
   const [birthDate, setBirthDate] = useState<Date>(new Date());
   const [nextCheckupDate, setNextCheckupDate] = useState<Date | undefined>(undefined);
   const [breedOptions, setBreedOptions] = useState<string[]>(breedsByType[formData.type]);
+  const [visibleFields, setVisibleFields] = useState<string[]>([]);
+
+  // Update visible fields based on selected animal type
+  useEffect(() => {
+    const typeSpecificFields = fieldVisibilityByType[formData.type as keyof typeof fieldVisibilityByType] || [];
+    const allVisibleFields = [...fieldVisibilityByType.common, ...typeSpecificFields];
+    setVisibleFields(allVisibleFields);
+  }, [formData.type]);
 
   useEffect(() => {
     setBreedOptions(breedsByType[formData.type]);
@@ -123,6 +171,11 @@ const AnimalForm: React.FC = () => {
       loadAnimal();
     }
   }, [id, isEditing]);
+
+  // Check if a field should be visible
+  const isFieldVisible = (fieldName: string): boolean => {
+    return visibleFields.includes(fieldName);
+  };
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -198,9 +251,9 @@ const AnimalForm: React.FC = () => {
     if (formData.gestation_length && formData.gestation_length < 0) {
       errors.gestation_length = 'Gestation length cannot be negative';
     }
-    if (formData.tag_number && isNaN(Number(formData.tag_number))) {
-      errors.tag_number = 'Tag number must be numeric';
-    }
+  //  if (formData.tag_number && isNaN(Number(formData.tag_number))) {
+     // errors.tag_number = 'Tag number must be numeric';
+   // }
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -253,12 +306,16 @@ const AnimalForm: React.FC = () => {
     }
   };
 
+  const getFormTitle = () => {
+    return isEditing ? `Edit ${formData.type.charAt(0).toUpperCase() + formData.type.slice(1)}` : `Add New ${formData.type.charAt(0).toUpperCase() + formData.type.slice(1)}`;
+  };
+
   return (
     <div className="container mx-auto px-4 py-6 max-w-5xl">
       <Card className="shadow-lg border-border">
         <CardHeader className="bg-card border-b">
           <CardTitle className="font-serif text-2xl flex items-center justify-between">
-            {isEditing ? 'Edit Animal' : 'Add New Animal'}
+            {getFormTitle()}
             {isFetching && (
               <span className="text-sm text-muted-foreground flex items-center">
                 <Loader2 className="inline h-4 w-4 animate-spin mr-2" /> Loading...
@@ -295,10 +352,10 @@ const AnimalForm: React.FC = () => {
                     <SelectTrigger className="font-serif">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="font-serif">
+                    <SelectContent className="font-serif max-h-80">
                       {animalTypes.map((type) => (
                         <SelectItem key={type} value={type} className="font-serif">
-                          {type}
+                          {type.charAt(0).toUpperCase() + type.slice(1)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -315,7 +372,7 @@ const AnimalForm: React.FC = () => {
                     <SelectTrigger className="font-serif">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="font-serif">
+                    <SelectContent className="font-serif max-h-80">
                       {breedOptions.map((breed) => (
                         <SelectItem key={breed} value={breed} className="font-serif">
                           {breed}
@@ -377,32 +434,23 @@ const AnimalForm: React.FC = () => {
                   {formErrors.birth_date && <p className="text-destructive text-xs">{formErrors.birth_date}</p>}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="birth_time" className="font-serif text-sm">Birth Time</Label>
-                  <Input
-                    id="birth_time"
-                    name="birth_time"
-                    value={formData.birth_time}
-                    onChange={handleInputChange}
-                    placeholder="HH:mm:ss (optional)"
-                    className={cn("font-serif", formErrors.birth_time && "border-destructive")}
-                    disabled={isLoading}
-                  />
-                  {formErrors.birth_time && <p className="text-destructive text-xs">{formErrors.birth_time}</p>}
-                </div>
+               
 
                 <div className="space-y-2">
                   <Label htmlFor="tag_number" className="font-serif text-sm">Tag Number</Label>
                   <Input
                     id="tag_number"
                     name="tag_number"
-                    value={isEditing ? (formData.tag_number || 'N/A') : 'Generated automatically'}
-                    className="font-serif bg-muted text-muted-foreground"
-                    disabled
+                    value={formData.tag_number ?? ''}
+                    onChange={handleInputChange}
+                    placeholder="Enter tag number"
+                    className={cn("font-serif", formErrors.tag_number && "border-destructive")}
+                    disabled={isLoading || isEditing} // Disable in edit mode if tag is system-managed
                   />
                   {!isEditing && (
-                    <p className="text-xs text-muted-foreground">System-generated</p>
+                    <p className="text-xs text-muted-foreground">Leave blank for auto-generation</p>
                   )}
+                  {formErrors.tag_number && <p className="text-destructive text-xs">{formErrors.tag_number}</p>}
                 </div>
 
                 <div className="space-y-2">
@@ -424,298 +472,463 @@ const AnimalForm: React.FC = () => {
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="is_deceased"
+                    checked={formData.is_deceased}
+                    onCheckedChange={handleCheckboxChange('is_deceased')}
+                    disabled={isLoading}
+                  />
+                  <Label htmlFor="is_deceased" className="font-serif text-sm">Deceased</Label>
+                </div>
               </div>
 
               {/* Additional Fields */}
-              <div className="md:col-span-2 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="birth_weight" className="font-serif text-sm">Birth Weight</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="birth_weight"
-                        name="birth_weight"
-                        type="number"
-                        value={formData.birth_weight ?? ''}
-                        onChange={handleInputChange}
-                        placeholder="Weight"
-                        className={cn("font-serif flex-1", formErrors.birth_weight && "border-destructive")}
-                        min="0"
-                        step="0.1"
-                        disabled={isLoading}
-                      />
-                      <Select 
-                        value={formData.weight_unit} 
-                        onValueChange={(value) => handleSelectChange('weight_unit', value)}
-                        disabled={isLoading}
-                      >
-                        <SelectTrigger className="w-24 font-serif">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="font-serif">
-                          {weightUnits.map((unit) => (
-                            <SelectItem key={unit.value} value={unit.value} className="font-serif">
-                              {unit.label}
-                            </SelectItem>
+              <div className="md:col-span-2 space-y-6">
+                {/* Weight Information */}
+                {isFieldVisible('birth_weight') && (
+                  <div className="space-y-4">
+                    <h3 className="font-serif font-medium text-lg">Weight Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="birth_weight" className="font-serif text-sm">Birth Weight</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="birth_weight"
+                            name="birth_weight"
+                            type="number"
+                            value={formData.birth_weight ?? ''}
+                            onChange={handleInputChange}
+                            placeholder="Weight"
+                            className={cn("font-serif flex-1", formErrors.birth_weight && "border-destructive")}
+                            min="0"
+                            step="0.1"
+                            disabled={isLoading}
+                          />
+                          <Select 
+                            value={formData.weight_unit} 
+                            onValueChange={(value) => handleSelectChange('weight_unit', value)}
+                            disabled={isLoading}
+                          >
+                            <SelectTrigger className="w-24 font-serif">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="font-serif">
+                              {weightUnits.map((unit) => (
+                                <SelectItem key={unit.value} value={unit.value} className="font-serif">
+                                  {unit.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {formErrors.birth_weight && <p className="text-destructive text-xs">{formErrors.birth_weight}</p>}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="next_checkup_date" className="font-serif text-sm">Next Checkup</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-serif",
+                                !nextCheckupDate && "text-muted-foreground"
+                              )}
+                              disabled={isLoading}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {nextCheckupDate ? format(nextCheckupDate, 'PPP') : <span>Pick a date</span>}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0 border-border shadow-md">
+                            <Calendar
+                              mode="single"
+                              selected={nextCheckupDate}
+                              onSelect={handleNextCheckupDateChange}
+                              initialFocus
+                              disabled={isLoading}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Birth Details Section */}
+                {fieldGroups.birthDetails.some(field => isFieldVisible(field)) && (
+                  <div className="space-y-4">
+                    <h3 className="font-serif font-medium text-lg">Birth Details</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {isFieldVisible('birth_status') && (
+                        <div className="space-y-2">
+                          <Label htmlFor="birth_status" className="font-serif text-sm">Birth Status</Label>
+                          <Select 
+                            value={formData.birth_status} 
+                            onValueChange={(value) => handleSelectChange('birth_status', value)}
+                            disabled={isLoading}
+                          >
+                            <SelectTrigger className="font-serif">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="font-serif">
+                              {birthStatusOptions.map((option) => (
+                                <SelectItem key={option.value} value={option.value} className="font-serif">
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {isFieldVisible('health_at_birth') && (
+                        <div className="space-y-2">
+                          <Label htmlFor="health_at_birth" className="font-serif text-sm">Health at Birth</Label>
+                          <Select 
+                            value={formData.health_at_birth} 
+                            onValueChange={(value) => handleSelectChange('health_at_birth', value)}
+                            disabled={isLoading}
+                          >
+                            <SelectTrigger className="font-serif">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="font-serif">
+                              {healthAtBirthOptions.map((option) => (
+                                <SelectItem key={option.value} value={option.value} className="font-serif">
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {isFieldVisible('multiple_birth') && (
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="multiple_birth"
+                            checked={formData.multiple_birth}
+                            onCheckedChange={handleCheckboxChange('multiple_birth')}
+                            disabled={isLoading}
+                          />
+                          <Label htmlFor="multiple_birth" className="font-serif text-sm">Multiple Birth</Label>
+                        </div>
+                      )}
+
+                      {isFieldVisible('birth_order') && (
+                        <div className="space-y-2">
+                          <Label htmlFor="birth_order" className="font-serif text-sm">Birth Order</Label>
+                          <Input
+                            id="birth_order"
+                            name="birth_order"
+                            type="number"
+                            value={formData.birth_order ?? ''}
+                            onChange={handleInputChange}
+                            placeholder="Enter order"
+                            className={cn("font-serif", formErrors.birth_order && "border-destructive")}
+                            disabled={isLoading}
+                            min="1"
+                          />
+                          {formErrors.birth_order && <p className="text-destructive text-xs">{formErrors.birth_order}</p>}
+                        </div>
+                      )}
+
+                      {isFieldVisible('gestation_length') && (
+                        <div className="space-y-2">
+                          <Label htmlFor="gestation_length" className="font-serif text-sm">Gestation Length (days)</Label>
+                          <Input
+                            id="gestation_length"
+                            name="gestation_length"
+                            type="number"
+                            value={formData.gestation_length ?? ''}
+                            onChange={handleInputChange}
+                            placeholder="Enter days"
+                            className={cn("font-serif", formErrors.gestation_length && "border-destructive")}
+                            disabled={isLoading}
+                            min="0"
+                          />
+                          {formErrors.gestation_length && <p className="text-destructive text-xs">{formErrors.gestation_length}</p>}
+                        </div>
+                      )}
+
+                      {isFieldVisible('birth_photos') && (
+                        <div className="space-y-2">
+                          <Label htmlFor="birth_photos" className="font-serif text-sm">Birth Photos URL</Label>
+                          <Input
+                            id="birth_photos"
+                            name="birth_photos"
+                            value={formData.birth_photos || ''}
+                            onChange={handleInputChange}
+                            placeholder="Enter URL"
+                            className="font-serif"
+                            disabled={isLoading}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Nutrition Section */}
+                {fieldGroups.nutrition.some(field => isFieldVisible(field)) && (
+                  <div className="space-y-4">
+                    <h3 className="font-serif font-medium text-lg">Nutrition</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {isFieldVisible('colostrum_intake') && (
+                        <div className="space-y-2">
+                          <Label htmlFor="colostrum_intake" className="font-serif text-sm">Colostrum Intake</Label>
+                          <Input
+                            id="colostrum_intake"
+                            name="colostrum_intake"
+                            value={formData.colostrum_intake || ''}
+                            onChange={handleInputChange}
+                            placeholder="Enter details"
+                            className="font-serif"
+                            disabled={isLoading}
+                          />
+                        </div>
+                      )}
+
+                      {isFieldVisible('milk_feeding') && (
+                        <div className="space-y-2">
+                          <Label htmlFor="milk_feeding" className="font-serif text-sm">Milk Feeding</Label>
+                          <Input
+                            id="milk_feeding"
+                            name="milk_feeding"
+                            value={formData.milk_feeding || ''}
+                            onChange={handleInputChange}
+                            placeholder="Enter feeding details"
+                            className="font-serif"
+                            disabled={isLoading}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Management Section */}
+                {fieldGroups.management.some(field => isFieldVisible(field)) && (
+                  <div className="space-y-4">
+                    <h3 className="font-serif font-medium text-lg">Management</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {isFieldVisible('is_breeding_stock') && (
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="is_breeding_stock"
+                            checked={formData.is_breeding_stock}
+                            onCheckedChange={handleCheckboxChange('is_breeding_stock')}
+                            disabled={isLoading}
+                          />
+                          <Label htmlFor="is_breeding_stock" className="font-serif text-sm">Breeding Stock</Label>
+                        </div>
+                      )}
+
+                      {isFieldVisible('raised_purchased') && (
+                        <div className="space-y-2">
+                          <Label htmlFor="raised_purchased" className="font-serif text-sm">Raised or Purchased</Label>
+                          <Select
+                            value={formData.raised_purchased}
+                            onValueChange={(value) => handleSelectChange('raised_purchased', value)}
+                            disabled={isLoading}
+                          >
+                            <SelectTrigger className="font-serif">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="font-serif">
+                              {raisedPurchasedOptions.map((option) => (
+                                <SelectItem key={option.value} value={option.value} className="font-serif">
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {isFieldVisible('breeder_info') && (
+                        <div className="space-y-2">
+                          <Label htmlFor="breeder_info" className="font-serif text-sm">Breeder Info</Label>
+                          <Input
+                            id="breeder_info"
+                            name="breeder_info"
+                            value={formData.breeder_info || ''}
+                            onChange={handleInputChange}
+                            placeholder="Enter breeder details"
+                            className="font-serif"
+                            disabled={isLoading}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {isFieldVisible('vaccinations') && (
+                      <div className="space-y-2">
+                        <Label className="font-serif text-sm">Vaccinations</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            value={newVaccination}
+                            onChange={(e) => setNewVaccination(e.target.value)}
+                            placeholder="Add vaccination"
+                            className="font-serif"
+                            disabled={isLoading}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                addItem('vaccinations', newVaccination, setNewVaccination);
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            onClick={() => addItem('vaccinations', newVaccination, setNewVaccination)}
+                            disabled={isLoading || !newVaccination.trim()}
+                            className="font-serif"
+                          >
+                            Add
+                          </Button>
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {formData.vaccinations.map((vaccination) => (
+                            <Badge key={vaccination} variant="secondary" className="font-serif">
+                              {vaccination}
+                              <button
+                                type="button"
+                                onClick={() => removeItem('vaccinations', vaccination)}
+                                className="ml-2 text-destructive"
+                                disabled={isLoading}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
                           ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {formErrors.birth_weight && <p className="text-destructive text-xs">{formErrors.birth_weight}</p>}
+                        </div>
+                      </div>
+                    )}
                   </div>
+                )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="next_checkup_date" className="font-serif text-sm">Next Checkup</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-serif",
-                            !nextCheckupDate && "text-muted-foreground"
-                          )}
-                          disabled={isLoading}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {nextCheckupDate ? format(nextCheckupDate, 'PPP') : <span>Pick a date</span>}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 border-border shadow-md">
-                        <Calendar
-                          mode="single"
-                          selected={nextCheckupDate}
-                          onSelect={handleNextCheckupDateChange}
-                          initialFocus
-                          disabled={isLoading}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-4">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="is_breeding_stock"
-                      checked={formData.is_breeding_stock}
-                      onCheckedChange={handleCheckboxChange('is_breeding_stock')}
-                      disabled={isLoading}
-                    />
-                    <Label htmlFor="is_breeding_stock" className="font-serif text-sm">Breeding Stock</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="is_deceased"
-                      checked={formData.is_deceased}
-                      onCheckedChange={handleCheckboxChange('is_deceased')}
-                      disabled={isLoading}
-                    />
-                    <Label htmlFor="is_deceased" className="font-serif text-sm">Deceased</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="multiple_birth"
-                      checked={formData.multiple_birth}
-                      onCheckedChange={handleCheckboxChange('multiple_birth')}
-                      disabled={isLoading}
-                    />
-                    <Label htmlFor="multiple_birth" className="font-serif text-sm">Multiple Birth</Label>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="font-serif text-sm">Vaccinations</Label>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {formData.vaccinations?.map((vaccination, index) => (
-                      <Badge key={index} variant="outline" className="font-serif">
-                        {vaccination}
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-4 w-4 p-0 ml-1" 
-                          onClick={() => removeItem('vaccinations', vaccination)}
-                          disabled={isLoading}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </Badge>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      value={newVaccination}
-                      onChange={(e) => setNewVaccination(e.target.value)}
-                      placeholder="Add vaccination"
-                      className="font-serif flex-1"
-                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addItem('vaccinations', newVaccination, setNewVaccination))}
-                      disabled={isLoading}
-                    />
-                    <Button 
-                      type="button" 
-                      onClick={() => addItem('vaccinations', newVaccination, setNewVaccination)} 
-                      size="sm"
-                      className="font-serif"
-                      disabled={isLoading}
-                    >
-                      Add
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="font-serif text-sm">Physical Traits</Label>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {formData.physical_traits?.map((trait, index) => (
-                      <Badge key={index} variant="secondary" className="font-serif">
-                        {trait}
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-4 w-4 p-0 ml-1" 
-                          onClick={() => removeItem('physical_traits', trait)}
-                          disabled={isLoading}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </Badge>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      value={newTrait}
-                      onChange={(e) => setNewTrait(e.target.value)}
-                      placeholder="Add trait"
-                      className="font-serif flex-1"
-                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addItem('physical_traits', newTrait, setNewTrait))}
-                      disabled={isLoading}
-                    />
-                    <Button 
-                      type="button" 
-                      onClick={() => addItem('physical_traits', newTrait, setNewTrait)} 
-                      size="sm"
-                      className="font-serif"
-                      disabled={isLoading}
-                    >
-                      Add
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="font-serif text-sm">Keywords</Label>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {formData.keywords?.map((keyword, index) => (
-                      <Badge key={index} variant="outline" className="font-serif">
-                        {keyword}
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-4 w-4 p-0 ml-1" 
-                          onClick={() => removeItem('keywords', keyword)}
-                          disabled={isLoading}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </Badge>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      value={newKeyword}
-                      onChange={(e) => setNewKeyword(e.target.value)}
-                      placeholder="Add keyword"
-                      className="font-serif flex-1"
-                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addItem('keywords', newKeyword, setNewKeyword))}
-                      disabled={isLoading}
-                    />
-                    <Button 
-                      type="button" 
-                      onClick={() => addItem('keywords', newKeyword, setNewKeyword)} 
-                      size="sm"
-                      className="font-serif"
-                      disabled={isLoading}
-                    >
-                      Add
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {[
-                    { id: "birth_status", label: "Birth Status", options: birthStatusOptions },
-                    { id: "health_at_birth", label: "Health at Birth", options: healthAtBirthOptions },
-                    { id: "raised_purchased", label: "Origin", options: raisedPurchasedOptions },
-                  ].map((field) => (
-                    <div key={field.id} className="space-y-2">
-                      <Label htmlFor={field.id} className="font-serif text-sm">{field.label}</Label>
-                      <Select 
-                        value={formData[field.id as keyof AnimalFormData] as string} 
-                        onValueChange={(value) => handleSelectChange(field.id as keyof AnimalFormData, value)}
-                        disabled={isLoading}
-                      >
-                        <SelectTrigger className="font-serif">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="font-serif">
-                          {field.options.map((option) => (
-                            <SelectItem key={option.value} value={option.value} className="font-serif">
-                              {option.label}
-                            </SelectItem>
+                {/* Traits and Keywords */}
+                <div className="space-y-4">
+                  <h3 className="font-serif font-medium text-lg">Traits & Keywords</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {isFieldVisible('physical_traits') && (
+                      <div className="space-y-2">
+                        <Label className="font-serif text-sm">Physical Traits</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            value={newTrait}
+                            onChange={(e) => setNewTrait(e.target.value)}
+                            placeholder="Add trait"
+                            className="font-serif"
+                            disabled={isLoading}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                addItem('physical_traits', newTrait, setNewTrait);
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            onClick={() => addItem('physical_traits', newTrait, setNewTrait)}
+                            disabled={isLoading || !newTrait.trim()}
+                            className="font-serif"
+                          >
+                            Add
+                          </Button>
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {formData.physical_traits.map((trait) => (
+                            <Badge key={trait} variant="secondary" className="font-serif">
+                              {trait}
+                              <button
+                                type="button"
+                                onClick={() => removeItem('physical_traits', trait)}
+                                className="ml-2 text-destructive"
+                                disabled={isLoading}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
                           ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ))}
-                </div>
+                        </div>
+                      </div>
+                    )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {[
-                    { id: "colostrum_intake", label: "Colostrum Intake", placeholder: "Enter intake" },
-                    { id: "milk_feeding", label: "Milk Feeding", placeholder: "Enter details" },
-                    { id: "birth_order", label: "Birth Order", placeholder: "Enter order", type: "number" },
-                    { id: "gestation_length", label: "Gestation Length (days)", placeholder: "Enter days", type: "number" },
-                    { id: "breeder_info", label: "Breeder Info", placeholder: "Enter info" },
-                    { id: "birth_photos", label: "Birth Photos URL", placeholder: "Enter URL" },
-                  ].map((field) => (
-                    <div key={field.id} className="space-y-2">
-                      <Label htmlFor={field.id} className="font-serif text-sm">{field.label}</Label>
-                      <Input
-                        id={field.id}
-                        name={field.id}
-                        type={field.type || "text"}
-                        value={formData[field.id as keyof AnimalFormData] === null 
-                          ? '' 
-                          : String(formData[field.id as keyof AnimalFormData])}
-                        onChange={handleInputChange}
-                        placeholder={field.placeholder}
-                        className={cn("font-serif", formErrors[field.id] && "border-destructive")}
-                        disabled={isLoading}
-                        min={field.type === "number" ? 0 : undefined}
-                      />
-                      {formErrors[field.id] && <p className="text-destructive text-xs">{formErrors[field.id]}</p>}
-                    </div>
-                  ))}
+                    {isFieldVisible('keywords') && (
+                      <div className="space-y-2">
+                        <Label className="font-serif text-sm">Keywords</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            value={newKeyword}
+                            onChange={(e) => setNewKeyword(e.target.value)}
+                            placeholder="Add keyword"
+                            className="font-serif"
+                            disabled={isLoading}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                addItem('keywords', newKeyword, setNewKeyword);
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            onClick={() => addItem('keywords', newKeyword, setNewKeyword)}
+                            disabled={isLoading || !newKeyword.trim()}
+                            className="font-serif"
+                          >
+                            Add
+                          </Button>
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {formData.keywords.map((keyword) => (
+                            <Badge key={keyword} variant="secondary" className="font-serif">
+                              {keyword}
+                              <button
+                                type="button"
+                                onClick={() => removeItem('keywords', keyword)}
+                                className="ml-2 text-destructive"
+                                disabled={isLoading}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t">
+            {/* Form Actions */}
+            <div className="flex justify-end gap-4 pt-4 border-t">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => navigate('/animals')}
-                className="font-serif px-6"
                 disabled={isLoading}
+                className="font-serif"
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
-                className="font-serif px-6"
+              <Button
+                type="submit"
                 disabled={isLoading}
+                className="font-serif"
               >
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isEditing ? "Update" : "Create"}
+                {isLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                {isEditing ? 'Update' : 'Save'}
               </Button>
             </div>
           </form>
