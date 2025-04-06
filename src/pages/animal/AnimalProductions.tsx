@@ -1,439 +1,674 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
-  ArrowLeft,
-  Plus,
-  Loader2,
-  Calendar,
-  Edit,
-  Trash2,
-  AlertTriangle,
-  Clock,
-  Tag,
-  BarChart3,
-  CheckCircle2,
-  XCircle,
-  Download,
-  DollarSign,
-  User,
-  ChevronLeft,
-  ChevronRight,
+    ArrowLeft, Plus, Calendar, Edit, Trash2, AlertTriangle, Clock, Tag, BarChart3, CheckCircle2, XCircle, Download, DollarSign, User, ChevronLeft, ChevronRight, MoreVertical, Inbox
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { fetchAnimal } from '@/services/animalService';
-import { fetchProductions, deleteProduction, Production } from '@/services/animalProductionApi';
+import { fetchProductions, deleteProduction, updateProduction, Production, ProductionFormData } from '@/services/animalProductionApi';
 import { Animal } from '@/types/AnimalTypes';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { formatDistanceToNow, format, isPast, parseISO } from 'date-fns';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
+import { formatDistanceToNowStrict, format, isPast, parseISO } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-const AnimalProductions: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [animal, setAnimal] = useState<Animal | null>(null);
-  const [productions, setProductions] = useState<Production[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
-  const [productionToDelete, setProductionToDelete] = useState<Production | null>(null);
-  const [activeTab, setActiveTab] = useState<string>('all');
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [itemsPerPage] = useState<number>(10);
-  const pdfContentRef = useRef<HTMLDivElement>(null);
+// --- Helper Functions ---
 
-  const loadData = async (animalId: string) => {
-    setLoading(true);
-    try {
-      const animalData = await fetchAnimal(animalId);
-      if (!animalData) throw new Error('No animal data returned');
-      setAnimal(animalData);
+interface BadgeStyleProps { bgClass: string; textClass: string; borderClass: string; }
 
-      const productionsData = await fetchProductions(animalId);
-      const productionList = Array.isArray(productionsData) ? productionsData : productionsData.data || [];
-      if (!productionList.length) toast.info('No production records found.');
-      setProductions(productionList);
-    } catch (error: any) {
-      toast.error(`Failed to load data: ${error.message || 'Unknown error'}`);
-      if (!animal) navigate('/animals');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!id) {
-      toast.error('Missing animal ID');
-      navigate('/animals');
-      return;
-    }
-    loadData(id).catch((err) => toast.error('Unexpected error occurred'));
-  }, [id, navigate, location.state?.refresh]);
-
-  const handleEditClick = (production: Production) => navigate(`/animals/${id}/production/${production.id}/edit`, { state: { production } });
-  const handleDeleteClick = (production: Production) => {
-    setProductionToDelete(production);
-    setDeleteConfirmOpen(true);
-  };
-  const handleConfirmDelete = async () => {
-    if (!productionToDelete || !id) return;
-    try {
-      await deleteProduction(id, productionToDelete.id);
-      setProductions(productions.filter((p) => p.id !== productionToDelete.id));
-      toast.success('Production record deleted');
-    } catch (error: any) {
-      toast.error(`Failed to delete: ${error.message || 'Unknown error'}`);
-    } finally {
-      setDeleteConfirmOpen(false);
-      setProductionToDelete(null);
-    }
-  };
-
-  const getFormattedDateTime = (date: string, time: string) => {
-    try {
-      const isoDate = parseISO(date);
-      const formattedTime = time.includes(':') ? time : format(parseISO(`${date.split('T')[0]}T${time}`), 'HH:mm');
-      return format(new Date(isoDate.setHours(parseInt(formattedTime.split(':')[0]), parseInt(formattedTime.split(':')[1]))), 'MMM d, yyyy • hh:mm a');
-    } catch {
-      return `${date.split('T')[0]} ${time}`;
-    }
-  };
-
-  const getQualityColor = (status: string | undefined) => {
+const getQualityStyles = (status?: string): { borderClass: string; iconColorClass: string; badgeStyle: BadgeStyleProps } => {
+    const baseStyle: BadgeStyleProps = { bgClass: '', textClass: '', borderClass: '' };
     switch (status?.toLowerCase()) {
-      case 'passed': return 'bg-green-500/10 text-green-700 dark:bg-green-500/20 dark:text-green-300 border-green-500/20';
-      case 'failed': return 'bg-red-500/10 text-red-700 dark:bg-red-500/20 dark:text-red-300 border-red-500/20';
-      case 'pending': return 'bg-yellow-500/10 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300 border-yellow-500/20';
-      default: return 'bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground border-muted';
+        case 'passed':
+            return { borderClass: 'border-l-4 border-green-500', iconColorClass: 'text-green-500', badgeStyle: { ...baseStyle, bgClass: 'bg-green-100', textClass: 'text-green-800', borderClass: 'border-green-500' } };
+        case 'failed':
+            return { borderClass: 'border-l-4 border-red-500', iconColorClass: 'text-red-500', badgeStyle: { ...baseStyle, bgClass: 'bg-red-100', textClass: 'text-red-800', borderClass: 'border-red-500' } };
+        case 'pending':
+            return { borderClass: 'border-l-4 border-yellow-500', iconColorClass: 'text-yellow-500', badgeStyle: { ...baseStyle, bgClass: 'bg-yellow-100', textClass: 'text-yellow-800', borderClass: 'border-yellow-500' } };
+        default:
+            return { borderClass: 'border-l-4 border-gray-300 dark:border-gray-600', iconColorClass: 'text-gray-500', badgeStyle: { ...baseStyle, bgClass: 'bg-gray-100', textClass: 'text-gray-800', borderClass: 'border-gray-500' } };
     }
-  };
+};
 
-  const getStatusIcon = (status: string | undefined) => {
+const getStatusIcon = (status?: string): React.ReactNode => {
     switch (status?.toLowerCase()) {
-      case 'passed': return <CheckCircle2 className="h-4 w-4 mr-1" />;
-      case 'failed': return <XCircle className="h-4 w-4 mr-1" />;
-      case 'pending': return <AlertTriangle className="h-4 w-4 mr-1" />;
-      default: return null;
+        case 'passed': return <CheckCircle2 className="h-3 w-3 mr-1" />;
+        case 'failed': return <XCircle className="h-3 w-3 mr-1" />;
+        case 'pending': return <AlertTriangle className="h-3 w-3 mr-1" />;
+        default: return null;
     }
-  };
+};
 
-  const isOrganic = (isOrganic: boolean | undefined) => (isOrganic ? 'Organic' : 'Non-Organic');
-  const isPastDue = (date: string, time: string) => {
+
+
+const formatDateTime = (dateStr: string, timeStr: string): string => {
     try {
-      return isPast(parseISO(`${date.split('T')[0]}T${time}`));
-    } catch {
-      return false;
-    }
-  };
-
-  const filteredProductions = () => {
-    if (activeTab === 'all') return productions;
-    if (activeTab === 'passed') return productions.filter((p) => p.quality_status?.toLowerCase() === 'passed');
-    if (activeTab === 'failed') return productions.filter((p) => p.quality_status?.toLowerCase() === 'failed');
-    if (activeTab === 'pending') return productions.filter((p) => p.quality_status?.toLowerCase() === 'pending');
-    if (activeTab === 'overdue') return productions.filter((p) => isPastDue(p.production_date, p.production_time) && p.quality_status?.toLowerCase() !== 'passed');
-    return productions;
-  };
-
-  const generatePDF = async () => {
-    if (!pdfContentRef.current || !animal) return;
-    try {
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const canvas = await html2canvas(pdfContentRef.current, { scale: 2 });
-      const imgData = canvas.toDataURL('image/png');
-      const imgWidth = 190;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      pdf.setFontSize(18);
-      pdf.text(`${animal.name}'s Production Report`, 10, 20);
-      pdf.setFontSize(12);
-      pdf.text(`Animal ID: ${animal.id}`, 10, 30);
-      pdf.text(`Generated on: ${format(new Date(), 'PPPp')}`, 10, 38);
-      pdf.setFontSize(10);
-      pdf.addImage(imgData, 'PNG', 10, 50, imgWidth, imgHeight);
-      pdf.save(`${animal.name}_productions_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
-      toast.success('PDF report generated');
+        const date = parseISO(dateStr);
+        const [hours, minutes, seconds] = timeStr.split(':');
+        const dateTime = new Date(date.setUTCHours(parseInt(hours), parseInt(minutes), parseInt(seconds.split('.')[0])));
+        return format(dateTime, 'MMM d, yyyy, h:mm a');
     } catch (error) {
-      toast.error('Failed to generate PDF');
+        console.error('Error formatting date-time:', error, { dateStr, timeStr });
+        return `${dateStr.split('T')[0]} ${timeStr.split('.')[0]}`;
     }
-  };
+};
 
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredProductions().slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredProductions().length / itemsPerPage);
+const formatRelativeTime = (dateStr: string): string => {
+    try {
+        return formatDistanceToNowStrict(parseISO(dateStr), { addSuffix: true });
+    } catch {
+        return 'Unknown time';
+    }
+};
 
-  const handleNextPage = () => currentPage < totalPages && setCurrentPage(currentPage + 1);
-  const handlePrevPage = () => currentPage > 1 && setCurrentPage(currentPage - 1);
+const isOrganic = (isOrganic?: boolean): string => (isOrganic ? 'Organic' : 'Non-Organic');
 
-  if (loading) {
+// --- ProductionCard Sub-Component ---
+
+interface ProductionCardProps {
+    production: Production;
+    animalId: string;
+    onEdit: (productionId: string) => void;
+    onDelete: (production: Production) => void;
+}
+
+const ProductionCard: React.FC<ProductionCardProps> = ({ production, animalId, onEdit, onDelete }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const { borderClass: qualityBorderClass, iconColorClass: qualityIconColor, badgeStyle: qualityBadgeStyle } = getQualityStyles(production.quality_status);
+    
+    const handleEditClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (production.yield_id) onEdit(production.yield_id);
+        else if (production.id) onEdit(production.id);
+    };
+    
+    const handleDeleteClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        console.log('[ProductionCard] Delete clicked - Production ID:', production.id, 'Yield ID:', production.yield_id, 'Animal ID:', animalId);
+        
+        // Check for yield_id first, then fall back to id
+        if (!production.yield_id && !production.id) {
+            toast.error('Cannot delete: Production ID is missing.');
+            return;
+        }
+        
+        onDelete(production);
+    };
+    
+    const description = production.notes || `${production.quantity} ${production.product_category.measurement_unit}`;
+    const isLongDescription = description.length > 150;
+    
+
+    const formattedDateTime = formatDateTime(production.production_date, production.production_time);
+    const relativeTime = formatRelativeTime(production.production_date);
+
     return (
-      <div className="bg-background min-h-screen flex items-center justify-center py-6 px-4">
-        <Card className="border-border shadow-md w-full max-w-md">
-          <CardContent className="flex flex-col items-center gap-4 py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-primary sm:h-8 sm:w-8" />
-            <p className="text-base font-sans text-foreground dark:text-foreground sm:text-lg">
-              Loading production data...
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+        <Card
+            className={`group relative overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200 ease-in-out flex flex-col h-full ${qualityBorderClass} border-border`}
+        >
+            <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full bg-background/70 backdrop-blur-sm">
+                            <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                            <span className="sr-only">Production Actions</span>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={handleEditClick}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            <span>Edit</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleDeleteClick} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            <span>Delete</span>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
 
-  if (!animal) {
-    return (
-      <div className="bg-background min-h-screen flex items-center justify-center py-6 px-4">
-        <Card className="border-border shadow-md w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-lg font-serif text-destructive dark:text-destructive sm:text-xl">
-              Oops!
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground dark:text-muted-foreground sm:text-base">
-              Animal not found.
-            </p>
-            <Button
-              variant="outline"
-              className="w-full font-serif text-primary dark:text-primary border-primary dark:border-primary hover:bg-primary/10 dark:hover:bg-primary/20 h-10 sm:h-12"
-              onClick={() => navigate('/animals')}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Animals
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-background min-h-screen py-6 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto">
-        {/* Header */}
-        <header className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3 flex-wrap">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate(`/animals/${id}`)}
-              className="text-primary dark:text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded-full h-10 w-10"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <h1 className="text-xl font-serif font-semibold text-foreground dark:text-foreground sm:text-2xl">
-              <span className="text-primary dark:text-primary">{animal.name}</span>’s Production
-            </h1>
-          </div>
-          <div className="flex gap-3 flex-wrap">
-            <Button
-              onClick={() => navigate(`/animals/${id}/production/new`)}
-              className="font-serif bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground hover:bg-primary/90 dark:hover:bg-primary/80 h-10 w-full sm:w-auto sm:h-12"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Production
-            </Button>
-            <Button
-              variant="outline"
-              onClick={generatePDF}
-              className="font-serif text-foreground dark:text-foreground border-muted-foreground dark:border-muted-foreground hover:bg-muted/10 dark:hover:bg-muted/20 h-10 w-full sm:w-auto sm:h-12"
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Export PDF
-            </Button>
-          </div>
-        </header>
-
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-          <TabsList className="grid grid-cols-3 gap-2 sm:grid-cols-5 bg-muted p-1 rounded-lg">
-            <TabsTrigger value="all" className="text-xs sm:text-sm font-sans">All</TabsTrigger>
-            <TabsTrigger value="passed" className="text-xs sm:text-sm font-sans">Passed</TabsTrigger>
-            <TabsTrigger value="failed" className="text-xs sm:text-sm font-sans">Failed</TabsTrigger>
-            <TabsTrigger value="pending" className="text-xs sm:text-sm font-sans">Pending</TabsTrigger>
-            <TabsTrigger value="overdue" className="text-xs sm:text-sm font-sans">Overdue</TabsTrigger>
-          </TabsList>
-          <TabsContent value={activeTab}>
-            {currentItems.length === 0 ? (
-              <Card className="border-border shadow-md">
-                <CardContent className="py-8 text-center">
-                  <Tag className="h-8 w-8 text-muted-foreground dark:text-muted-foreground mx-auto mb-4 sm:h-10 sm:w-10" />
-                  <h3 className="text-base font-sans font-medium text-foreground dark:text-foreground mb-2 sm:text-lg">
-                    No {activeTab !== 'all' ? activeTab : 'Production'} Records
-                  </h3>
-                  <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-6 max-w-md mx-auto">
-                    {activeTab === 'all' ? `Add a production record for ${animal.name}.` : `No ${activeTab} records found.`}
-                  </p>
-                  <Button
-                    onClick={() => navigate(`/animals/${id}/production/new`)}
-                    className="font-serif bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground hover:bg-primary/90 dark:hover:bg-primary/80 h-10 w-full max-w-xs mx-auto sm:h-12"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Production
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div ref={pdfContentRef} className="space-y-6">
-                {currentItems.map((production) => (
-                  <Card
-                    key={production.id}
-                    className={`border-border shadow-md ${isPastDue(production.production_date, production.production_time) ? 'border-destructive/50' : ''}`}
-                  >
-                    {isPastDue(production.production_date, production.production_time) && (
-                      <div className="bg-destructive/10 dark:bg-destructive/20 border-b border-destructive/50 px-4 py-2 flex items-center">
-                        <AlertTriangle className="h-4 w-4 text-destructive dark:text-destructive mr-2" />
-                        <span className="text-sm font-sans text-destructive dark:text-destructive">Past Due</span>
-                      </div>
+            <CardHeader className="p-4 pb-3">
+                <div className="flex justify-between items-start gap-2 mb-1">
+                    <CardTitle className="text-base font-semibold leading-tight pr-8 group-hover:text-primary transition-colors">
+                        {production.product_category.name} - {production.trace_number}
+                    </CardTitle>
+                    {production.quality_status && (
+                        <Tooltip>
+                            <TooltipTrigger>
+                                <BarChart3 className={`h-4 w-4 flex-shrink-0 ${qualityIconColor} transform rotate-90`} />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Quality: {production.quality_status}</p>
+                            </TooltipContent>
+                        </Tooltip>
                     )}
-                    <CardHeader className="flex flex-col gap-3 pb-4 border-b border-border sm:flex-row sm:items-start sm:justify-between">
-                      <div className="space-y-1">
-                        <CardTitle className="text-base font-serif text-foreground dark:text-foreground sm:text-lg">
-                          {production.product_category.name} - {production.trace_number}
-                        </CardTitle>
-                        <div className="flex flex-col gap-1 text-xs text-muted-foreground dark:text-muted-foreground sm:text-sm sm:flex-row sm:gap-4">
-                          <span className="flex items-center">
-                            <Calendar className="h-3 w-3 mr-1 sm:h-4 sm:w-4" />
-                            {getFormattedDateTime(production.production_date, production.production_time)}
-                          </span>
-                          <span className="flex items-center">
-                            <Clock className="h-3 w-3 mr-1 sm:h-4 sm:w-4" />
-                            Created {formatDistanceToNow(parseISO(production.created_at), { addSuffix: true })}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 flex-wrap">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditClick(production)}
-                          className="font-sans text-primary dark:text-primary border-primary dark:border-primary hover:bg-primary/10 dark:hover:bg-primary/20 h-9 w-full sm:w-auto sm:h-10"
-                        >
-                          <Edit className="h-4 w-4 mr-1" />
-                          Edit
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteClick(production)}
-                          className="font-sans text-destructive dark:text-destructive border-destructive dark:border-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 h-9 w-full sm:w-auto sm:h-10"
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Delete
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-4">
-                      <p className="text-sm text-foreground dark:text-foreground font-sans mb-4">
-                        {production.notes || `${production.quantity} ${production.product_category.measurement_unit}`}
-                      </p>
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        <Badge variant="outline" className="text-xs font-sans">{production.product_grade.name}</Badge>
-                        <Badge variant="outline" className={`${getQualityColor(production.quality_status)} text-xs font-sans`}>
-                          {getStatusIcon(production.quality_status)}
-                          {production.quality_status}
+                </div>
+                <CardDescription className="text-xs text-muted-foreground flex items-center gap-x-3 gap-y-1 flex-wrap">
+                    <Tooltip>
+                        <TooltipTrigger className="flex items-center cursor-default">
+                            <Calendar className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+                            <span>{formattedDateTime}</span>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                            <p>Production Date & Time</p>
+                            <p>Relative: {relativeTime}</p>
+                            <p>Raw: {production.production_date} {production.production_time}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                    <span className="text-muted-foreground/50 hidden sm:inline">•</span>
+                    <Tooltip>
+                        <TooltipTrigger className="flex items-center cursor-default">
+                            <Clock className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+                            <span>Created {formatRelativeTime(production.created_at)}</span>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">Creation Date</TooltipContent>
+                    </Tooltip>
+                </CardDescription>
+            </CardHeader>
+
+            <CardContent className="p-4 pt-2 pb-3 flex-grow">
+                <div className="flex flex-wrap gap-2 mb-3">
+                    {production.product_grade?.name && (
+                        <Badge variant="secondary" className="text-xs font-medium">
+                            <Tag className="h-3 w-3 mr-1.5" />
+                            {production.product_grade.name}
                         </Badge>
-                        <Badge variant="outline" className="text-xs font-sans">
-                          <BarChart3 className="h-3 w-3 mr-1" />
-                          {isOrganic(production.is_organic)}
+                    )}
+                    {production.quality_status && (
+                        <Badge
+                            variant="outline"
+                            className={`text-xs font-medium flex items-center ${qualityBadgeStyle.bgClass} ${qualityBadgeStyle.textClass} ${qualityBadgeStyle.borderClass}`}
+                        >
+                            {getStatusIcon(production.quality_status)}
+                            {production.quality_status}
                         </Badge>
-                      </div>
-                      <div className="grid grid-cols-1 gap-3 text-sm text-foreground dark:text-foreground sm:grid-cols-2">
+                    )}
+                    <Badge variant="outline" className="text-xs font-medium">
+                        {isOrganic(production.is_organic)}
+                    </Badge>
+                </div>
+
+                <div>
+                    <p
+                        className={`text-sm text-foreground/90 whitespace-pre-wrap ${!production.notes ? 'text-muted-foreground italic' : ''} ${!isExpanded && isLongDescription ? 'line-clamp-3' : ''}`}
+                    >
+                        {description}
+                    </p>
+                    {isLongDescription && (
+                        <Button
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0 mt-1 text-primary"
+                            onClick={() => setIsExpanded(!isExpanded)}
+                        >
+                            {isExpanded ? 'Show Less' : 'Read More'}
+                        </Button>
+                    )}
+                </div>
+
+                <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                    <div className="flex items-center">
+                        <User className="h-3.5 w-3.5 mr-1.5" />
+                        <span><strong>Collector:</strong> {production.collector?.name || 'Unknown'}</span>
+                    </div>
+                    <div className="flex items-center">
+                        <DollarSign className="h-3.5 w-3.5 mr-1.5" />
+                        <span><strong>Total:</strong> ${production.total_price || '0'} (${production.price_per_unit || '0'}/unit)</span>
+                    </div>
+                    <div className="flex items-center">
+                        <Tag className="h-3.5 w-3.5 mr-1.5" />
+                        <span><strong>Method:</strong> {production.production_method?.method_name || 'N/A'}</span>
+                    </div>
+                    <div className="flex items-center">
+                        <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+                        <span><strong>Storage:</strong> {production.storage_location?.name || 'N/A'} ({production.storage_location?.location_code || 'N/A'})</span>
+                    </div>
+                    {production.weather_conditions && (
                         <div className="flex items-center">
-                          <User className="h-4 w-4 mr-2 text-muted-foreground dark:text-muted-foreground" />
-                          <span><strong>Collector:</strong> {production.collector.name}</span>
-                        </div>
-                        <div className="flex items-center">
-                          <DollarSign className="h-4 w-4 mr-2 text-muted-foreground dark:text-muted-foreground" />
-                          <span><strong>Total:</strong> ${production.total_price} <span className="text-xs">(${production.price_per_unit}/unit)</span></span>
-                        </div>
-                        <div className="flex items-center">
-                          <Tag className="h-4 w-4 mr-2 text-muted-foreground dark:text-muted-foreground" />
-                          <span><strong>Method:</strong> {production.production_method.method_name}</span>
-                        </div>
-                        <div className="flex items-center">
-                          <BarChart3 className="h-4 w-4 mr-2 text-muted-foreground dark:text-muted-foreground" />
-                          <span><strong>Storage:</strong> {production.storage_location.name}</span>
-                        </div>
-                        {production.weather_conditions && (
-                          <div className="flex items-center">
-                            <Tag className="h-4 w-4 mr-2 text-muted-foreground dark:text-muted-foreground" />
+                            <Tag className="h-3.5 w-3.5 mr-1.5" />
                             <span><strong>Weather:</strong> {production.weather_conditions.temperature}°C, {production.weather_conditions.humidity}%</span>
-                          </div>
-                        )}
-                      </div>
+                        </div>
+                    )}
+                </div>
+            </CardContent>
+        </Card>
+    );
+};
+
+// --- Main AnimalProductions Component ---
+
+const AnimalProductions: React.FC = () => {
+    const { id } = useParams<{ id: string }>();
+    const navigate = useNavigate();
+    const location = useLocation();
+    const [animal, setAnimal] = useState<Animal | null>(null);
+    const [productions, setProductions] = useState<Production[]>([]);
+    const [loading, setLoading] = useState<boolean>(true);
+    const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
+    const [productionToDelete, setProductionToDelete] = useState<Production | null>(null);
+    const [activeTab, setActiveTab] = useState<string>('all');
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [itemsPerPage] = useState<number>(10);
+    const pdfContentRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!id) {
+            toast.error('Animal ID is missing.');
+            navigate('/animals');
+            return;
+        }
+        
+        let isMounted = true;
+        
+        const loadData = async () => {
+            try {
+                setLoading(true);
+                
+                // First try to fetch just the animal data
+                let animalData;
+                try {
+                    animalData = await fetchAnimal(id);
+                    console.log('Animal data fetched successfully:', animalData);
+                } catch (animalError) {
+                    console.error('Error fetching animal data:', animalError);
+                    if (isMounted) {
+                        toast.error(`Failed to load animal: ${animalError.message || 'Unknown error'}`);
+                        navigate('/animals');
+                    }
+                    return; // Exit early if animal fetch fails
+                }
+                
+                // Then try to fetch productions separately
+                let productionsData;
+                try {
+                    productionsData = await fetchProductions(id);
+                    console.log('Productions data fetched successfully:', productionsData);
+                } catch (productionsError) {
+                    console.error('Error fetching productions data:', productionsError);
+                    if (isMounted) {
+                        toast.error(`Failed to load productions: ${productionsError.message || 'Unknown error'}`);
+                        // Don't navigate away - we at least have the animal data
+                        setAnimal(animalData);
+                        setProductions([]);
+                        setLoading(false);
+                        setIsInitialLoad(false);
+                    }
+                    return; // Exit after setting the animal data
+                }
+                
+                // If both fetches succeed
+                if (isMounted) {
+                    setAnimal(animalData);
+                    setProductions(productionsData.sort((a, b) => 
+                        parseISO(b.created_at).getTime() - parseISO(a.created_at).getTime()
+                    ));
+                    
+                    if (!productionsData.length) {
+                        console.log('No production records returned.');
+                        toast.info('No production records found.');
+                    } else {
+                        console.log('Productions set successfully:', productionsData.length, 'records');
+                    }
+                }
+            } catch (error) {
+                console.error('Error in loadData:', error);
+                if (isMounted) {
+                    toast.error(`Failed to load data: ${error.message || 'Check your network or authentication.'}`);
+                }
+            } finally {
+                if (isMounted) {
+                    setLoading(false);
+                    setIsInitialLoad(false);
+                }
+            }
+        };
+        
+        loadData();
+        return () => { isMounted = false; };
+    }, [id, navigate, location.state?.refresh]);
+
+    const handleDeleteClick = useCallback((production: Production) => {
+        console.log('Delete clicked for production:', production.id);
+        setProductionToDelete(production);
+        setDeleteConfirmOpen(true);
+    }, []);
+
+    const handleConfirmDelete = useCallback(async () => {
+        const productionId = productionToDelete?.yield_id || productionToDelete?.id;
+        
+        if (!productionId || !id) {
+            toast.error('Missing production ID or animal ID');
+            setDeleteConfirmOpen(false);
+            return;
+        }
+        
+        const originalProductions = [...productions];
+        setProductions(prev => prev.filter(p => (p.id !== productionId && p.yield_id !== productionId)));
+        setDeleteConfirmOpen(false);
+        
+        try {
+            await deleteProduction(id, productionId);
+            // toast.success is already handled in deleteProduction
+            setProductionToDelete(null);
+        } catch (error: any) {
+            console.error('AnimalProductions - Error deleting production:', error);
+            toast.error(`Failed to delete production: ${error.message || 'Operation failed.'}`);
+            setProductions(originalProductions);
+        }
+    }, [id, productionToDelete, productions]);
+
+    const handleAddProduction = useCallback(() => {
+        if (!id) return;
+        navigate(`/animals/${id}/production/new`);
+    }, [id, navigate]);
+
+    const handleEditProduction = useCallback((productionId: string) => {
+        console.log('Edit clicked for production:', productionId);
+        
+        if (!id || !productionId) {
+            toast.error('Missing animal ID or production ID');
+            return;
+        }
+        
+        // Search for the production using both id and yield_id
+        const production = productions.find(p => p.id === productionId || p.yield_id === productionId);
+        
+        if (!production) {
+            toast.error('Production not found');
+            return;
+        }
+        
+        // Use the productionId passed from the ProductionCard component
+        // This ensures we're using the correct ID (either id or yield_id)
+        navigate(`/animals/${id}/production/${productionId}/edit`, { state: { production } });
+    }, [id, productions, navigate]);
+
+    const generatePDF = useCallback(async () => {
+        if (!pdfContentRef.current || !animal) return;
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const canvas = await html2canvas(pdfContentRef.current, { scale: 2 });
+        const imgData = canvas.toDataURL('image/png');
+        const imgWidth = 190;
+        const pageHeight = 295;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        let heightLeft = imgHeight;
+        let position = 10;
+
+        pdf.setFontSize(18);
+        pdf.setTextColor(0, 102, 204);
+        pdf.text(`${animal.name}'s Production Report`, 10, 20);
+        pdf.setFontSize(10);
+        pdf.setTextColor(100);
+        pdf.text(`Animal ID: ${animal.id} | Location: ${productions[0]?.storage_location?.location_code || 'N/A'} | Generated on: ${format(new Date(), 'PPPp')}`, 10, 28);
+
+        pdf.addImage(imgData, 'PNG', 10, 40, imgWidth, imgHeight);
+        heightLeft -= pageHeight - 40;
+
+        while (heightLeft > 0) {
+            position = heightLeft - imgHeight + 40;
+            pdf.addPage();
+            pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+        }
+
+        pdf.setFontSize(8);
+        pdf.setTextColor(150);
+        pdf.text(`Animal Management System - Page ${pdf.getNumberOfPages()}`, 10, 290);
+        pdf.save(`${animal.name}_productions_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+        toast.success('PDF report generated successfully');
+    }, [animal, productions]);
+
+    const productionCounts = useMemo(() => {
+        const counts = { 
+            all: productions.length, 
+            organic: 0, 
+            recent: 0, 
+            highValue: 0 
+        };
+        productions.forEach(p => {
+            if (p.is_organic) counts.organic++;
+            if (isPast(parseISO(p.production_date)) && (new Date().getTime() - parseISO(p.production_date).getTime()) / (1000 * 60 * 60 * 24) <= 30) counts.recent++; // Last 30 days
+            if (parseFloat(p.total_price || '0') > 100) counts.highValue++; // Arbitrary threshold of $100
+        });
+        return counts;
+    }, [productions]);
+
+    const filteredProductions = useMemo(() => {
+        const lowerCaseTab = activeTab.toLowerCase();
+        if (lowerCaseTab === 'all') return productions;
+        if (lowerCaseTab === 'organic') return productions.filter(p => p.is_organic);
+        if (lowerCaseTab === 'recent') return productions.filter(p => isPast(parseISO(p.production_date)) && (new Date().getTime() - parseISO(p.production_date).getTime()) / (1000 * 60 * 60 * 24) <= 30);
+        if (lowerCaseTab === 'highvalue') return productions.filter(p => parseFloat(p.total_price || '0') > 100);
+        return productions;
+    }, [productions, activeTab]);
+
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentItems = filteredProductions.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(filteredProductions.length / itemsPerPage);
+
+    const handleNextPage = useCallback(() => currentPage < totalPages && setCurrentPage(prev => prev + 1), [currentPage, totalPages]);
+    const handlePrevPage = useCallback(() => currentPage > 1 && setCurrentPage(prev => prev - 1), [currentPage]);
+
+    const renderSkeletons = (count = 6) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {Array.from({ length: count }).map((_, index) => (
+                <Card key={index} className="flex flex-col border-l-4 border-gray-200 dark:border-gray-700">
+                    <CardHeader className="p-4 pb-3">
+                        <Skeleton className="h-5 w-3/4 mb-2" />
+                        <Skeleton className="h-3 w-1/2" />
+                    </CardHeader>
+                    <CardContent className="p-4 pt-2 pb-3 flex-grow">
+                        <div className="flex gap-2 mb-3">
+                            <Skeleton className="h-5 w-16 rounded-full" />
+                            <Skeleton className="h-5 w-20 rounded-full" />
+                        </div>
+                        <Skeleton className="h-4 w-full mb-1" />
+                        <Skeleton className="h-4 w-5/6" />
                     </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
-
-        {/* Pagination */}
-        <div className="flex flex-col items-center gap-4 mt-6 sm:flex-row sm:justify-between">
-          <Button
-            variant="outline"
-            onClick={handlePrevPage}
-            disabled={currentPage === 1}
-            className="font-sans text-foreground dark:text-foreground border-muted-foreground dark:border-muted-foreground hover:bg-muted/10 dark:hover:bg-muted/20 h-10 w-full sm:w-auto max-w-xs"
-          >
-            <ChevronLeft className="h-4 w-4 mr-2" /> Previous
-          </Button>
-          <span className="text-sm text-muted-foreground dark:text-muted-foreground">
-            Page {currentPage} of {totalPages} ({filteredProductions().length} records)
-          </span>
-          <Button
-            variant="outline"
-            onClick={handleNextPage}
-            disabled={currentPage === totalPages}
-            className="font-sans text-foreground dark:text-foreground border-muted-foreground dark:border-muted-foreground hover:bg-muted/10 dark:hover:bg-muted/20 h-10 w-full sm:w-auto max-w-xs"
-          >
-            Next <ChevronRight className="h-4 w-4 ml-2" />
-          </Button>
+                </Card>
+            ))}
         </div>
+    );
 
-        {/* Delete Dialog */}
-        <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-          <DialogContent className="bg-background border-border shadow-md w-[90vw] max-w-md sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-lg font-serif text-foreground dark:text-foreground sm:text-xl">
-                Confirm Deletion
-              </DialogTitle>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                Are you sure you want to delete{' '}
-                <span className="font-medium">
-                  {productionToDelete?.product_category.name} - {productionToDelete?.trace_number}
-                </span>
-                ? This action cannot be undone.
-              </p>
-            </DialogHeader>
-            <DialogFooter className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
-              <Button
-                variant="outline"
-                onClick={() => setDeleteConfirmOpen(false)}
-                className="font-serif w-full text-foreground dark:text-foreground border-muted-foreground dark:border-muted-foreground hover:bg-muted/10 dark:hover:bg-muted/20 h-10 sm:w-auto"
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleConfirmDelete}
-                className="font-serif w-full bg-destructive text-destructive-foreground dark:bg-destructive dark:text-destructive-foreground hover:bg-destructive/90 dark:hover:bg-destructive/80 h-10 sm:w-auto"
-              >
-                Delete
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-    </div>
-  );
+    if (!loading && !animal) {
+        return (
+            <div className="flex items-center justify-center min-h-[calc(100vh-150px)] px-4">
+                <Card className="w-full max-w-md text-center shadow-lg border-destructive/50">
+                    <CardHeader>
+                        <CardTitle className="text-2xl text-destructive flex items-center justify-center gap-2">
+                            <AlertTriangle className="h-6 w-6" />
+                            Animal Not Found
+                        </CardTitle>
+                        <CardDescription>
+                            We couldn't find the animal associated with this ID.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-muted-foreground mb-6">
+                            Please check the ID or navigate back to the animals list.
+                        </p>
+                        <Button variant="outline" onClick={() => navigate('/animals')}>
+                            <ArrowLeft className="mr-2 h-4 w-4" />
+                            Back to Animals
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    return (
+        <TooltipProvider delayDuration={150}>
+            <div className="container mx-auto py-6 px-4 sm:px-6 lg:px-8 max-w-7xl">
+                <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+                    <div className="flex items-center gap-4">
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="outline" size="icon" className="rounded-full flex-shrink-0 h-10 w-10" onClick={() => navigate(`/animals/${id}`)} disabled={!animal}>
+                                    <ArrowLeft className="h-5 w-5" />
+                                    <span className="sr-only">Back</span>
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent><p>Back to {animal?.name || 'Animal'}'s Details</p></TooltipContent>
+                        </Tooltip>
+                        <div className="flex items-center gap-3">
+                            {loading && !animal ? (
+                                <Skeleton className="h-12 w-12 rounded-full" />
+                            ) : (
+                                <Avatar className="h-12 w-12 border">
+                                    <AvatarFallback className="text-lg bg-muted">{animal?.name?.charAt(0)?.toUpperCase() ?? '?'}</AvatarFallback>
+                                </Avatar>
+                            )}
+                            <div>
+                                {loading && !animal ? (
+                                    <>
+                                        <Skeleton className="h-6 w-40 mb-1.5" />
+                                        <Skeleton className="h-4 w-60" />
+                                    </>
+                                ) : (
+                                    <>
+                                        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                                            {animal?.name}'s Production
+                                        </h1>
+                                        <p className="text-sm text-muted-foreground">
+                                            Type: {animal?.animal_type || 'N/A'} | Breed: {animal?.breed || 'N/A'} | Location: {productions[0]?.storage_location?.location_code || 'N/A'}
+                                        </p>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                        <Button onClick={handleAddProduction} disabled={loading || !animal} className="w-full sm:w-auto">
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add New Production
+                        </Button>
+                        <Button onClick={generatePDF} variant="outline" disabled={loading || !animal || !productions.length} className="w-full sm:w-auto">
+                            <Download className="mr-2 h-4 w-4" />
+                            Download PDF
+                        </Button>
+                    </div>
+                </header>
+
+                <Separator className="mb-6" />
+
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                    <TabsList className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full sm:w-auto mb-6 h-auto p-1.5">
+                        <TabsTrigger value="all" className="py-1.5 text-xs sm:text-sm">All <Badge variant="secondary" className="ml-1.5 px-1.5">{productionCounts.all}</Badge></TabsTrigger>
+                        <TabsTrigger value="organic" className="py-1.5 text-xs sm:text-sm">Organic <Badge variant="secondary" className="ml-1.5 px-1.5">{productionCounts.organic}</Badge></TabsTrigger>
+                        <TabsTrigger value="recent" className="py-1.5 text-xs sm:text-sm">Recent <Badge variant="secondary" className="ml-1.5 px-1.5">{productionCounts.recent}</Badge></TabsTrigger>
+                        <TabsTrigger value="highValue" className="py-1.5 text-xs sm:text-sm">High Value <Badge variant="secondary" className="ml-1.5 px-1.5">{productionCounts.highValue}</Badge></TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value={activeTab}>
+                        {isInitialLoad ? (
+                            renderSkeletons()
+                        ) : currentItems.length === 0 ? (
+                            <Card className="border-dashed border-border shadow-none mt-8">
+                                <CardContent className="py-12 flex flex-col items-center text-center">
+                                    <div className="p-3 rounded-full bg-muted mb-4">
+                                        {activeTab === 'all' && <Inbox className="h-10 w-10 text-muted-foreground" />}
+                                        {activeTab === 'organic' && <Tag className="h-10 w-10 text-green-500" />}
+                                        {activeTab === 'recent' && <Clock className="h-10 w-10 text-blue-500" />}
+                                        {activeTab === 'highValue' && <DollarSign className="h-10 w-10 text-yellow-500" />}
+                                    </div>
+                                    <h3 className="text-xl font-semibold text-foreground mb-1">
+                                        No {activeTab !== 'all' ? `${activeTab} ` : ''}Production Records Found
+                                    </h3>
+                                    <p className="text-muted-foreground mb-6 max-w-sm">
+                                        {activeTab === 'all'
+                                            ? `There are currently no production records for ${animal?.name ?? 'this animal'}. Add one!`
+                                            : `No production records match the filter "${activeTab}".`}
+                                    </p>
+                                    {activeTab === 'all' && (
+                                        <Button onClick={handleAddProduction} disabled={!animal}>
+                                            <Plus className="mr-2 h-4 w-4" />
+                                            Add First Production
+                                        </Button>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            <div ref={pdfContentRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                                {currentItems.map((production) => (
+                                    <ProductionCard
+                                        key={production.id}
+                                        production={production}
+                                        animalId={id!}
+                                        onEdit={handleEditProduction}
+                                        onDelete={handleDeleteClick}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </TabsContent>
+                </Tabs>
+
+                {filteredProductions.length > itemsPerPage && (
+                    <div className="flex flex-col items-center gap-4 mt-6 sm:flex-row sm:justify-between">
+                        <Button
+                            variant="outline"
+                            onClick={handlePrevPage}
+                            disabled={currentPage === 1}
+                            className="w-full sm:w-auto"
+                        >
+                            <ChevronLeft className="h-4 w-4 mr-2" /> Previous
+                        </Button>
+                        <span className="text-sm text-muted-foreground">
+                            Page {currentPage} of {totalPages} ({filteredProductions.length} records)
+                        </span>
+                        <Button
+                            variant="outline"
+                            onClick={handleNextPage}
+                            disabled={currentPage === totalPages}
+                            className="w-full sm:w-auto"
+                        >
+                            Next <ChevronRight className="h-4 w-4 ml-2" />
+                        </Button>
+                    </div>
+                )}
+
+<Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+                    <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                            <DialogTitle className="text-xl flex items-center gap-2">
+                                <AlertTriangle className="h-5 w-5 text-destructive" /> Confirm Deletion
+                            </DialogTitle>
+                            <DialogDescription className="pt-2">
+                                Are you sure you want to permanently delete the production record: <br />
+                                <strong className="px-1 text-foreground">{productionToDelete?.product_category.name} - {productionToDelete?.trace_number}</strong>?
+                                <br /> This action cannot be undone.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter className="mt-4 gap-2 flex-col-reverse sm:flex-row sm:justify-end">
+                            <DialogClose asChild>
+                                <Button variant="outline">Cancel</Button>
+                            </DialogClose>
+                            <Button variant="destructive" onClick={handleConfirmDelete}>
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete Production
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            </div>
+        </TooltipProvider>
+    );
 };
 
 export default AnimalProductions;

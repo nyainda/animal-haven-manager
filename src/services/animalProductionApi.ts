@@ -81,6 +81,7 @@ export interface ProductionFormData {
 
 export interface Production extends ProductionFormData {
   id: string;
+  yield_id?: string; // Added yield_id to the interface
   animal_id: string;
   user_id: string;
   product_category_id?: string;
@@ -103,22 +104,104 @@ export interface ProductionStatistics {
   organic_vs_non_organic: { [key: string]: number };
 }
 
-let csrfTokenFetched = false;
+interface ApiResponse {
+  code: number;
+  data: Production[];
+  message: string;
+  success: boolean;
+}
 
-const fetchCsrfToken = async (): Promise<void> => {
-  if (csrfTokenFetched) return;
+// Animal production types mapping
+export const productionTypesByAnimal = {
+  // Dairy animals
+  cattle: ["Milk", "Meat"],
+  goat: ["Milk", "Meat"],
+  sheep: ["Milk", "Meat", "Wool"],
+  buffalo: ["Milk", "Meat"],
+  camel: ["Milk", "Meat"],
+  donkey: ["Milk"],
+  
+  // Poultry/birds
+  chicken: ["Eggs", "Meat"],
+  duck: ["Eggs", "Meat"],
+  turkey: ["Eggs", "Meat"],
+  quail: ["Eggs", "Meat"],
+  pheasant: ["Eggs", "Meat"],
+  geese: ["Eggs", "Meat"],
+  ostrich: ["Eggs", "Meat"],
+  emu: ["Eggs", "Meat"],
+  "guinea fowl": ["Eggs", "Meat"],
+  
+  // Meat animals
+  pig: ["Meat"],
+  rabbit: ["Meat", "Fur"],
+  deer: ["Meat", "Antlers"],
+  bison: ["Meat"],
+  
+  // Fiber animals
+  alpaca: ["Fiber", "Meat"],
+  llama: ["Fiber", "Meat"],
+  
+  // Working animals
+  horse: ["Service"],
+  mule: ["Service"],
+  
+  // Aquaculture
+  fish: ["Meat"],
+  
+  // For custom animals
+  other: ["Custom Production"]
+};
+
+// Production measurement units mapping
+export const measurementUnitsByProductionType = {
+  Milk: ["Liters", "Gallons", "kg"],
+  Eggs: ["Count", "Dozen"],
+  Meat: ["kg", "lbs"],
+  Wool: ["kg", "lbs"],
+  Fiber: ["kg", "lbs"],
+  Fur: ["Count", "kg"],
+  Antlers: ["Count", "kg"],
+  Service: ["Hours", "Days"],
+  "Custom Production": ["Custom Unit"]
+};
+
+// Production quality grades mapping
+export const qualityGradesByProductionIQType = {
+  Milk: ["Grade A", "Grade B", "Premium", "Organic", "Raw"],
+  Eggs: ["Grade A", "Grade B", "Premium", "Organic", "Free Range"],
+  Meat: ["Premium", "Standard", "Organic", "Grass-fed", "Grain-fed"],
+  Wool: ["Fine", "Medium", "Coarse", "Premium"],
+  Fiber: ["Fine", "Medium w", "Coarse", "Premium"],
+  Fur: ["Premium", "Standard"],
+  Antlers: ["Premium", "Standard"],
+  Service: ["Certified", "Trained", "In Training"],
+  "Custom Production": ["Custom Grade"]
+};
+
+// Production methods mapping
+export const productionMethodsByProductionType = {
+  Milk: ["Traditional Milking", "Machine Milking", "Robotic Milking", "Organic"],
+  Eggs: ["Free Range", "Cage-Free", "Conventional", "Organic", "Pastured"],
+  Meat: ["Grass-Fed", "Grain-Fed", "Organic", "Free Range", "Conventional"],
+  Wool: ["Hand Shearing", "Machine Shearing"],
+  Fiber: ["Hand Shearing", "Machine Shearing"],
+  Fur: ["Traditional", "Humane"],
+  Antlers: ["Natural Shed", "Harvested"],
+  Service: ["Training", "Working", "Recreational"],
+  "Custom Production": ["Custom Method"]
+};
+
+const fetchCsrfToken = async () => {
   try {
     const response = await fetch(CSRF_URL, {
       method: 'GET',
       credentials: 'include',
     });
-    if (!response.ok) {
-      throw new Error(`CSRF token fetch failed with status ${response.status}`);
-    }
-    console.log('CSRF token fetched successfully');
-    csrfTokenFetched = true;
+    if (!response.ok) throw new Error(`Failed to fetch CSRF token: ${response.status}`);
+    console.log('[PRODUCTION] CSRF token fetched successfully');
   } catch (error) {
-    console.error('CSRF token fetch failed:', error);
+    console.error('[PRODUCTION] CSRF fetch failed:', error);
     throw error;
   }
 };
@@ -129,9 +212,6 @@ const getAuthHeaders = (): Record<string, string> => {
     .split('; ')
     .find((row) => row.startsWith('XSRF-TOKEN='))
     ?.split('=')[1];
-
-  console.log('Auth token:', token, 'XSRF token:', xsrfToken); // Debug tokens
-  if (!token) console.warn('No auth token found in localStorage');
 
   return {
     'Content-Type': 'application/json',
@@ -157,9 +237,11 @@ export const fetchProductions = async (animalId: string): Promise<Production[]> 
       throw new Error(errorData.message || `Failed to fetch productions: ${response.status}`);
     }
 
-    const responseData = await response.json();
+    const responseData: ApiResponse = await response.json();
     console.log('Productions response:', responseData);
-    const productionList = Array.isArray(responseData) ? responseData : responseData.data || [];
+
+    // Extract the 'data' property, default to empty array if missing
+    const productionList = responseData.data || [];
     if (!productionList.length) console.log('No productions returned for animal:', animalId);
     return productionList;
   } catch (error) {
@@ -167,8 +249,6 @@ export const fetchProductions = async (animalId: string): Promise<Production[]> 
     throw error;
   }
 };
-
-// ... (other functions remain unchanged unless you report issues with them)
 
 export const fetchProduction = async (animalId: string, productionId: string): Promise<Production> => {
   try {
@@ -194,7 +274,6 @@ export const fetchProduction = async (animalId: string, productionId: string): P
     throw error;
   }
 };
-
 
 export const createProduction = async (animalId: string, productionData: ProductionFormData): Promise<Production> => {
   try {
@@ -239,7 +318,14 @@ export const updateProduction = async (
       ...productionData,
     };
 
-    const response = await fetch(`${API_URL}/${animalId}/production/${productionId}`, {
+    // Determine which ID to use for the API endpoint
+    // Check if the production object itself has a yield_id
+    const production = productionData as Production;
+    const idToUse = production.yield_id || productionId;
+    
+    console.log(`[PRODUCTION] Updating production using ID: ${idToUse} (yield_id: ${production.yield_id}, productionId: ${productionId})`);
+    
+    const response = await fetch(`${API_URL}/${animalId}/production/${idToUse}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       credentials: 'include',
@@ -260,22 +346,33 @@ export const updateProduction = async (
   }
 };
 
-export const deleteProduction = async (animalId: string, productionId: string): Promise<void> => {
+// Modified to support yield_id for deletion
+export const deleteProduction = async (animalId: string, productionIdOrYieldId: string): Promise<void> => {
+  await fetchCsrfToken(); // Fetch CSRF token first
   try {
-    await fetchCsrfToken();
-    const response = await fetch(`${API_URL}/${animalId}/production/${productionId}`, {
+    // Use the provided ID (which could be either production ID or yield_id)
+    const url = `${API_URL}/${animalId}/production/${productionIdOrYieldId}`;
+    console.log('[PRODUCTION] Deleting production at:', url);
+    
+    const response = await fetch(url, {
       method: 'DELETE',
       headers: getAuthHeaders(),
       credentials: 'include',
     });
 
+    console.log('[PRODUCTION] Delete Production Status:', response.status);
+    const rawData = await response.json();
+    console.log('[PRODUCTION] Raw Delete Production Response:', rawData);
+
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to delete production');
+      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
+      throw new Error(errorMessage);
     }
-    toast.success('Production deleted successfully');
+
+    toast.success(rawData.message || 'Production deleted successfully');
   } catch (error) {
-    console.error(`Error deleting production ${productionId}:`, error);
+    console.error(`[PRODUCTION] Error deleting production ${productionIdOrYieldId} for animal ${animalId}:`, error);
+    toast.error(`Failed to delete production: ${error instanceof Error ? error.message : 'Unknown error'}`);
     throw error;
   }
 };
@@ -283,8 +380,8 @@ export const deleteProduction = async (animalId: string, productionId: string): 
 export const fetchProductionStatistics = async (animalId: string): Promise<ProductionStatistics> => {
   try {
     await fetchCsrfToken();
-    const url = `${API_URL}/${animalId}/production-statistics`; // Updated endpoint
-    console.log('Fetching production statistics from:', url); // Debug log
+    const url = `${API_URL}/${animalId}/production-statistics`;
+    console.log('Fetching production statistics from:', url);
     const response = await fetch(url, {
       method: 'GET',
       headers: getAuthHeaders(),
@@ -297,7 +394,7 @@ export const fetchProductionStatistics = async (animalId: string): Promise<Produ
     }
 
     const data = await response.json();
-    console.log('Production statistics response:', data); // Debug log
+    console.log('Production statistics response:', data);
     return data.data || data;
   } catch (error) {
     console.error(`Error fetching production statistics for animal ${animalId}:`, error);

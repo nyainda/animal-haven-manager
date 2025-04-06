@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate, NavigateFunction } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { 
   ArrowLeft, Edit, Trash2, AlertTriangle, MoreHorizontal, 
   FileText, Activity, Heart, PiggyBank, CheckSquare, Tag,
-  LucideProps
+  Calendar, Info, Layers, ExternalLink
 } from 'lucide-react';
 import { 
-  Card, CardContent, CardHeader, CardTitle 
+  Card, CardContent, CardHeader, CardTitle, CardFooter
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +16,8 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, 
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Separator } from '@/components/ui/separator';
+import { Avatar } from '@/components/ui/avatar';
 import { fetchAnimal } from '@/services/animalService';
 import { fetchSuppliers, Supplier } from '@/services/supplierApi';
 import { fetchProductions, Production } from '@/services/animalProductionApi';
@@ -26,30 +28,48 @@ import { Animal } from '@/types/AnimalTypes';
 interface QuickAction {
   label: string;
   href: string;
-  icon: React.ForwardRefExoticComponent<Omit<LucideProps, "ref"> & React.RefAttributes<SVGSVGElement>>;
+  description: string;
+  icon: React.FC<React.SVGProps<SVGSVGElement>>;
 }
 
-interface QuickActionsProps {
-  actions: QuickAction[];
-  navigate: NavigateFunction;
-}
+const QuickActionCard = ({ action, onClick }: { action: QuickAction; onClick: () => void }) => (
+  <Card 
+    className="overflow-hidden cursor-pointer transition-all border-muted hover:border-primary/50 hover:shadow-md group"
+    onClick={onClick}
+  >
+    <CardContent className="p-4 flex items-center space-x-3">
+      <div className="bg-primary/10 p-2 rounded-lg group-hover:bg-primary/20 transition-colors">
+        <action.icon className="h-5 w-5 text-primary" />
+      </div>
+      <div className="space-y-1">
+        <h3 className="font-medium text-sm">{action.label}</h3>
+        <p className="text-xs text-muted-foreground">{action.description}</p>
+      </div>
+    </CardContent>
+  </Card>
+);
 
-const QuickActions = React.memo(({ actions, navigate }: QuickActionsProps) => (
-  <div className="grid grid-cols-1 gap-2">
-    {actions.map((action) => (
-      <Button 
-        key={action.label} 
-        variant="outline" 
-        size="sm"
-        className="w-full justify-start h-10 px-3 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors border border-input rounded-md"
-        onClick={() => navigate(action.href)}
-      >
-        <action.icon className="h-4 w-4 mr-2" />
-        {action.label}
-      </Button>
-    ))}
+const AnimalsDetailsSkeleton = () => (
+  <div className="max-w-7xl mx-auto px-4 py-8 md:px-6 space-y-8">
+    <div className="flex items-center gap-4">
+      <div className="rounded-full bg-muted h-16 w-16 animate-pulse" />
+      <div className="space-y-2">
+        <div className="h-6 w-32 bg-muted rounded animate-pulse" />
+        <div className="h-4 w-24 bg-muted rounded animate-pulse" />
+      </div>
+    </div>
+    
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2 space-y-6">
+        <div className="bg-muted h-96 rounded-lg animate-pulse" />
+      </div>
+      <div className="space-y-6">
+        <div className="bg-muted h-64 rounded-lg animate-pulse" />
+        <div className="bg-muted h-64 rounded-lg animate-pulse" />
+      </div>
+    </div>
   </div>
-));
+);
 
 const AnimalDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -85,7 +105,11 @@ const AnimalDetails: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('overview');
 
   useEffect(() => {
-    if (!id) return;
+    if (!id) {
+      toast.error('Animal ID is missing.');
+      navigate('/animals');
+      return;
+    }
 
     const controller = new AbortController();
     
@@ -98,17 +122,21 @@ const AnimalDetails: React.FC = () => {
           fetchProductions(id)
         ]);
 
+        console.log('Fetched productions for AnimalDetails:', productionsData); // Debug log
+
         setData(prev => ({
           ...prev,
           animal: animalData,
           suppliers: suppliersData,
-          productions: productionsData
+          productions: productionsData.sort((a, b) => parseISO(b.created_at).getTime() - parseISO(a.created_at).getTime())
         }));
         setError(null);
+        if (!productionsData.length) toast.info('No production records found for this animal.');
       } catch (err) {
         if (!controller.signal.aborted) {
           setError('Failed to load data');
           toast.error('Error loading animal details');
+          console.error('Error fetching data:', err);
         }
       } finally {
         setLoadingStates(prev => ({ ...prev, main: false }));
@@ -138,7 +166,7 @@ const AnimalDetails: React.FC = () => {
     fetchTasks();
 
     return () => controller.abort();
-  }, [id]);
+  }, [id, navigate]);
 
   const formatDate = useCallback((dateString?: string | null): string => {
     return dateString ? format(parseISO(dateString), 'PPP') : 'Not specified';
@@ -172,20 +200,52 @@ const AnimalDetails: React.FC = () => {
   const handleDelete = () => toast.error('Delete functionality not implemented yet');
 
   const quickActions: QuickAction[] = [
-    { label: 'Activities', href: `/animals/${id}/activities`, icon: Activity },
-    { label: 'Health', href: `/animals/${id}/health`, icon: Heart },
-    { label: 'Notes', href: `/animals/${id}/notes`, icon: FileText },
-    { label: 'Production', href: `/animals/${id}/production`, icon: PiggyBank },
-    { label: 'Tasks', href: `/animals/${id}/tasks`, icon: CheckSquare },
-    { label: 'Suppliers', href: `/animals/${id}/suppliers`, icon: Tag },
+    { label: 'Activities', href: `/animals/${id}/activities`, icon: Activity, description: 'View activity history' },
+    { label: 'Health', href: `/animals/${id}/health`, icon: Heart, description: 'Health records & checkups' },
+    { label: 'Notes', href: `/animals/${id}/notes`, icon: FileText, description: 'Notes & observations' },
+    { label: 'Production', href: `/animals/${id}/production`, icon: PiggyBank, description: 'Production metrics' },
+    { label: 'Tasks', href: `/animals/${id}/tasks`, icon: CheckSquare, description: 'Scheduled tasks' },
+    { label: 'Suppliers', href: `/animals/${id}/suppliers`, icon: Tag, description: 'Supplier management' },
   ];
 
-  if (loadingStates.main) {
+  const getAnimalTypeIcon = (type?: string) => {
+    switch(type?.toLowerCase()) {
+      case 'cow': case 'cattle': case 'bull': return '🐄';
+      case 'sheep': return '🐑';
+      case 'goat': return '🐐';
+      case 'pig': return '🐖';
+      case 'chicken': return '🐓';
+      case 'horse': return '🐎';
+      default: return '🦮';
+    }
+  };
+
+  const getAnimalAvatar = (animal: Animal) => {
+    const initials = animal.name.substring(0, 2).toUpperCase();
+    const animalIcon = getAnimalTypeIcon(animal.type);
+    
+    const typeColors = {
+      'cow': 'bg-blue-600',
+      'cattle': 'bg-blue-600',
+      'bull': 'bg-blue-800',
+      'sheep': 'bg-gray-600',
+      'goat': 'bg-amber-600',
+      'pig': 'bg-pink-600',
+      'chicken': 'bg-yellow-600',
+      'horse': 'bg-brown-600',
+    };
+    
+    const bgColor = typeColors[animal.type?.toLowerCase()] || 'bg-primary';
+    
     return (
-      <div className="min-h-[80vh] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary" />
-      </div>
+      <Avatar className={`h-16 w-16 text-lg ${bgColor} text-white`}>
+        <span>{animalIcon || initials}</span>
+      </Avatar>
     );
+  };
+
+  if (loadingStates.main) {
+    return <AnimalsDetailsSkeleton />;
   }
 
   if (error || !data.animal) {
@@ -208,21 +268,34 @@ const AnimalDetails: React.FC = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 md:px-6">
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <div className="flex items-center gap-3 flex-wrap">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/animals')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <h1 className="text-2xl font-bold tracking-tight">{data.animal.name}</h1>
-          <Badge className={cn("ml-2", getStatusColor(data.animal.status))}>
-            {data.animal.status}
-          </Badge>
+    <div className="max-w-7xl mx-auto px-4 py-8 md:px-6 space-y-8">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="flex items-center gap-4">
+          {getAnimalAvatar(data.animal)}
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold tracking-tight">{data.animal.name}</h1>
+              <Badge className={cn("ml-1", getStatusColor(data.animal.status))}>
+                {data.animal.status}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-2 mt-1 text-muted-foreground">
+              <span>{data.animal.type}</span>
+              <span>•</span>
+              <span>{data.animal.breed}</span>
+              <span>•</span>
+              <span>ID: {data.animal.tag_number}</span>
+            </div>
+          </div>
         </div>
 
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => navigate(`/animals/${id}/edit`)}>
+          <Button variant="outline" size="sm" onClick={() => navigate('/animals')}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <Button variant="default" size="sm" onClick={() => navigate(`/animals/${id}/edit`)}>
             <Edit className="h-4 w-4 mr-2" />
             Edit
           </Button>
@@ -256,207 +329,334 @@ const AnimalDetails: React.FC = () => {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </header>
+      </div>
+
+      {/* Overview Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="border-l-4 border-l-primary">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-muted-foreground">Age</p>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <p className="text-2xl font-bold mt-2">{data.animal.age} years</p>
+            <p className="text-xs text-muted-foreground mt-1">Born: {formatDate(data.animal.birth_date)}</p>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-l-4 border-l-blue-500">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-muted-foreground">Gender</p>
+              <Info className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <p className="text-2xl font-bold mt-2">{data.animal.gender}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {data.animal.is_breeding_stock ? 'Breeding Stock' : 'Not Breeding Stock'}
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-l-4 border-l-amber-500">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-muted-foreground">Production</p>
+              <PiggyBank className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <p className="text-2xl font-bold mt-2">{data.productions.length}</p>
+            <p className="text-xs text-muted-foreground mt-1">Production Records</p>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-l-4 border-l-green-500">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-muted-foreground">Tasks</p>
+              <CheckSquare className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <p className="text-2xl font-bold mt-2">{data.upcomingTasks.length}</p>
+            <p className="text-xs text-muted-foreground mt-1">Pending Tasks</p>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <Card className="shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader className="bg-muted/50">
-              <CardTitle className="text-xl">Animal Information</CardTitle>
+          <Card className="shadow-sm overflow-hidden">
+            <CardHeader className="bg-muted/30 border-b pb-3">
+              <CardTitle className="flex items-center text-xl">
+                <Info className="h-5 w-5 mr-2 text-primary" />
+                Animal Information
+              </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6">
+            
+            <CardContent className="p-0">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-6 rounded-lg bg-muted p-1">
+                <TabsList className="flex w-full h-12 rounded-none border-b bg-transparent p-0">
                   {['overview', 'details', 'birth', 'production', 'suppliers'].map(tab => (
                     <TabsTrigger 
                       key={tab}
                       value={tab}
-                      className="capitalize transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm text-sm"
+                      className="flex-1 h-full capitalize rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent transition-all"
                     >
                       {tab}
                     </TabsTrigger>
                   ))}
                 </TabsList>
 
-                <TabsContent value="overview" className="space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {[
-                      { label: 'Animal Type', value: data.animal.type },
-                      { label: 'Breed', value: data.animal.breed },
-                      { label: 'Gender', value: data.animal.gender },
-                      { label: 'Tag Number', value: data.animal.tag_number || 'None' },
-                      { label: 'Birth Date', value: formatDate(data.animal.birth_date) },
-                      { label: 'Status', value: (
-                        <Badge className={getStatusColor(data.animal.status)}>
-                          {data.animal.status}
-                        </Badge>
-                      )},
-                      { label: 'Age', value: `${data.animal.age} years` }, // Added
-                      { label: 'Internal ID', value: data.animal.internal_id }, // Added
-                      { label: 'Animal ID', value: data.animal.animal_id }, // Added
-                    ].map((item, idx) => (
-                      <div key={idx} className="min-w-0">
-                        <h3 className="text-sm text-muted-foreground font-medium truncate">{item.label}</h3>
-                        <p className="mt-1 text-base font-medium truncate">{item.value}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div>
-                    <h3 className="text-sm text-muted-foreground font-medium mb-3">Quick Actions</h3>
-                    <QuickActions actions={quickActions} navigate={navigate} />
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="details" className="space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {[
-                      { label: 'Breeding Stock', value: data.animal.is_breeding_stock ? 'Yes' : 'No' }, // Added
-                      { label: 'Deceased', value: data.animal.is_deceased ? 'Yes' : 'No' }, // Added
-                      { label: 'Origin', value: data.animal.raised_purchased || 'Not specified' },
-                      { label: 'Next Checkup', value: formatDate(data.animal.next_checkup_date) },
-                      { label: 'Breeder Info', value: data.animal.breeder_info || 'Not specified' }, // Added
-                    ].map((item, idx) => (
-                      <div key={idx} className="min-w-0">
-                        <h3 className="text-sm text-muted-foreground font-medium truncate">{item.label}</h3>
-                        <p className="mt-1 text-base font-medium truncate">{item.value}</p>
-                      </div>
-                    ))}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="birth" className="space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {[
-                      { label: 'Birth Date', value: formatDate(data.animal.birth_date) },
-                      { label: 'Birth Time', value: data.animal.birth_time || 'Not recorded' },
-                      { label: 'Birth Weight', value: data.animal.birth_weight ? `${data.animal.birth_weight} ${data.animal.weight_unit}` : 'Not recorded' },
-                      { label: 'Birth Status', value: data.animal.birth_status || 'Not specified' },
-                      { label: 'Health at Birth', value: data.animal.health_at_birth || 'Not specified' }, // Added
-                      { label: 'Multiple Birth', value: data.animal.multiple_birth ? 'Yes' : 'No' }, // Added
-                    ].map((item, idx) => (
-                      <div key={idx} className="min-w-0">
-                        <h3 className="text-sm text-muted-foreground font-medium truncate">{item.label}</h3>
-                        <p className="mt-1 text-base font-medium truncate">{item.value}</p>
-                      </div>
-                    ))}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="production" className="space-y-4">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <h3 className="text-base font-medium">Production Records</h3>
-                    <Button size="sm" onClick={() => navigate(`/animals/${id}/production`)}>
-                      <PiggyBank className="h-4 w-4 mr-2" />
-                      Manage Production
-                    </Button>
-                  </div>
-                  {data.productions.length > 0 ? (
-                    <div className="space-y-3">
-                      {data.productions.slice(0, 3).map((production) => (
-                        <div key={production.id} className="border rounded-lg p-3 bg-background">
-                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">{production.product_category.name}</p>
-                              <p className="text-xs text-muted-foreground mt-1 truncate">
-                                {formatDate(production.production_date)} - {production.quantity}{' '}
-                                {production.product_category.measurement_unit}
-                              </p>
+                <div className="p-6">
+                  <TabsContent value="overview" className="space-y-6 mt-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {[
+                        { label: 'Animal Type', value: data.animal.type, icon: Layers },
+                        { label: 'Breed', value: data.animal.breed, icon: Tag },
+                        { label: 'Gender', value: data.animal.gender, icon: Info },
+                        { label: 'Tag Number', value: data.animal.tag_number || 'None', icon: Tag },
+                        { label: 'Birth Date', value: formatDate(data.animal.birth_date), icon: Calendar },
+                        { label: 'Status', value: (
+                          <Badge className={getStatusColor(data.animal.status)}>
+                            {data.animal.status}
+                          </Badge>
+                        ), icon: Activity },
+                        { label: 'Age', value: `${data.animal.age} years`, icon: Calendar }, 
+                        { label: 'Internal ID', value: data.animal.internal_id, icon: Tag }, 
+                        { label: 'Animal ID', value: data.animal.animal_id, icon: Tag }, 
+                      ].map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                          <div className="bg-primary/10 p-2 rounded-full">
+                            <item.icon className="h-4 w-4 text-primary" />
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="text-sm text-muted-foreground font-medium truncate">{item.label}</h3>
+                            <div className="mt-1 text-base font-medium truncate">
+                              {typeof item.value === 'string' ? item.value : item.value}
                             </div>
-                            <Badge className={getQualityStatusColor(production.quality_status)}>
-                              {production.quality_status}
-                            </Badge>
                           </div>
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No production records available</p>
-                  )}
-                </TabsContent>
+                  </TabsContent>
 
-                <TabsContent value="suppliers" className="space-y-4">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <h3 className="text-base font-medium">Suppliers</h3>
-                    <Button size="sm" onClick={() => navigate(`/animals/${id}/suppliers`)}>
-                      <Tag className="h-4 w-4 mr-2" />
-                      Manage Suppliers
-                    </Button>
-                  </div>
-                  {data.suppliers.length > 0 ? (
-                    <div className="space-y-3">
-                      {data.suppliers.slice(0, 3).map((supplier) => (
-                        <div key={supplier.id} className="border rounded-lg p-3 bg-background">
-                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">{supplier.name}</p>
-                              <p className="text-xs text-muted-foreground mt-1 truncate">
-                                Ends: {formatDate(supplier.contract_end_date)}
-                              </p>
-                            </div>
-                            <Badge className={getSupplierImportanceColor(supplier.supplier_importance)}>
-                              {supplier.supplier_importance}
-                            </Badge>
+                  <TabsContent value="details" className="space-y-6 mt-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {[
+                        { label: 'Breeding Stock', value: data.animal.is_breeding_stock ? 'Yes' : 'No', icon: Heart },
+                        { label: 'Deceased', value: data.animal.is_deceased ? 'Yes' : 'No', icon: AlertTriangle },
+                        { label: 'Origin', value: data.animal.raised_purchased || 'Not specified', icon: ExternalLink },
+                        { label: 'Next Checkup', value: formatDate(data.animal.next_checkup_date), icon: Calendar },
+                        { label: 'Breeder Info', value: data.animal.breeder_info || 'Not specified', icon: Info },
+                      ].map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                          <div className="bg-primary/10 p-2 rounded-full">
+                            <item.icon className="h-4 w-4 text-primary" />
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="text-sm text-muted-foreground font-medium truncate">{item.label}</h3>
+                            <div className="mt-1 text-base font-medium truncate">{item.value}</div>
                           </div>
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No suppliers available</p>
-                  )}
-                </TabsContent>
+                  </TabsContent>
+
+                  <TabsContent value="birth" className="space-y-6 mt-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {[
+                        { label: 'Birth Date', value: formatDate(data.animal.birth_date), icon: Calendar },
+                        { label: 'Birth Time', value: data.animal.birth_time || 'Not recorded', icon: Calendar },
+                        { label: 'Birth Weight', value: data.animal.birth_weight ? `${data.animal.birth_weight} ${data.animal.weight_unit}` : 'Not recorded', icon: Activity },
+                        { label: 'Birth Status', value: data.animal.birth_status || 'Not specified', icon: Info },
+                        { label: 'Health at Birth', value: data.animal.health_at_birth || 'Not specified', icon: Heart },
+                        { label: 'Multiple Birth', value: data.animal.multiple_birth ? 'Yes' : 'No', icon: Layers },
+                      ].map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                          <div className="bg-primary/10 p-2 rounded-full">
+                            <item.icon className="h-4 w-4 text-primary" />
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="text-sm text-muted-foreground font-medium truncate">{item.label}</h3>
+                            <div className="mt-1 text-base font-medium truncate">{item.value}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="production" className="space-y-6 mt-0">
+  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <h3 className="text-base font-medium flex items-center">
+      <PiggyBank className="h-4 w-4 mr-2 text-primary" />
+      Production Records
+    </h3>
+    <Button size="sm" onClick={() => navigate(`/animals/${id}/production`)}>
+      Manage Production
+    </Button>
+  </div>
+  {data.productions.length > 0 ? (
+    <div className="space-y-4">
+      {data.productions.slice(0, 3).map((production, idx) => (
+        <Card
+          key={production.id}
+          className={`overflow-hidden transition-shadow hover:shadow-md ${
+            idx % 2 === 0 ? 'bg-muted/20' : 'bg-background'
+          }`}
+        >
+          <CardContent className="p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Left Section: Product Info */}
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 p-2 rounded-full flex-shrink-0">
+                  <PiggyBank className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate">
+                    {production.product_category.name} - {production.trace_number}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {format(parseISO(production.production_date), 'MMM d, yyyy, h:mm a')}
+                  </p>
+                </div>
+              </div>
+              {/* Right Section: Metrics */}
+              <div className="flex items-center justify-between gap-3 sm:justify-end">
+                <div className="text-right">
+                  <p className="text-sm font-bold">
+                    {production.quantity} {production.product_category.measurement_unit}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    ${parseFloat(production.total_price).toFixed(2) || '0.00'}
+                  </p>
+                </div>
+                <Badge className={getQualityStatusColor(production.quality_status)}>
+                  {production.quality_status}
+                </Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="w-full text-primary hover:text-primary/80"
+        onClick={() => navigate(`/animals/${id}/production`)}
+      >
+        View All Production Records
+      </Button>
+    </div>
+  ) : (
+    <div className="text-center py-8 bg-muted/20 rounded-lg">
+      <PiggyBank className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
+      <p className="text-sm text-muted-foreground mb-2">No production records available</p>
+      <Button variant="outline" size="sm" onClick={() => navigate(`/animals/${id}/production/new`)}>
+        Add Production Record
+      </Button>
+    </div>
+  )}
+</TabsContent>
+
+                  <TabsContent value="suppliers" className="space-y-6 mt-0">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <h3 className="text-base font-medium flex items-center">
+                        <Tag className="h-4 w-4 mr-2 text-primary" /> 
+                        Suppliers
+                      </h3>
+                      <Button size="sm" onClick={() => navigate(`/animals/${id}/suppliers`)}>
+                        Manage Suppliers
+                      </Button>
+                    </div>
+                    {data.suppliers.length > 0 ? (
+                      <div className="space-y-3">
+                        {data.suppliers.slice(0, 3).map((supplier, idx) => (
+                          <Card key={supplier.id} className={`overflow-hidden ${idx % 2 === 0 ? 'bg-muted/20' : 'bg-background'}`}>
+                            <CardContent className="p-4">
+                              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                                <div className="flex items-center gap-3">
+                                  <div className="bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 p-2 rounded-full">
+                                    <Tag className="h-5 w-5" />
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium">{supplier.name}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      Contract Ends: {formatDate(supplier.contract_end_date)}
+                                    </p>
+                                  </div>
+                                </div>
+                                <Badge className={getSupplierImportanceColor(supplier.supplier_importance)}>
+                                  {supplier.supplier_importance}
+                                </Badge>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-primary hover:text-primary/80"
+                          onClick={() => navigate(`/animals/${id}/suppliers`)}
+                        >
+                          View All Suppliers
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 bg-muted/20 rounded-lg">
+                        <Tag className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground mb-2">No suppliers available</p>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => navigate(`/animals/${id}/suppliers/new`)}
+                        >
+                          Add Supplier
+                        </Button>
+                      </div>
+                    )}
+                  </TabsContent>
+                </div>
               </Tabs>
             </CardContent>
           </Card>
         </div>
 
         <aside className="space-y-6">
-          <Card className="shadow-sm border border-input">
-            <CardHeader className="bg-muted/50 border-b border-input">
-              <CardTitle className="text-lg font-semibold text-foreground">Quick Access</CardTitle>
+          <Card className="shadow-sm overflow-hidden">
+            <CardHeader className="bg-muted/30 border-b pb-3">
+              <CardTitle className="flex items-center text-xl">
+                <CheckSquare className="h-5 w-5 mr-2 text-primary" />
+                Upcoming Tasks
+              </CardTitle>
             </CardHeader>
-            <CardContent className="p-4">
-              <QuickActions actions={quickActions} navigate={navigate} />
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm border border-input">
-            <CardHeader className="bg-muted/50 border-b border-input">
-              <CardTitle className="text-lg font-semibold text-foreground">Upcoming Tasks</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4">
+            <CardContent className="p-6">
               {loadingStates.tasks ? (
-                <div className="flex justify-center py-4">
-                  <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary" />
+                <div className="space-y-3">
+                  {[...Array(3)].map((_, idx) => (
+                    <div key={idx} className="h-16 bg-muted/50 rounded animate-pulse" />
+                  ))}
                 </div>
               ) : data.upcomingTasks.length > 0 ? (
-                <div className="space-y-3">
-                  {data.upcomingTasks.map((task) => (
-                    <div 
-                      key={task.id} 
-                      className="border border-input rounded-md p-3 bg-background hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                        <div className="space-y-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{task.title}</p>
-                          <p className="text-xs text-muted-foreground truncate">
-                            Due: {formatDate(task.due_date)}
-                          </p>
+                <div className="space-y-4">
+                  {data.upcomingTasks.slice(0, 3).map((task) => (
+                    <div key={task.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                      <div className="bg-primary/10 p-2 rounded-full">
+                        <CheckSquare className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium truncate">{task.title}</p>
+                          <Badge className={getTaskPriorityColor(task.priority)}>
+                            {task.priority}
+                          </Badge>
                         </div>
-                        <Badge 
-                          className={cn(
-                            getTaskPriorityColor(task.priority),
-                            "text-xs font-medium px-2 py-0.5"
-                          )}
-                        >
-                          {task.priority}
-                        </Badge>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Due: {formatDate(task.due_date)}
+                        </p>
                       </div>
                     </div>
                   ))}
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="w-full mt-2 text-muted-foreground hover:text-foreground"
+                    className="w-full text-primary hover:text-primary/80"
                     onClick={() => navigate(`/animals/${id}/tasks`)}
                   >
                     View All Tasks
@@ -464,17 +664,35 @@ const AnimalDetails: React.FC = () => {
                 </div>
               ) : (
                 <div className="text-center py-4">
+                  <CheckSquare className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground mb-2">No upcoming tasks</p>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => navigate(`/animals/${id}/tasks/new`)}
                   >
-                    <CheckSquare className="h-4 w-4 mr-2" />
                     Add Task
                   </Button>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm overflow-hidden">
+            <CardHeader className="bg-muted/30 border-b pb-3">
+              <CardTitle className="flex items-center text-xl">
+                <Layers className="h-5 w-5 mr-2 text-primary" />
+                Quick Actions
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              {quickActions.map((action) => (
+                <QuickActionCard
+                  key={action.label}
+                  action={action}
+                  onClick={() => navigate(action.href)}
+                />
+              ))}
             </CardContent>
           </Card>
         </aside>
@@ -483,4 +701,4 @@ const AnimalDetails: React.FC = () => {
   );
 };
 
-export default React.memo(AnimalDetails);
+export default AnimalDetails;

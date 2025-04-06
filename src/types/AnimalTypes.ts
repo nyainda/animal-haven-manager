@@ -198,6 +198,87 @@ export const breedsByType: Record<string, string[]> = {
   other: ['Custom Breed']
 };
 
+// Animal production types mapping
+export const productionTypesByAnimal = {
+  // Dairy animals
+  cattle: ["Milk", "Meat"],
+  goat: ["Milk", "Meat"],
+  sheep: ["Milk", "Meat", "Wool"],
+  buffalo: ["Milk", "Meat"],
+  camel: ["Milk", "Meat"],
+  donkey: ["Milk"],
+  
+  // Poultry/birds
+  chicken: ["Eggs", "Meat"],
+  duck: ["Eggs", "Meat"],
+  turkey: ["Eggs", "Meat"],
+  quail: ["Eggs", "Meat"],
+  pheasant: ["Eggs", "Meat"],
+  geese: ["Eggs", "Meat"],
+  ostrich: ["Eggs", "Meat"],
+  emu: ["Eggs", "Meat"],
+  "guinea fowl": ["Eggs", "Meat"],
+  
+  // Meat animals
+  pig: ["Meat"],
+  rabbit: ["Meat", "Fur"],
+  deer: ["Meat", "Antlers"],
+  bison: ["Meat"],
+  
+  // Fiber animals
+  alpaca: ["Fiber", "Meat"],
+  llama: ["Fiber", "Meat"],
+  
+  // Working animals
+  horse: ["Service"],
+  mule: ["Service"],
+  
+  // Aquaculture
+  fish: ["Meat"],
+  
+  // For custom animals
+  other: ["Custom Production"]
+};
+
+// Production measurement units mapping
+export const measurementUnitsByProductionType = {
+  Milk: ["Liters", "Gallons", "kg"],
+  Eggs: ["Count", "Dozen"],
+  Meat: ["kg", "lbs"],
+  Wool: ["kg", "lbs"],
+  Fiber: ["kg", "lbs"],
+  Fur: ["Count", "kg"],
+  Antlers: ["Count", "kg"],
+  Service: ["Hours", "Days"],
+  "Custom Production": ["Custom Unit"]
+};
+
+// Production quality grades mapping
+export const qualityGradesByProductionType = {
+  Milk: ["Grade A", "Grade B", "Premium", "Organic", "Raw"],
+  Eggs: ["Grade A", "Grade B", "Premium", "Organic", "Free Range"],
+  Meat: ["Premium", "Standard", "Organic", "Grass-fed", "Grain-fed"],
+  Wool: ["Fine", "Medium", "Coarse", "Premium"],
+  Fiber: ["Fine", "Medium", "Coarse", "Premium"],
+  Fur: ["Premium", "Standard"],
+  Antlers: ["Premium", "Standard"],
+  Service: ["Certified", "Trained", "In Training"],
+  "Custom Production": ["Custom Grade"]
+};
+
+// Production methods mapping
+export const productionMethodsByProductionType = {
+  Milk: ["Traditional Milking", "Machine Milking", "Robotic Milking", "Organic"],
+  Eggs: ["Free Range", "Cage-Free", "Conventional", "Organic", "Pastured"],
+  Meat: ["Grass-Fed", "Grain-Fed", "Organic", "Free Range", "Conventional"],
+  Wool: ["Hand Shearing", "Machine Shearing"],
+  Fiber: ["Hand Shearing", "Machine Shearing"],
+  Fur: ["Traditional", "Humane"],
+  Antlers: ["Natural Shed", "Harvested"],
+  Service: ["Training", "Working", "Recreational"],
+  "Custom Production": ["Custom Method"]
+};
+
 export const genderOptions = [
   { value: 'male', label: 'Male' },
   { value: 'female', label: 'Female' },

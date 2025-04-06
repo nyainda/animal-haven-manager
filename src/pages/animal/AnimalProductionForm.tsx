@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { animalTypes, breedsByType } from '@/types/AnimalTypes';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
@@ -17,11 +18,23 @@ import {
   fetchProduction,
   ProductionFormData,
 } from '@/services/animalProductionApi';
+import { 
+  productionTypesByAnimal, 
+  measurementUnitsByProductionType,
+  qualityGradesByProductionType, 
+  productionMethodsByProductionType 
+} from '@/types/AnimalTypes'; 
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
 interface FormErrors {
   [key: string]: string | string[];
+}
+
+// Extend ProductionFormData to include animal_type and breed
+interface ExtendedProductionFormData extends ProductionFormData {
+  animal_type: string;
+  breed: string;
 }
 
 const AnimalProductionForm: React.FC = () => {
@@ -30,7 +43,9 @@ const AnimalProductionForm: React.FC = () => {
   const isEditing = !!productionId;
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-  const [formData, setFormData] = useState<ProductionFormData>({
+  const [formData, setFormData] = useState<ExtendedProductionFormData>({
+    animal_type: '',
+    breed: '',
     product_category: { name: '', description: '', measurement_unit: '' },
     product_grade: { name: '', description: '', price_modifier: 1.0 },
     production_method: { method_name: '', description: '', requires_certification: false, is_active: true },
@@ -59,6 +74,11 @@ const AnimalProductionForm: React.FC = () => {
   });
   const [errors, setErrors] = useState<FormErrors>({});
 
+  // Reset breed when animal_type changes
+  useEffect(() => {
+    setFormData((prev) => ({ ...prev, breed: '' }));
+  }, [formData.animal_type]);
+
   useEffect(() => {
     if (!animalId) {
       toast.error('Missing animal ID');
@@ -73,6 +93,8 @@ const AnimalProductionForm: React.FC = () => {
       .then((data) => {
         setFormData({
           ...data,
+          animal_type: data.animal_type || '',
+          breed: data.breed || '',
           production_date: data.production_date
             ? format(parseISO(data.production_date), 'yyyy-MM-dd')
             : format(new Date(), 'yyyy-MM-dd'),
@@ -100,11 +122,11 @@ const AnimalProductionForm: React.FC = () => {
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-    field?: keyof ProductionFormData,
+    field?: keyof ExtendedProductionFormData,
     subField?: keyof StorageLocation
   ) => {
     const { name, value } = e.target;
-    setFormData((prev: ProductionFormData) => {
+    setFormData((prev) => {
       if (field === 'storage_location' && subField === 'storage_conditions' && prev.storage_location) {
         return {
           ...prev,
@@ -112,7 +134,7 @@ const AnimalProductionForm: React.FC = () => {
             ...prev.storage_location,
             storage_conditions: {
               ...prev.storage_location.storage_conditions,
-              [name]: value, // Keep as string
+              [name]: value,
             },
           },
         };
@@ -121,7 +143,7 @@ const AnimalProductionForm: React.FC = () => {
           ...prev,
           weather_conditions: {
             ...prev.weather_conditions,
-            [name]: value, // Keep as string
+            [name]: value,
           },
         };
       } else if (field === 'additional_attributes' && prev.additional_attributes) {
@@ -149,7 +171,7 @@ const AnimalProductionForm: React.FC = () => {
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
-      setFormData((prev: ProductionFormData) => {
+      setFormData((prev) => {
         const updated = { ...prev, [name]: value };
         if (name === 'quantity' || name === 'price_per_unit') {
           updated.total_price =
@@ -165,10 +187,10 @@ const AnimalProductionForm: React.FC = () => {
 
   const handleCheckboxChange = (
     e: React.ChangeEvent<HTMLInputElement>,
-    field?: keyof ProductionFormData
+    field?: keyof ExtendedProductionFormData
   ) => {
     const { name, checked } = e.target;
-    setFormData((prev: ProductionFormData) =>
+    setFormData((prev) =>
       field && prev[field] && typeof prev[field] === 'object'
         ? { ...prev, [field]: { ...(prev[field] as object), [name]: checked } }
         : { ...prev, [name]: checked }
@@ -177,7 +199,7 @@ const AnimalProductionForm: React.FC = () => {
 
   const handleDateChange = (date: Date | undefined) => {
     if (date) {
-      setFormData((prev: ProductionFormData) => ({ ...prev, production_date: format(date, 'yyyy-MM-dd') }));
+      setFormData((prev) => ({ ...prev, production_date: format(date, 'yyyy-MM-dd') }));
       setErrors((prev) => ({ ...prev, production_date: '' }));
     }
   };
@@ -185,9 +207,9 @@ const AnimalProductionForm: React.FC = () => {
   const handleSelectChange = (
     name: string,
     value: string,
-    field?: keyof ProductionFormData
+    field?: keyof ExtendedProductionFormData
   ) => {
-    setFormData((prev: ProductionFormData) =>
+    setFormData((prev) =>
       field && prev[field] && typeof prev[field] === 'object'
         ? { ...prev, [field]: { ...(prev[field] as object), [name]: value } }
         : { ...prev, [name]: value }
@@ -196,7 +218,9 @@ const AnimalProductionForm: React.FC = () => {
   };
 
   const validateForm = (): FormErrors => {
-    const requiredFields: (keyof ProductionFormData)[] = [
+    const requiredFields: (keyof ExtendedProductionFormData)[] = [
+      'animal_type',
+      'breed',
       'quantity',
       'price_per_unit',
       'total_price',
@@ -207,6 +231,8 @@ const AnimalProductionForm: React.FC = () => {
     ];
     const newErrors: FormErrors = {};
 
+    if (!formData.animal_type) newErrors.animal_type = 'Animal type is required';
+    if (!formData.breed) newErrors.breed = 'Breed is required';
     if (!formData.product_category.name) newErrors['product_category.name'] = 'Product category name is required';
     if (!formData.product_category.measurement_unit)
       newErrors['product_category.measurement_unit'] = 'Measurement unit is required';
@@ -230,12 +256,11 @@ const AnimalProductionForm: React.FC = () => {
       newErrors.total_price = 'Total price must be a valid number';
     }
 
-    // Validate weather_conditions.temperature range
     if (
       formData.weather_conditions?.temperature &&
-      (parseFloat(formData.weather_conditions.temperature) < -50 || parseFloat(formData.weather_conditions.temperature) > 60)
+      (parseFloat(formData.weather_conditions.temperature) < -50 || parseFloat(formData.weather_conditions.temperature) > 100)
     ) {
-      newErrors['weather_conditions.temperature'] = 'Temperature must be between -50°C and 60°C';
+      newErrors['weather_conditions.temperature'] = 'Temperature must be between -50°C and 100°C';
     }
 
     return newErrors;
@@ -346,6 +371,53 @@ const AnimalProductionForm: React.FC = () => {
         </CardHeader>
         <CardContent id="production-form-content">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Animal Selection */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Animal Selection</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Animal Type *</Label>
+                  <Select
+                    value={formData.animal_type}
+                    onValueChange={(value) => handleSelectChange('animal_type', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select animal type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {animalTypes.map((animal) => (
+                        <SelectItem key={animal} value={animal}>
+                          {animal.charAt(0).toUpperCase() + animal.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.animal_type && <p className="text-red-500 text-sm">{errors.animal_type}</p>}
+                </div>
+                {formData.animal_type && (
+                  <div className="space-y-2">
+                    <Label>Breed *</Label>
+                    <Select
+                      value={formData.breed}
+                      onValueChange={(value) => handleSelectChange('breed', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select breed" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {breedsByType[formData.animal_type]?.map((breed) => (
+                          <SelectItem key={breed} value={breed}>
+                            {breed}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.breed && <p className="text-red-500 text-sm">{errors.breed}</p>}
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Product Category */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Product Category</h3>
@@ -360,9 +432,9 @@ const AnimalProductionForm: React.FC = () => {
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Milk">Milk</SelectItem>
-                      <SelectItem value="Eggs">Eggs</SelectItem>
-                      <SelectItem value="Meat">Meat</SelectItem>
+                      {formData.animal_type && productionTypesByAnimal[formData.animal_type]?.map((type) => (
+                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   {errors['product_category.name'] && (
@@ -379,9 +451,9 @@ const AnimalProductionForm: React.FC = () => {
                       <SelectValue placeholder="Select unit" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="liters">Liters</SelectItem>
-                      <SelectItem value="count">Count</SelectItem>
-                      <SelectItem value="kg">Kilograms</SelectItem>
+                      {formData.product_category.name && measurementUnitsByProductionType[formData.product_category.name]?.map((unit) => (
+                        <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   {errors['product_category.measurement_unit'] && (
@@ -413,9 +485,9 @@ const AnimalProductionForm: React.FC = () => {
                       <SelectValue placeholder="Select grade" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Grade A">Grade A</SelectItem>
-                      <SelectItem value="Grade B">Grade B</SelectItem>
-                      <SelectItem value="Premium">Premium</SelectItem>
+                      {formData.product_category.name && qualityGradesByProductionType[formData.product_category.name]?.map((grade) => (
+                        <SelectItem key={grade} value={grade}>{grade}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   {errors['product_grade.name'] && (
@@ -447,9 +519,9 @@ const AnimalProductionForm: React.FC = () => {
                       <SelectValue placeholder="Select method" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Traditional Milking">Traditional Milking</SelectItem>
-                      <SelectItem value="Machine Milking">Machine Milking</SelectItem>
-                      <SelectItem value="Free Range">Free Range</SelectItem>
+                      {formData.product_category.name && productionMethodsByProductionType[formData.product_category.name]?.map((method) => (
+                        <SelectItem key={method} value={method}>{method}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   {errors['production_method.method_name'] && (
@@ -541,25 +613,25 @@ const AnimalProductionForm: React.FC = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Storage Temperature (°C)</Label>
+                  <Label>Storage Temperature (°C) *</Label>
                   <Input
                     name="temperature"
                     value={formData.storage_location.storage_conditions.temperature}
                     onChange={(e) => handleInputChange(e, 'storage_location', 'storage_conditions')}
-                    // Removed type="number" to keep as string
                     step="0.1"
+                    required
                   />
                   {errors['storage_location.storage_conditions.temperature'] && (
                     <p className="text-red-500 text-sm">{errors['storage_location.storage_conditions.temperature']}</p>
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Storage Humidity (%)</Label>
+                  <Label>Storage Humidity (%) *</Label>
                   <Input
                     name="humidity"
                     value={formData.storage_location.storage_conditions.humidity}
                     onChange={(e) => handleInputChange(e, 'storage_location', 'storage_conditions')}
-                    // Removed type="number" to keep as string
+                    required
                     step="1"
                   />
                   {errors['storage_location.storage_conditions.humidity'] && (

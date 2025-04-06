@@ -73,7 +73,7 @@ const Navbar: React.FC = () => {
               className="flex items-center space-x-2"
             >
               <span className="text-xl font-serif font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70">
-                Animal Manager
+               Agro-insight
               </span>
             </Link>
             
