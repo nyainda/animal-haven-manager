@@ -75,16 +75,16 @@ const fetchCsrfToken = async (): Promise<void> => {
     console.log('[SUPPLIER] CSRF token fetched successfully');
   } catch (error) {
     console.warn('[SUPPLIER] CSRF fetch failed:', error);
-    throw error; // Re-throw to handle in calling functions if needed
+    throw error;
   }
 };
 
 // Get authentication headers (Bearer token and XSRF token)
 const getAuthHeaders = (): Record<string, string> => {
-  const token = localStorage.getItem('auth_token'); // Adjust based on your auth system
+  const token = localStorage.getItem('auth_token');
   const xsrfToken = document.cookie
     .split('; ')
-    .find(row => row.startsWith('XSRF-TOKEN='))
+    .find((row) => row.startsWith('XSRF-TOKEN='))
     ?.split('=')[1];
 
   return {
@@ -95,7 +95,7 @@ const getAuthHeaders = (): Record<string, string> => {
   };
 };
 
-// Fetch all suppliers for an animal )
+// Fetch all suppliers for an animal
 export const fetchSuppliers = async (animalId: string): Promise<Supplier[]> => {
   await fetchCsrfToken();
   try {
@@ -111,19 +111,17 @@ export const fetchSuppliers = async (animalId: string): Promise<Supplier[]> => {
     console.log('[SUPPLIER] Raw response:', rawData);
 
     if (!response.ok) {
-      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
-      throw new Error(errorMessage);
+      throw new Error(JSON.stringify(rawData));
     }
 
     return rawData.data || [];
   } catch (error) {
     console.error(`[SUPPLIER] Error fetching suppliers for animal ${animalId}:`, error);
-    toast.error(`Failed to fetch suppliers: ${error instanceof Error ? error.message : 'Unknown error'}`);
     throw error;
   }
 };
 
-// Fetch a single supplier (GET /api/animals/{animal}/suppliers/{supplier})
+// Fetch a single supplier
 export const fetchSupplier = async (animalId: string, supplierId: string): Promise<Supplier> => {
   await fetchCsrfToken();
   try {
@@ -139,19 +137,17 @@ export const fetchSupplier = async (animalId: string, supplierId: string): Promi
     console.log('[SUPPLIER] Raw response:', rawData);
 
     if (!response.ok) {
-      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
-      throw new Error(errorMessage);
+      throw new Error(JSON.stringify(rawData));
     }
 
     return rawData.data || rawData;
   } catch (error) {
     console.error(`[SUPPLIER] Error fetching supplier ${supplierId} for animal ${animalId}:`, error);
-    toast.error(`Failed to fetch supplier: ${error instanceof Error ? error.message : 'Unknown error'}`);
     throw error;
   }
 };
 
-// Create a supplier (POST /api/animals/{animal}/suppliers)
+// Create a supplier
 export const createSupplier = async (animalId: string, supplierData: SupplierFormData): Promise<Supplier> => {
   await fetchCsrfToken();
   try {
@@ -168,20 +164,18 @@ export const createSupplier = async (animalId: string, supplierData: SupplierFor
     console.log('[SUPPLIER] Raw response:', rawData);
 
     if (!response.ok) {
-      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
-      throw new Error(errorMessage);
+      throw new Error(JSON.stringify(rawData));
     }
 
     toast.success(rawData.message || 'Supplier created successfully');
     return rawData.data;
   } catch (error) {
     console.error(`[SUPPLIER] Error creating supplier for animal ${animalId}:`, error);
-    toast.error(`Failed to create supplier: ${error instanceof Error ? error.message : 'Unknown error'}`);
     throw error;
   }
 };
 
-// Update a supplier (PUT /api/animals/{animal}/suppliers/{supplier})
+// Update a supplier
 export const updateSupplier = async (
   animalId: string,
   supplierId: string,
@@ -202,20 +196,18 @@ export const updateSupplier = async (
     console.log('[SUPPLIER] Raw response:', rawData);
 
     if (!response.ok) {
-      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
-      throw new Error(errorMessage);
+      throw new Error(JSON.stringify(rawData));
     }
 
     toast.success(rawData.message || 'Supplier updated successfully');
     return rawData.data;
   } catch (error) {
     console.error(`[SUPPLIER] Error updating supplier ${supplierId} for animal ${animalId}:`, error);
-    toast.error(`Failed to update supplier: ${error instanceof Error ? error.message : 'Unknown error'}`);
     throw error;
   }
 };
 
-// Delete a supplier (DELETE /api/animals/{animal}/suppliers/{supplier})
+// Delete a supplier
 export const deleteSupplier = async (animalId: string, supplierId: string): Promise<void> => {
   await fetchCsrfToken();
   try {
@@ -231,14 +223,12 @@ export const deleteSupplier = async (animalId: string, supplierId: string): Prom
     console.log('[SUPPLIER] Raw response:', rawData);
 
     if (!response.ok) {
-      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
-      throw new Error(errorMessage);
+      throw new Error(JSON.stringify(rawData));
     }
 
     toast.success(rawData.message || 'Supplier deleted successfully');
   } catch (error) {
     console.error(`[SUPPLIER] Error deleting supplier ${supplierId} for animal ${animalId}:`, error);
-    toast.error(`Failed to delete supplier: ${error instanceof Error ? error.message : 'Unknown error'}`);
     throw error;
   }
 };
