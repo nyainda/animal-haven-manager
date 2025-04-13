@@ -1,19 +1,19 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
-import { 
-  ArrowLeft, Edit, Trash2, AlertTriangle, MoreHorizontal, 
+import {
+  ArrowLeft, Edit, Trash2, AlertTriangle, MoreHorizontal,
   FileText, Activity, Heart, PiggyBank, CheckSquare, Tag,
-  Calendar, Info, Layers, ExternalLink
+  Calendar, Info, Layers, ExternalLink, DollarSign
 } from 'lucide-react';
-import { 
+import {
   Card, CardContent, CardHeader, CardTitle, CardFooter
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, 
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Separator } from '@/components/ui/separator';
@@ -21,6 +21,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { fetchAnimal } from '@/services/animalService';
 import { fetchSuppliers, Supplier } from '@/services/supplierApi';
 import { fetchProductions, Production } from '@/services/animalProductionApi';
+import { fetchTransactions, deleteTransaction, Transaction } from '@/services/transactionApis'; 
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Animal } from '@/types/AnimalTypes';
@@ -33,7 +34,7 @@ interface QuickAction {
 }
 
 const QuickActionCard = ({ action, onClick }: { action: QuickAction; onClick: () => void }) => (
-  <Card 
+  <Card
     className="overflow-hidden cursor-pointer transition-all border-muted hover:border-primary/50 hover:shadow-md group"
     onClick={onClick}
   >
@@ -58,7 +59,7 @@ const AnimalsDetailsSkeleton = () => (
         <div className="h-4 w-24 bg-muted rounded animate-pulse" />
       </div>
     </div>
-    
+
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2 space-y-6">
         <div className="bg-muted h-96 rounded-lg animate-pulse" />
@@ -79,6 +80,7 @@ const AnimalDetails: React.FC = () => {
     animal: Animal | null;
     suppliers: Supplier[];
     productions: Production[];
+    transactions: Transaction[];
     upcomingTasks: any[];
   }
 
@@ -86,6 +88,7 @@ const AnimalDetails: React.FC = () => {
     main: boolean;
     productions: boolean;
     suppliers: boolean;
+    transactions: boolean;
     tasks: boolean;
   }
 
@@ -93,13 +96,15 @@ const AnimalDetails: React.FC = () => {
     animal: null,
     suppliers: [],
     productions: [],
-    upcomingTasks: []
+    transactions: [],
+    upcomingTasks: [],
   });
   const [loadingStates, setLoadingStates] = useState<LoadingStates>({
     main: true,
     productions: false,
     suppliers: false,
-    tasks: false
+    transactions: false,
+    tasks: false,
   });
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('overview');
@@ -112,26 +117,30 @@ const AnimalDetails: React.FC = () => {
     }
 
     const controller = new AbortController();
-    
+
     const fetchData = async () => {
       try {
         setLoadingStates(prev => ({ ...prev, main: true }));
-        const [animalData, suppliersData, productionsData] = await Promise.all([
+        const [animalData, suppliersData, productionsData, transactionsData] = await Promise.all([
           fetchAnimal(id),
           fetchSuppliers(id),
-          fetchProductions(id)
+          fetchProductions(id),
+          fetchTransactions(id),
         ]);
 
         console.log('Fetched productions for AnimalDetails:', productionsData); // Debug log
+        console.log('Fetched transactions for AnimalDetails:', transactionsData); // Debug log
 
         setData(prev => ({
           ...prev,
           animal: animalData,
           suppliers: suppliersData,
-          productions: productionsData.sort((a, b) => parseISO(b.created_at).getTime() - parseISO(a.created_at).getTime())
+          productions: productionsData.sort((a, b) => parseISO(b.created_at).getTime() - parseISO(a.created_at).getTime()),
+          transactions: transactionsData.sort((a, b) => parseISO(b.transaction_date).getTime() - parseISO(a.transaction_date).getTime()),
         }));
         setError(null);
         if (!productionsData.length) toast.info('No production records found for this animal.');
+        if (!transactionsData.length) toast.info('No transaction records found for this animal.');
       } catch (err) {
         if (!controller.signal.aborted) {
           setError('Failed to load data');
@@ -146,14 +155,14 @@ const AnimalDetails: React.FC = () => {
     const fetchTasks = async () => {
       try {
         setLoadingStates(prev => ({ ...prev, tasks: true }));
-        const response = await fetch(`/api/animals/${id}/tasks?status=pending&limit=3`, {
-          signal: controller.signal
+        const response = await fetch(`/api/animals/${id}/tasks?status=cancelled&limit=3`, {
+          signal: controller.signal,
         });
         if (!response.ok) throw new Error('Failed to fetch tasks');
         const taskData = await response.json();
         setData(prev => ({
           ...prev,
-          upcomingTasks: taskData.data || []
+          upcomingTasks: taskData.data || [],
         }));
       } catch (err) {
         console.error('Failed to fetch tasks:', err);
@@ -172,32 +181,62 @@ const AnimalDetails: React.FC = () => {
     return dateString ? format(parseISO(dateString), 'PPP') : 'Not specified';
   }, []);
 
+  const formatCurrency = useCallback((amount: number, currency: string): string => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+    }).format(amount);
+  }, []);
+
   const getStatusColor = useCallback((status?: string): string => ({
     active: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100',
     inactive: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100',
     sold: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100',
-    deceased: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
+    deceased: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100',
   }[status?.toLowerCase()] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'), []);
 
   const getTaskPriorityColor = useCallback((priority?: string): string => ({
     high: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100',
     medium: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100',
-    low: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100'
+    low: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100',
   }[priority?.toLowerCase()] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'), []);
 
   const getSupplierImportanceColor = useCallback((importance?: string): string => ({
     high: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100',
     medium: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100',
-    low: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
+    low: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100',
   }[importance?.toLowerCase()] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'), []);
 
   const getQualityStatusColor = useCallback((status?: string): string => ({
     passed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100',
     failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100',
-    pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100'
+    pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100',
+  }[status?.toLowerCase()] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'), []);
+
+  const getTransactionStatusColor = useCallback((status?: string): string => ({
+    pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100',
+    completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100',
+    cancelled: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100',
   }[status?.toLowerCase()] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'), []);
 
   const handleDelete = () => toast.error('Delete functionality not implemented yet');
+
+  const handleDeleteTransaction = async (transactionId: string) => {
+    try {
+      setLoadingStates(prev => ({ ...prev, transactions: true }));
+      await deleteTransaction(id!, transactionId);
+      setData(prev => ({
+        ...prev,
+        transactions: prev.transactions.filter(t => t.id !== transactionId),
+      }));
+      toast.success('Transaction deleted successfully');
+    } catch (err) {
+      console.error('Failed to delete transaction:', err);
+      toast.error('Failed to delete transaction');
+    } finally {
+      setLoadingStates(prev => ({ ...prev, transactions: false }));
+    }
+  };
 
   const quickActions: QuickAction[] = [
     { label: 'Activities', href: `/animals/${id}/activities`, icon: Activity, description: 'View activity history' },
@@ -206,10 +245,11 @@ const AnimalDetails: React.FC = () => {
     { label: 'Production', href: `/animals/${id}/production`, icon: PiggyBank, description: 'Production metrics' },
     { label: 'Tasks', href: `/animals/${id}/tasks`, icon: CheckSquare, description: 'Scheduled tasks' },
     { label: 'Suppliers', href: `/animals/${id}/suppliers`, icon: Tag, description: 'Supplier management' },
+    { label: 'Transactions', href: `/animals/${id}/transactions`, icon: DollarSign, description: 'Financial transactions' },
   ];
 
   const getAnimalTypeIcon = (type?: string) => {
-    switch(type?.toLowerCase()) {
+    switch (type?.toLowerCase()) {
       case 'cow': case 'cattle': case 'bull': return '🐄';
       case 'sheep': return '🐑';
       case 'goat': return '🐐';
@@ -223,7 +263,7 @@ const AnimalDetails: React.FC = () => {
   const getAnimalAvatar = (animal: Animal) => {
     const initials = animal.name.substring(0, 2).toUpperCase();
     const animalIcon = getAnimalTypeIcon(animal.type);
-    
+
     const typeColors = {
       'cow': 'bg-blue-600',
       'cattle': 'bg-blue-600',
@@ -234,9 +274,9 @@ const AnimalDetails: React.FC = () => {
       'chicken': 'bg-yellow-600',
       'horse': 'bg-brown-600',
     };
-    
+
     const bgColor = typeColors[animal.type?.toLowerCase()] || 'bg-primary';
-    
+
     return (
       <Avatar className={`h-16 w-16 text-lg ${bgColor} text-white`}>
         <span>{animalIcon || initials}</span>
@@ -309,7 +349,7 @@ const AnimalDetails: React.FC = () => {
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {quickActions.map((action) => (
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   key={action.label}
                   onClick={() => navigate(action.href)}
                   className="cursor-pointer"
@@ -319,7 +359,7 @@ const AnimalDetails: React.FC = () => {
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 onClick={handleDelete}
                 className="text-destructive focus:text-destructive cursor-pointer"
               >
@@ -336,14 +376,14 @@ const AnimalDetails: React.FC = () => {
         <Card className="border-l-4 border-l-primary">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground">Age</p>
+              <p className="text-sm font-medium text-muted-foreground">Animal-id</p>
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </div>
-            <p className="text-2xl font-bold mt-2">{data.animal.age} years</p>
+            <p className="text-2xl font-bold mt-2">{data.animal.internal_id}</p>
             <p className="text-xs text-muted-foreground mt-1">Born: {formatDate(data.animal.birth_date)}</p>
           </CardContent>
         </Card>
-        
+
         <Card className="border-l-4 border-l-blue-500">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
@@ -356,7 +396,7 @@ const AnimalDetails: React.FC = () => {
             </p>
           </CardContent>
         </Card>
-        
+
         <Card className="border-l-4 border-l-amber-500">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
@@ -367,7 +407,7 @@ const AnimalDetails: React.FC = () => {
             <p className="text-xs text-muted-foreground mt-1">Production Records</p>
           </CardContent>
         </Card>
-        
+
         <Card className="border-l-4 border-l-green-500">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
@@ -389,12 +429,12 @@ const AnimalDetails: React.FC = () => {
                 Animal Information
               </CardTitle>
             </CardHeader>
-            
+
             <CardContent className="p-0">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="flex w-full h-12 rounded-none border-b bg-transparent p-0">
-                  {['overview', 'details', 'birth', 'production', 'suppliers'].map(tab => (
-                    <TabsTrigger 
+                  {['overview', 'details', 'birth', 'production', 'suppliers', 'transactions'].map(tab => (
+                    <TabsTrigger
                       key={tab}
                       value={tab}
                       className="flex-1 h-full capitalize rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent transition-all"
@@ -418,9 +458,9 @@ const AnimalDetails: React.FC = () => {
                             {data.animal.status}
                           </Badge>
                         ), icon: Activity },
-                        { label: 'Age', value: `${data.animal.age} years`, icon: Calendar }, 
-                        { label: 'Internal ID', value: data.animal.internal_id, icon: Tag }, 
-                        { label: 'Animal ID', value: data.animal.animal_id, icon: Tag }, 
+                        { label: 'Age', value: `${data.animal.age} years`, icon: Calendar },
+                        { label: 'Internal ID', value: data.animal.internal_id, icon: Tag },
+                        { label: 'Animal ID', value: data.animal.animal_id, icon: Tag },
                       ].map((item, idx) => (
                         <div key={idx} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
                           <div className="bg-primary/10 p-2 rounded-full">
@@ -483,82 +523,80 @@ const AnimalDetails: React.FC = () => {
                   </TabsContent>
 
                   <TabsContent value="production" className="space-y-6 mt-0">
-  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-    <h3 className="text-base font-medium flex items-center">
-      <PiggyBank className="h-4 w-4 mr-2 text-primary" />
-      Production Records
-    </h3>
-    <Button size="sm" onClick={() => navigate(`/animals/${id}/production`)}>
-      Manage Production
-    </Button>
-  </div>
-  {data.productions.length > 0 ? (
-    <div className="space-y-4">
-      {data.productions.slice(0, 3).map((production, idx) => (
-        <Card
-          key={production.id}
-          className={`overflow-hidden transition-shadow hover:shadow-md ${
-            idx % 2 === 0 ? 'bg-muted/20' : 'bg-background'
-          }`}
-        >
-          <CardContent className="p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Left Section: Product Info */}
-              <div className="flex items-center gap-3">
-                <div className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 p-2 rounded-full flex-shrink-0">
-                  <PiggyBank className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold truncate">
-                    {production.product_category.name} - {production.trace_number}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {format(parseISO(production.production_date), 'MMM d, yyyy, h:mm a')}
-                  </p>
-                </div>
-              </div>
-              {/* Right Section: Metrics */}
-              <div className="flex items-center justify-between gap-3 sm:justify-end">
-                <div className="text-right">
-                  <p className="text-sm font-bold">
-                    {production.quantity} {production.product_category.measurement_unit}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    ${parseFloat(production.total_price).toFixed(2) || '0.00'}
-                  </p>
-                </div>
-                <Badge className={getQualityStatusColor(production.quality_status)}>
-                  {production.quality_status}
-                </Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="w-full text-primary hover:text-primary/80"
-        onClick={() => navigate(`/animals/${id}/production`)}
-      >
-        View All Production Records
-      </Button>
-    </div>
-  ) : (
-    <div className="text-center py-8 bg-muted/20 rounded-lg">
-      <PiggyBank className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-      <p className="text-sm text-muted-foreground mb-2">No production records available</p>
-      <Button variant="outline" size="sm" onClick={() => navigate(`/animals/${id}/production/new`)}>
-        Add Production Record
-      </Button>
-    </div>
-  )}
-</TabsContent>
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <h3 className="text-base font-medium flex items-center">
+                        <PiggyBank className="h-4 w-4 mr-2 text-primary" />
+                        Production Records
+                      </h3>
+                      <Button size="sm" onClick={() => navigate(`/animals/${id}/production`)}>
+                        Manage Production
+                      </Button>
+                    </div>
+                    {data.productions.length > 0 ? (
+                      <div className="space-y-4">
+                        {data.productions.slice(0, 3).map((production, idx) => (
+                          <Card
+                            key={production.id}
+                            className={`overflow-hidden transition-shadow hover:shadow-md ${idx % 2 === 0 ? 'bg-muted/20' : 'bg-background'}`}
+                          >
+                            <CardContent className="p-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {/* Left Section: Product Info */}
+                                <div className="flex items-center gap-3">
+                                  <div className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 p-2 rounded-full flex-shrink-0">
+                                    <PiggyBank className="h-5 w-5" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-semibold truncate">
+                                      {production.product_category.name} - {production.trace_number}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {format(parseISO(production.production_date), 'MMM d, yyyy, h:mm a')}
+                                    </p>
+                                  </div>
+                                </div>
+                                {/* Right Section: Metrics */}
+                                <div className="flex items-center justify-between gap-3 sm:justify-end">
+                                  <div className="text-right">
+                                    <p className="text-sm font-bold">
+                                      {production.quantity} {production.product_category.measurement_unit}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      ${parseFloat(production.total_price).toFixed(2) || '0.00'}
+                                    </p>
+                                  </div>
+                                  <Badge className={getQualityStatusColor(production.quality_status)}>
+                                    {production.quality_status}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-primary hover:text-primary/80"
+                          onClick={() => navigate(`/animals/${id}/production`)}
+                        >
+                          View All Production Records
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 bg-muted/20 rounded-lg">
+                        <PiggyBank className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground mb-2">No production records available</p>
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/animals/${id}/production/new`)}>
+                          Add Production Record
+                        </Button>
+                      </div>
+                    )}
+                  </TabsContent>
 
                   <TabsContent value="suppliers" className="space-y-6 mt-0">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <h3 className="text-base font-medium flex items-center">
-                        <Tag className="h-4 w-4 mr-2 text-primary" /> 
+                        <Tag className="h-4 w-4 mr-2 text-primary" />
                         Suppliers
                       </h3>
                       <Button size="sm" onClick={() => navigate(`/animals/${id}/suppliers`)}>
@@ -602,12 +640,98 @@ const AnimalDetails: React.FC = () => {
                       <div className="text-center py-8 bg-muted/20 rounded-lg">
                         <Tag className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
                         <p className="text-sm text-muted-foreground mb-2">No suppliers available</p>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => navigate(`/animals/${id}/suppliers/new`)}
                         >
                           Add Supplier
+                        </Button>
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="transactions" className="space-y-6 mt-0">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <h3 className="text-base font-medium flex items-center">
+                        <DollarSign className="h-4 w-4 mr-2 text-primary" />
+                        Transactions
+                      </h3>
+                      <Button size="sm" onClick={() => navigate(`/animals/${id}/transactions`)}>
+                        Manage Transactions
+                      </Button>
+                    </div>
+                    {data.transactions.length > 0 ? (
+                      <div className="space-y-4">
+                        {data.transactions.slice(0, 3).map((transaction, idx) => (
+                          <Card
+                            key={transaction.id}
+                            className={`overflow-hidden transition-shadow hover:shadow-md ${idx % 2 === 0 ? 'bg-muted/20' : 'bg-background'}`}
+                          >
+                            <CardContent className="p-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {/* Left Section: Transaction Info */}
+                                <div className="flex items-center gap-3">
+                                  <div className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 p-2 rounded-full flex-shrink-0">
+                                    <DollarSign className="h-5 w-5" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-semibold truncate capitalize">
+                                      {transaction.transaction_type} - {transaction.payment_reference || transaction.id}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {format(parseISO(transaction.transaction_date), 'MMM d, yyyy')}
+                                    </p>
+                                  </div>
+                                </div>
+                                {/* Right Section: Metrics */}
+                                <div className="flex items-center justify-between gap-3 sm:justify-end">
+                                  <div className="text-right">
+                                    <p className="text-sm font-bold">
+                                      {formatCurrency(transaction.total_amount, transaction.currency)}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground truncate">
+                                      {transaction.seller_name} → {transaction.buyer_name}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Badge className={getTransactionStatusColor(transaction.transaction_status)}>
+                                      {transaction.transaction_status || 'N/A'}
+                                    </Badge>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleDeleteTransaction(transaction.id)}
+                                      disabled={loadingStates.transactions}
+                                      className="text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-primary hover:text-primary/80"
+                          onClick={() => navigate(`/animals/${id}/transactions`)}
+                        >
+                          View All Transactions
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 bg-muted/20 rounded-lg">
+                        <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground mb-2">No transactions available</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/animals/${id}/transactions/new`)}
+                        >
+                          Add Transaction
                         </Button>
                       </div>
                     )}

@@ -32,6 +32,61 @@ export interface Animal {
   keywords: string[];
 }
 
+// HealthStatistics.ts
+export interface HealthStatistics {
+  vaccination_rate: number;
+  health_incidents: number;
+  animals_requiring_checkup: number;
+  healthy_animals: number;
+  vaccination_history?: Array<{
+    date: string;
+    vaccine_name: string;
+    animals_count: number;
+  }>;
+  health_incidents_by_type?: Record<string, number>;
+}
+
+// ReproductiveStatistics.ts
+export interface ReproductiveStatistics {
+  breeding_success_rate: number;
+  average_gestation: number;
+  successful_births: number;
+  failed_births: number;
+  births_by_month?: Record<string, number>;
+  breeding_efficiency?: number;
+  average_litter_size?: number;
+  breeding_cycles_completed?: number;
+}
+
+// GrowthStatistics.ts
+export interface GrowthStatistics {
+  average_weight_gain: number;
+  weight_by_age_group: Record<string, number>;
+  expected_vs_actual_weight?: {
+    expected: number[];
+    actual: number[];
+    dates: string[];
+  };
+  feed_conversion_ratio?: number;
+  growth_rate_by_breed?: Record<string, number>;
+}
+
+// Updating existing ProductionStatistics
+export interface ProductionStatistics {
+  total_production: number;
+  average_production: number;
+  production_by_animal_type?: Record<string, number>;
+  production_by_month?: Record<string, number>;
+  quality_distribution?: Record<string, number>;
+  production_efficiency?: number;
+  feed_to_production_ratio?: number;
+  seasonal_variations?: Record<string, number>;
+  production_trends?: {
+    dates: string[];
+    values: number[];
+  };
+}
+
 export interface AnimalFormData {
   name: string;
   type: string;

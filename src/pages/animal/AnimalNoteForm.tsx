@@ -241,7 +241,7 @@ const AnimalNoteForm: React.FC = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="normal">Normal</SelectItem>
+                    
                     <SelectItem value="high">High</SelectItem>
                   </SelectContent>
                 </Select>

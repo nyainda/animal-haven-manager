@@ -53,8 +53,6 @@ const getStatusIcon = (status?: string): React.ReactNode => {
     }
 };
 
-
-
 const formatDateTime = (dateStr: string, timeStr: string): string => {
     try {
         const date = parseISO(dateStr);
@@ -82,7 +80,7 @@ const isOrganic = (isOrganic?: boolean): string => (isOrganic ? 'Organic' : 'Non
 interface ProductionCardProps {
     production: Production;
     animalId: string;
-    onEdit: (productionId: string) => void;
+    onEdit: (production: Production) => void;
     onDelete: (production: Production) => void;
 }
 
@@ -92,26 +90,38 @@ const ProductionCard: React.FC<ProductionCardProps> = ({ production, animalId, o
     
     const handleEditClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (production.yield_id) onEdit(production.yield_id);
-        else if (production.id) onEdit(production.id);
+        console.log('[ProductionCard] Edit clicked:', {
+            animalId,
+            yield_id: production.yield_id,
+            id: production.id,
+            trace_number: production.trace_number,
+        });
+        if (!production.yield_id) {
+            console.error('[ProductionCard] Missing yield_id for production:', production);
+            toast.error('Cannot edit: Production ID is missing.');
+            return;
+        }
+        onEdit(production);
     };
     
     const handleDeleteClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        console.log('[ProductionCard] Delete clicked - Production ID:', production.id, 'Yield ID:', production.yield_id, 'Animal ID:', animalId);
-        
-        // Check for yield_id first, then fall back to id
+        console.log('[ProductionCard] Delete clicked:', {
+            animalId,
+            yield_id: production.yield_id,
+            id: production.id,
+            trace_number: production.trace_number,
+        });
         if (!production.yield_id && !production.id) {
+            console.error('[ProductionCard] Missing both yield_id and id for production:', production);
             toast.error('Cannot delete: Production ID is missing.');
             return;
         }
-        
         onDelete(production);
     };
     
     const description = production.notes || `${production.quantity} ${production.product_category.measurement_unit}`;
     const isLongDescription = description.length > 150;
-    
 
     const formattedDateTime = formatDateTime(production.production_date, production.production_time);
     const relativeTime = formatRelativeTime(production.production_date);
@@ -268,6 +278,7 @@ const AnimalProductions: React.FC = () => {
 
     useEffect(() => {
         if (!id) {
+            console.error('[AnimalProductions] Missing animal ID');
             toast.error('Animal ID is missing.');
             navigate('/animals');
             return;
@@ -279,39 +290,35 @@ const AnimalProductions: React.FC = () => {
             try {
                 setLoading(true);
                 
-                // First try to fetch just the animal data
                 let animalData;
                 try {
                     animalData = await fetchAnimal(id);
-                    console.log('Animal data fetched successfully:', animalData);
-                } catch (animalError) {
-                    console.error('Error fetching animal data:', animalError);
+                    console.log('[AnimalProductions] Animal data fetched:', animalData);
+                } catch (animalError: any) {
+                    console.error('[AnimalProductions] Error fetching animal:', animalError);
                     if (isMounted) {
                         toast.error(`Failed to load animal: ${animalError.message || 'Unknown error'}`);
                         navigate('/animals');
                     }
-                    return; // Exit early if animal fetch fails
+                    return;
                 }
                 
-                // Then try to fetch productions separately
                 let productionsData;
                 try {
                     productionsData = await fetchProductions(id);
-                    console.log('Productions data fetched successfully:', productionsData);
-                } catch (productionsError) {
-                    console.error('Error fetching productions data:', productionsError);
+                    console.log('[AnimalProductions] Productions data fetched:', productionsData.length, 'records');
+                } catch (productionsError: any) {
+                    console.error('[AnimalProductions] Error fetching productions:', productionsError);
                     if (isMounted) {
                         toast.error(`Failed to load productions: ${productionsError.message || 'Unknown error'}`);
-                        // Don't navigate away - we at least have the animal data
                         setAnimal(animalData);
                         setProductions([]);
                         setLoading(false);
                         setIsInitialLoad(false);
                     }
-                    return; // Exit after setting the animal data
+                    return;
                 }
                 
-                // If both fetches succeed
                 if (isMounted) {
                     setAnimal(animalData);
                     setProductions(productionsData.sort((a, b) => 
@@ -319,14 +326,12 @@ const AnimalProductions: React.FC = () => {
                     ));
                     
                     if (!productionsData.length) {
-                        console.log('No production records returned.');
+                        console.log('[AnimalProductions] No production records found');
                         toast.info('No production records found.');
-                    } else {
-                        console.log('Productions set successfully:', productionsData.length, 'records');
                     }
                 }
-            } catch (error) {
-                console.error('Error in loadData:', error);
+            } catch (error: any) {
+                console.error('[AnimalProductions] Error in loadData:', error);
                 if (isMounted) {
                     toast.error(`Failed to load data: ${error.message || 'Check your network or authentication.'}`);
                 }
@@ -343,7 +348,11 @@ const AnimalProductions: React.FC = () => {
     }, [id, navigate, location.state?.refresh]);
 
     const handleDeleteClick = useCallback((production: Production) => {
-        console.log('Delete clicked for production:', production.id);
+        console.log('[AnimalProductions] Delete clicked:', {
+            yield_id: production.yield_id,
+            id: production.id,
+            trace_number: production.trace_number,
+        });
         setProductionToDelete(production);
         setDeleteConfirmOpen(true);
     }, []);
@@ -352,85 +361,122 @@ const AnimalProductions: React.FC = () => {
         const productionId = productionToDelete?.yield_id || productionToDelete?.id;
         
         if (!productionId || !id) {
+            console.error('[AnimalProductions] Missing production ID or animal ID:', {
+                productionId,
+                animalId: id,
+            });
             toast.error('Missing production ID or animal ID');
             setDeleteConfirmOpen(false);
             return;
         }
         
         const originalProductions = [...productions];
-        setProductions(prev => prev.filter(p => (p.id !== productionId && p.yield_id !== productionId)));
+        setProductions(prev => prev.filter(p => (p.yield_id !== productionId && p.id !== productionId)));
         setDeleteConfirmOpen(false);
         
         try {
             await deleteProduction(id, productionId);
-            // toast.success is already handled in deleteProduction
+            console.log('[AnimalProductions] Production deleted:', productionId);
             setProductionToDelete(null);
         } catch (error: any) {
-            console.error('AnimalProductions - Error deleting production:', error);
+            console.error('[AnimalProductions] Error deleting production:', error);
             toast.error(`Failed to delete production: ${error.message || 'Operation failed.'}`);
             setProductions(originalProductions);
         }
     }, [id, productionToDelete, productions]);
 
     const handleAddProduction = useCallback(() => {
-        if (!id) return;
+        if (!id) {
+            console.error('[AnimalProductions] Missing animal ID for new production');
+            toast.error('Animal ID is missing');
+            return;
+        }
+        console.log('[AnimalProductions] Navigating to new production form:', { animalId: id });
         navigate(`/animals/${id}/production/new`);
     }, [id, navigate]);
 
-    const handleEditProduction = useCallback((productionId: string) => {
-        console.log('Edit clicked for production:', productionId);
-        
-        if (!id || !productionId) {
-            toast.error('Missing animal ID or production ID');
+    const handleEditProduction = useCallback((production: Production) => {
+        if (!id) {
+            console.error('[AnimalProductions] Missing animal ID');
+            toast.error('Animal ID is missing');
             return;
         }
         
-        // Search for the production using both id and yield_id
-        const production = productions.find(p => p.id === productionId || p.yield_id === productionId);
-        
-        if (!production) {
-            toast.error('Production not found');
+        if (!production.yield_id) {
+            console.error('[AnimalProductions] Missing yield_id for production:', {
+                id: production.id,
+                trace_number: production.trace_number,
+            });
+            toast.error('Cannot edit: Production ID is missing');
             return;
         }
         
-        // Use the productionId passed from the ProductionCard component
-        // This ensures we're using the correct ID (either id or yield_id)
-        navigate(`/animals/${id}/production/${productionId}/edit`, { state: { production } });
-    }, [id, productions, navigate]);
+        console.log('[AnimalProductions] Navigating to edit production:', {
+            animalId: id,
+            yield_id: production.yield_id,
+            trace_number: production.trace_number,
+            stateProduction: {
+                product_category: production.product_category,
+                quantity: production.quantity,
+                animal_type: production.animal_type,
+                breed: production.breed,
+            },
+        });
+        
+        navigate(`/animals/${id}/production/${production.yield_id}/edit`, {
+            state: {
+                production: {
+                    ...production,
+                    animal_type: production.animal_type || animal?.animal_type || '',
+                    breed: production.breed || animal?.breed || '',
+                },
+            },
+        });
+    }, [id, animal, navigate]);
 
     const generatePDF = useCallback(async () => {
-        if (!pdfContentRef.current || !animal) return;
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const canvas = await html2canvas(pdfContentRef.current, { scale: 2 });
-        const imgData = canvas.toDataURL('image/png');
-        const imgWidth = 190;
-        const pageHeight = 295;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        let heightLeft = imgHeight;
-        let position = 10;
-
-        pdf.setFontSize(18);
-        pdf.setTextColor(0, 102, 204);
-        pdf.text(`${animal.name}'s Production Report`, 10, 20);
-        pdf.setFontSize(10);
-        pdf.setTextColor(100);
-        pdf.text(`Animal ID: ${animal.id} | Location: ${productions[0]?.storage_location?.location_code || 'N/A'} | Generated on: ${format(new Date(), 'PPPp')}`, 10, 28);
-
-        pdf.addImage(imgData, 'PNG', 10, 40, imgWidth, imgHeight);
-        heightLeft -= pageHeight - 40;
-
-        while (heightLeft > 0) {
-            position = heightLeft - imgHeight + 40;
-            pdf.addPage();
-            pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-            heightLeft -= pageHeight;
+        if (!pdfContentRef.current || !animal) {
+            console.error('[AnimalProductions] Missing PDF content or animal data');
+            toast.error('Cannot generate PDF: Missing data');
+            return;
         }
+        try {
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const canvas = await html2canvas(pdfContentRef.current, { scale: 2 });
+            const imgData = canvas.toDataURL('image/png');
+            const imgWidth = 190;
+            const pageHeight = 295;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            let heightLeft = imgHeight;
+            let position = 10;
 
-        pdf.setFontSize(8);
-        pdf.setTextColor(150);
-        pdf.text(`Animal Management System - Page ${pdf.getNumberOfPages()}`, 10, 290);
-        pdf.save(`${animal.name}_productions_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
-        toast.success('PDF report generated successfully');
+            pdf.setFontSize(18);
+            pdf.setTextColor(0, 102, 204);
+            pdf.text(`${animal.name}'s Production Report`, 10, 20);
+            pdf.setFontSize(10);
+            pdf.setTextColor(100);
+            pdf.text(`Animal ID: ${animal.id} | Location: ${productions[0]?.storage_location?.location_code || 'N/A'} | Generated on: ${format(new Date(), 'PPPp')}`, 10, 28);
+
+            pdf.addImage(imgData, 'PNG', 10, 40, imgWidth, imgHeight);
+            heightLeft -= pageHeight - 40;
+
+            while (heightLeft > 0) {
+                position = heightLeft - imgHeight + 40;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+
+            pdf.setFontSize(8);
+            pdf.setTextColor(150);
+            pdf.text(`Animal Management System - Page ${pdf.getNumberOfPages()}`, 10, 290);
+            pdf.save(`${animal.name}_productions_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+            console.log('[AnimalProductions] PDF generated successfully');
+            toast.success('PDF report generated successfully');
+        } catch (error: any) {
+            console.error('[AnimalProductions] Error generating PDF:', error);
+            toast.error('Failed to generate PDF');
+        }
     }, [animal, productions]);
 
     const productionCounts = useMemo(() => {
@@ -442,8 +488,8 @@ const AnimalProductions: React.FC = () => {
         };
         productions.forEach(p => {
             if (p.is_organic) counts.organic++;
-            if (isPast(parseISO(p.production_date)) && (new Date().getTime() - parseISO(p.production_date).getTime()) / (1000 * 60 * 60 * 24) <= 30) counts.recent++; // Last 30 days
-            if (parseFloat(p.total_price || '0') > 100) counts.highValue++; // Arbitrary threshold of $100
+            if (isPast(parseISO(p.production_date)) && (new Date().getTime() - parseISO(p.production_date).getTime()) / (1000 * 60 * 60 * 24) <= 30) counts.recent++;
+            if (parseFloat(p.total_price || '0') > 100) counts.highValue++;
         });
         return counts;
     }, [productions]);
@@ -608,7 +654,7 @@ const AnimalProductions: React.FC = () => {
                             <div ref={pdfContentRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                                 {currentItems.map((production) => (
                                     <ProductionCard
-                                        key={production.id}
+                                        key={production.yield_id || production.id}
                                         production={production}
                                         animalId={id!}
                                         onEdit={handleEditProduction}
@@ -644,7 +690,7 @@ const AnimalProductions: React.FC = () => {
                     </div>
                 )}
 
-<Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+                <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
                     <DialogContent className="sm:max-w-[425px]">
                         <DialogHeader>
                             <DialogTitle className="text-xl flex items-center gap-2">

@@ -33,43 +33,50 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from '@/components/ui/dialog'; // Added explicit import for Dialog components
-import { Activity, fetchActivities, deleteActivity } from '@/services/ActivityApi';
+} from '@/components/ui/dialog';
+import {
+  Transaction,
+  TransactionSummary,
+  fetchTransactions,
+  fetchTransactionSummary,
+  deleteTransaction,
+} from '@/services/transactionApis';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import { toast } from 'sonner';
 
-interface ActivityManagementProps {
+interface AnimalTransactionsProps {
   animalId: string;
 }
 
 type ViewMode = 'list' | 'summary';
 
-// Reusable Dialog Component
-interface ActivityDialogProps {
+// Reusable Dialog Component for long text fields
+interface TransactionDialogProps {
   open: boolean;
   onClose: () => void;
-  activityId: string;
-  field: 'description' | 'notes';
+  transactionId: string;
+  field: 'details' | 'delivery_instructions';
   content: string;
-  activityType: string;
-  activityDate: string;
+  transactionType: string;
+  transactionDate: string;
   animalId: string;
 }
 
-function ActivityDialog({
+function TransactionDialog({
   open,
   onClose,
-  activityId,
+  transactionId,
   field,
   content,
-  activityType,
-  activityDate,
+  transactionType,
+  transactionDate,
   animalId,
-}: ActivityDialogProps) {
+}: TransactionDialogProps) {
   const navigate = useNavigate();
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    // Optionally, add a toast notification here to confirm copy
+    toast.success(`${field.charAt(0).toUpperCase() + field.slice(1)} copied to clipboard`);
   };
 
   return (
@@ -77,23 +84,23 @@ function ActivityDialog({
       <DialogContent className="sm:max-w-lg transition-all duration-200 ease-in-out">
         <DialogHeader className="pb-4">
           <DialogTitle className="flex items-center gap-2">
-            {field === 'description' ? (
+            {field === 'details' ? (
               <FileText className="h-5 w-5 text-primary" />
             ) : (
               <Notebook className="h-5 w-5 text-primary" />
             )}
-            {activityType.replace('_', ' ').toUpperCase()} -{' '}
+            {transactionType.charAt(0).toUpperCase() + transactionType.slice(1)} -{' '}
             {field.charAt(0).toUpperCase() + field.slice(1)}
           </DialogTitle>
           <DialogDescription className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
-            Recorded on {format(parseISO(activityDate), 'PP')}
+            Recorded on {format(parseISO(transactionDate), 'PP')}
           </DialogDescription>
         </DialogHeader>
         <div className="mt-4 p-4 bg-muted/50 rounded-lg border border-border">
           <p className="text-sm text-foreground whitespace-pre-wrap">{content}</p>
         </div>
-       
+        <div className="flex justify-between gap-2 mt-4">
           <Button
             variant="outline"
             onClick={() => copyToClipboard(content)}
@@ -105,8 +112,8 @@ function ActivityDialog({
           <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={() => navigate(`/animals/${animalId}/activities/${activityId}/edit`)}
-              aria-label={`Edit ${activityType} activity`}
+              onClick={() => navigate(`/animals/${animalId}/transactions/${transactionId}/edit`)}
+              aria-label={`Edit ${transactionType} transaction`}
             >
               <Edit className="mr-2 h-4 w-4" />
               Edit
@@ -115,45 +122,68 @@ function ActivityDialog({
               Close
             </Button>
           </div>
-        </DialogContent>
-      </Dialog>
-  
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-export function ActivityManagement({ animalId }: ActivityManagementProps) {
+export function AnimalTransactions({ animalId }: AnimalTransactionsProps) {
   const navigate = useNavigate();
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [summary, setSummary] = useState<TransactionSummary | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [isLoading, setIsLoading] = useState(false);
 
-  const loadActivities = useCallback(async () => {
+  const loadTransactions = useCallback(async () => {
     try {
       setIsLoading(true);
-      const data = await fetchActivities(animalId);
-      setActivities(data);
+      const data = await fetchTransactions(animalId);
+      setTransactions(data);
     } catch (error) {
-      console.error('Failed to load activities:', error);
+      console.error('Failed to load transactions:', error);
+      toast.error('Failed to load transactions');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [animalId]);
+
+  const loadSummary = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const data = await fetchTransactionSummary(animalId);
+      setSummary(data);
+    } catch (error) {
+      console.error('Failed to load transaction summary:', error);
+      toast.error('Failed to load transaction summary');
     } finally {
       setIsLoading(false);
     }
   }, [animalId]);
 
   React.useEffect(() => {
-    loadActivities();
-  }, [loadActivities]);
+    loadTransactions();
+    loadSummary();
+  }, [loadTransactions, loadSummary]);
 
-  const handleDelete = useCallback(async (activityId: string) => {
-    try {
-      setIsLoading(true);
-      await deleteActivity(animalId, activityId);
-      setActivities((prev) => prev.filter((a) => a.id !== activityId));
-    } catch (error) {
-      console.error('Failed to delete activity:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [animalId]);
+  const handleDelete = useCallback(
+    async (transactionId: string) => {
+      try {
+        setIsLoading(true);
+        await deleteTransaction(animalId, transactionId);
+        setTransactions((prev) => prev.filter((t) => t.id !== transactionId));
+        toast.success('Transaction deleted successfully');
+        // Reload summary to reflect changes
+        loadSummary();
+      } catch (error) {
+        console.error('Failed to delete transaction:', error);
+        toast.error('Failed to delete transaction');
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [animalId, loadSummary]
+  );
 
   const formatDate = (dateString: string): string => {
     try {
@@ -163,12 +193,19 @@ export function ActivityManagement({ animalId }: ActivityManagementProps) {
     }
   };
 
-  const activityActions = useMemo(
+  const formatCurrency = (amount: number, currency: string): string => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+    }).format(amount);
+  };
+
+  const transactionActions = useMemo(
     () => ({
-      onEdit: (activity: Activity) => {
-        navigate(`/animals/${animalId}/activities/${activity.id}/edit`);
+      onEdit: (transaction: Transaction) => {
+        navigate(`/animals/${animalId}/transactions/${transaction.id}/edit`);
       },
-      onDelete: (activityId: string) => handleDelete(activityId),
+      onDelete: (transactionId: string) => handleDelete(transactionId),
     }),
     [handleDelete, navigate, animalId]
   );
@@ -212,10 +249,10 @@ export function ActivityManagement({ animalId }: ActivityManagementProps) {
             </Button>
             <div>
               <h1 className="text-3xl font-bold text-foreground">
-                Activity Dashboard
+                Transaction Dashboard
               </h1>
               <p className="text-muted-foreground ml-1">
-                Track and manage all activities for this animal
+                Track and manage all transactions for this animal
               </p>
             </div>
           </div>
@@ -224,12 +261,21 @@ export function ActivityManagement({ animalId }: ActivityManagementProps) {
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 mb-8">
           <Button
-            onClick={() => navigate(`/animals/${animalId}/activities/new`)}
+            onClick={() => navigate(`/animals/${animalId}/transactions/new`)}
             disabled={isLoading}
           >
             <Plus className="mr-2 h-5 w-5" />
-            New Activity
+            New Transaction
           </Button>
+          {viewMode === 'list' && (
+            <Button
+              onClick={() => navigate(`/animals/${animalId}/transactions/summary`)}
+              disabled={isLoading}
+            >
+              <BarChart2 className="mr-2 h-5 w-5" />
+              View Summary
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={() => navigate('/dashboard')}
@@ -278,16 +324,18 @@ export function ActivityManagement({ animalId }: ActivityManagementProps) {
         {isLoading ? (
           renderSkeletons()
         ) : viewMode === 'list' ? (
-          <ActivityListView
-            activities={activities}
+          <TransactionListView
+            transactions={transactions}
             formatDate={formatDate}
-            actions={activityActions}
+            formatCurrency={formatCurrency}
+            actions={transactionActions}
             animalId={animalId}
           />
         ) : (
-          <ActivitySummaryView
-            activities={activities}
+          <TransactionSummaryView
+            summary={summary}
             formatDate={formatDate}
+            formatCurrency={formatCurrency}
             animalId={animalId}
           />
         )}
@@ -296,41 +344,48 @@ export function ActivityManagement({ animalId }: ActivityManagementProps) {
   );
 }
 
-// ActivityListView Component
-interface ActivityListViewProps {
-  activities: Activity[];
+// TransactionListView Component
+interface TransactionListViewProps {
+  transactions: Transaction[];
   formatDate: (date: string) => string;
+  formatCurrency: (amount: number, currency: string) => string;
   actions: {
-    onEdit: (activity: Activity) => void;
-    onDelete: (activityId: string) => void;
+    onEdit: (transaction: Transaction) => void;
+    onDelete: (transactionId: string) => void;
   };
   animalId: string;
 }
 
-function ActivityListView({ activities, formatDate, actions, animalId }: ActivityListViewProps) {
+function TransactionListView({
+  transactions,
+  formatDate,
+  formatCurrency,
+  actions,
+  animalId,
+}: TransactionListViewProps) {
   const [modalContent, setModalContent] = useState<{
-    activityId: string;
-    field: 'description' | 'notes';
+    transactionId: string;
+    field: 'details' | 'delivery_instructions';
     content: string;
-    activityType: string;
-    activityDate: string;
+    transactionType: string;
+    transactionDate: string;
   } | null>(null);
 
   const openModal = (
-    activityId: string,
-    field: 'description' | 'notes',
+    transactionId: string,
+    field: 'details' | 'delivery_instructions',
     content: string,
-    activityType: string,
-    activityDate: string
+    transactionType: string,
+    transactionDate: string
   ) => {
-    setModalContent({ activityId, field, content, activityType, activityDate });
+    setModalContent({ transactionId, field, content, transactionType, transactionDate });
   };
 
   const closeModal = () => {
     setModalContent(null);
   };
 
-  if (activities.length === 0) {
+  if (transactions.length === 0) {
     return (
       <Card className="border-dashed border-border shadow-sm p-8 text-center">
         <CardContent className="pt-6">
@@ -338,10 +393,10 @@ function ActivityListView({ activities, formatDate, actions, animalId }: Activit
             <List className="h-6 w-6 text-muted-foreground" />
           </div>
           <h3 className="text-xl font-semibold text-foreground mb-3">
-            No Activities Recorded
+            No Transactions Recorded
           </h3>
           <p className="text-muted-foreground max-w-md mx-auto">
-            Start tracking activities by adding your first entry. This will help you monitor care and treatment over time.
+            Start tracking transactions by adding your first entry. This will help you monitor sales and purchases.
           </p>
         </CardContent>
       </Card>
@@ -351,31 +406,33 @@ function ActivityListView({ activities, formatDate, actions, animalId }: Activit
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        {activities.map((activity) => {
-          const isDescriptionLong = (activity.description?.length || 0) > 50;
-          const isNotesLong = (activity.notes?.length || 0) > 50;
-          const truncatedDescription = isDescriptionLong
-            ? `${activity.description?.slice(0, 50)}...`
-            : activity.description;
-          const truncatedNotes = isNotesLong
-            ? `${activity.notes?.slice(0, 50)}...`
-            : activity.notes;
+        {transactions.map((transaction) => {
+          const isDetailsLong = (transaction.details?.length || 0) > 50;
+          const isDeliveryInstructionsLong =
+            (transaction.delivery_instructions?.length || 0) > 50;
+          const truncatedDetails = isDetailsLong
+            ? `${transaction.details?.slice(0, 50)}...`
+            : transaction.details;
+          const truncatedDeliveryInstructions = isDeliveryInstructionsLong
+            ? `${transaction.delivery_instructions?.slice(0, 50)}...`
+            : transaction.delivery_instructions;
 
           return (
             <Card
-              key={activity.id}
+              key={transaction.id}
               className="flex flex-col border-l-4 border-primary shadow-sm hover:shadow-md transition-shadow duration-200 min-h-[250px] max-h-[250px]"
             >
               <CardHeader className="p-4 pb-3">
                 <div className="flex justify-between items-center">
                   <CardTitle className="text-lg font-semibold text-foreground">
-                    {activity.activity_type.replace('_', ' ').toUpperCase()}
+                    {transaction.transaction_type.charAt(0).toUpperCase() +
+                      transaction.transaction_type.slice(1)}
                   </CardTitle>
                   <div className="flex gap-2">
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => actions.onEdit(activity)}
+                      onClick={() => actions.onEdit(transaction)}
                       className="h-8 w-8"
                     >
                       <Pencil className="h-4 w-4" />
@@ -383,7 +440,7 @@ function ActivityListView({ activities, formatDate, actions, animalId }: Activit
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => actions.onDelete(activity.id)}
+                      onClick={() => actions.onDelete(transaction.id)}
                       className="h-8 w-8 text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -392,52 +449,66 @@ function ActivityListView({ activities, formatDate, actions, animalId }: Activit
                 </div>
                 <CardDescription className="flex items-center gap-2 text-sm">
                   <Calendar className="h-4 w-4" />
-                  {formatDate(activity.activity_date)}
+                  {formatDate(transaction.transaction_date)}
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4 pt-2 flex-grow flex flex-col space-y-3 overflow-hidden">
-                <div className="flex-1 min-h-0">
-                  <p className="text-sm font-medium text-foreground">Description</p>
-                  <p className="text-sm text-muted-foreground line-clamp-2">
-                    {truncatedDescription || 'No description provided.'}
-                  </p>
-                  {isDescriptionLong && (
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="h-auto p-0 mt-1 text-primary"
-                      onClick={() =>
-                        openModal(
-                          activity.id,
-                          'description',
-                          activity.description || '',
-                          activity.activity_type,
-                          activity.activity_date
-                        )
-                      }
-                    >
-                      Read More
-                    </Button>
-                  )}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">Amount:</span>
+                  <span className="text-sm text-muted-foreground">
+                    {formatCurrency(transaction.total_amount, transaction.currency)}
+                  </span>
                 </div>
-                {activity.notes && (
+                <div className="flex-1 min-h-0">
+                  <p className="text-sm font-medium text-foreground">Seller/Buyer</p>
+                  <p className="text-sm text-muted-foreground line-clamp-1">
+                    {transaction.seller_name} → {transaction.buyer_name}
+                  </p>
+                </div>
+                {transaction.details && (
                   <div className="flex-1 min-h-0">
-                    <p className="text-sm font-medium text-foreground">Notes</p>
+                    <p className="text-sm font-medium text-foreground">Details</p>
                     <p className="text-sm text-muted-foreground line-clamp-2">
-                      {truncatedNotes}
+                      {truncatedDetails}
                     </p>
-                    {isNotesLong && (
+                    {isDetailsLong && (
                       <Button
                         variant="link"
                         size="sm"
                         className="h-auto p-0 mt-1 text-primary"
                         onClick={() =>
                           openModal(
-                            activity.id,
-                            'notes',
-                            activity.notes || '',
-                            activity.activity_type,
-                            activity.activity_date
+                            transaction.id,
+                            'details',
+                            transaction.details || '',
+                            transaction.transaction_type,
+                            transaction.transaction_date
+                          )
+                        }
+                      >
+                        Read More
+                      </Button>
+                    )}
+                  </div>
+                )}
+                {transaction.delivery_instructions && (
+                  <div className="flex-1 min-h-0">
+                    <p className="text-sm font-medium text-foreground">Delivery Instructions</p>
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {truncatedDeliveryInstructions}
+                    </p>
+                    {isDeliveryInstructionsLong && (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 mt-1 text-primary"
+                        onClick={() =>
+                          openModal(
+                            transaction.id,
+                            'delivery_instructions',
+                            transaction.delivery_instructions || '',
+                            transaction.transaction_type,
+                            transaction.transaction_date
                           )
                         }
                       >
@@ -453,14 +524,14 @@ function ActivityListView({ activities, formatDate, actions, animalId }: Activit
       </div>
 
       {modalContent && (
-        <ActivityDialog
+        <TransactionDialog
           open={!!modalContent}
           onClose={closeModal}
-          activityId={modalContent.activityId}
+          transactionId={modalContent.transactionId}
           field={modalContent.field}
           content={modalContent.content}
-          activityType={modalContent.activityType}
-          activityDate={modalContent.activityDate}
+          transactionType={modalContent.transactionType}
+          transactionDate={modalContent.transactionDate}
           animalId={animalId}
         />
       )}
@@ -468,70 +539,43 @@ function ActivityListView({ activities, formatDate, actions, animalId }: Activit
   );
 }
 
-// ActivitySummaryView Component
-interface ActivitySummaryViewProps {
-  activities: Activity[];
+// TransactionSummaryView Component
+interface TransactionSummaryViewProps {
+  summary: TransactionSummary | null;
   formatDate: (date: string) => string;
+  formatCurrency: (amount: number, currency: string) => string;
   animalId: string;
 }
 
-function ActivitySummaryView({ activities, formatDate, animalId }: ActivitySummaryViewProps) {
+function TransactionSummaryView({
+  summary,
+  formatDate,
+  formatCurrency,
+  animalId,
+}: TransactionSummaryViewProps) {
   const [modalContent, setModalContent] = useState<{
-    activityId: string;
-    field: 'description' | 'notes';
+    transactionId: string;
+    field: 'details' | 'delivery_instructions';
     content: string;
-    activityType: string;
-    activityDate: string;
+    transactionType: string;
+    transactionDate: string;
   } | null>(null);
 
   const openModal = (
-    activityId: string,
-    field: 'description' | 'notes',
+    transactionId: string,
+    field: 'details' | 'delivery_instructions',
     content: string,
-    activityType: string,
-    activityDate: string
+    transactionType: string,
+    transactionDate: string
   ) => {
-    setModalContent({ activityId, field, content, activityType, activityDate });
+    setModalContent({ transactionId, field, content, transactionType, transactionDate });
   };
 
   const closeModal = () => {
     setModalContent(null);
   };
 
-  const summary = useMemo(() => {
-    if (activities.length === 0) return [];
-
-    const counts = activities.reduce(
-      (acc, curr) => {
-        acc[curr.activity_type] = (acc[curr.activity_type] || 0) + 1;
-        return acc;
-      },
-      {} as Record<string, number>
-    );
-
-    return Object.entries(counts)
-      .map(([type, count]) => ({
-        type: type.replace('_', ' ').toUpperCase(),
-        count,
-        percentage: ((count / activities.length) * 100).toFixed(1),
-      }))
-      .sort((a, b) => b.count - a.count);
-  }, [activities]);
-
-  const chartData = useMemo(
-    () =>
-      summary.map((item) => ({
-        name: item.type,
-        value: item.count,
-      })),
-    [summary]
-  );
-
-  const recent = activities.slice(0, 5);
-
-  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-
-  if (activities.length === 0) {
+  if (!summary || summary.overview.total_transactions === 0) {
     return (
       <Card className="border-dashed border-border shadow-sm p-8 text-center">
         <CardContent className="pt-6">
@@ -542,12 +586,23 @@ function ActivitySummaryView({ activities, formatDate, animalId }: ActivitySumma
             No Data to Summarize
           </h3>
           <p className="text-muted-foreground max-w-md mx-auto">
-            Add activities to generate insights and visualize patterns over time.
+            Add transactions to generate insights and visualize financial activity.
           </p>
         </CardContent>
       </Card>
     );
   }
+
+  const chartData = useMemo(() => {
+    return Object.entries(summary.status_distribution).map(([status, count]) => ({
+      name: status.charAt(0).toUpperCase() + status.slice(1),
+      value: count,
+    }));
+  }, [summary.status_distribution]);
+
+  const recent = summary.recent_transactions.slice(0, 5);
+
+  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
   return (
     <div className="space-y-6">
@@ -556,47 +611,47 @@ function ActivitySummaryView({ activities, formatDate, animalId }: ActivitySumma
         <CardHeader>
           <CardTitle className="text-xl font-semibold flex items-center gap-2">
             <Tag className="h-5 w-5 text-primary" />
-            Activity Overview
+            Transaction Overview
           </CardTitle>
           <CardDescription>
-            Key metrics about your animal's activities
+            Key metrics about your animal's transactions
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-muted/50 rounded-lg p-4 text-center transition-transform hover:scale-105">
               <div className="text-2xl font-semibold text-foreground mb-1">
-                {activities.length}
+                {summary.overview.total_transactions}
               </div>
-              <div className="text-sm text-muted-foreground">Total Activities</div>
+              <div className="text-sm text-muted-foreground">Total Transactions</div>
             </div>
             <div className="bg-muted/50 rounded-lg p-4 text-center transition-transform hover:scale-105">
               <div className="text-2xl font-semibold text-foreground mb-1">
-                {summary.length}
+                {summary.overview.total_value} {summary.currency}
               </div>
-              <div className="text-sm text-muted-foreground">Activity Types</div>
+              <div className="text-sm text-muted-foreground">Total Value</div>
             </div>
             <div className="bg-muted/50 rounded-lg p-4 text-center transition-transform hover:scale-105">
               <div className="text-2xl font-semibold text-foreground mb-1">
-                {summary.length > 0 ? summary[0].type : 'N/A'}
+                {summary.overview.pending_amount} {summary.currency}
               </div>
-              <div className="text-sm text-muted-foreground">Most Common</div>
+              <div className="text-sm text-muted-foreground">Pending Amount</div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Distribution and Recent Activities */}
+      {/* Distribution and Recent Transactions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Activity Distribution */}
+        {/* Transaction Status Distribution */}
         <Card className="shadow-sm border-border flex flex-col min-h-[400px] max-h-[400px] overflow-hidden">
           <CardHeader className="p-4">
             <CardTitle className="text-xl font-semibold flex items-center gap-2">
               <BarChart2 className="h-5 w-5 text-primary" />
-              Activity Distribution
+              Status Distribution
             </CardTitle>
             <CardDescription>
-              Breakdown of activities by type
+              Breakdown of transactions by status
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-grow p-4 pt-0 flex flex-col overflow-hidden">
@@ -619,7 +674,7 @@ function ActivitySummaryView({ activities, formatDate, animalId }: ActivitySumma
                     ))}
                   </Pie>
                   <RechartsTooltip
-                    formatter={(value, name) => [`${value} activities`, name]}
+                    formatter={(value, name) => [`${value} transactions`, name]}
                     contentStyle={{
                       backgroundColor: 'hsl(var(--background))',
                       border: '1px solid hsl(var(--border))',
@@ -632,17 +687,17 @@ function ActivitySummaryView({ activities, formatDate, animalId }: ActivitySumma
             </div>
             <div className="flex-1 overflow-y-auto pr-2">
               <div className="space-y-2">
-                {summary.map((item, index) => (
-                  <div key={item.type} className="flex items-center gap-2 text-sm">
+                {chartData.map((item, index) => (
+                  <div key={item.name} className="flex items-center gap-2 text-sm">
                     <div
                       className="w-3 h-3 rounded-full flex-shrink-0"
                       style={{ backgroundColor: COLORS[index % COLORS.length] }}
                     />
                     <span className="text-foreground truncate flex-1 min-w-0">
-                      {item.type}
+                      {item.name}
                     </span>
                     <span className="text-muted-foreground flex-shrink-0">
-                      ({item.percentage}%)
+                      ({((item.value / summary.overview.total_transactions) * 100).toFixed(1)}%)
                     </span>
                   </div>
                 ))}
@@ -651,38 +706,44 @@ function ActivitySummaryView({ activities, formatDate, animalId }: ActivitySumma
           </CardContent>
         </Card>
 
-        {/* Recent Activities */}
+        {/* Recent Transactions */}
         <Card className="shadow-sm border-border flex flex-col min-h-[400px] max-h-[400px]">
           <CardHeader className="p-4">
             <CardTitle className="text-xl font-semibold flex items-center gap-2">
               <Clock className="h-5 w-5 text-primary" />
-              Recent Activities
+              Recent Transactions
             </CardTitle>
             <CardDescription>
-              Latest activity entries
+              Latest transaction entries
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-grow p-4 pt-0 overflow-y-auto">
             {recent.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <AlertCircle className="w-6 h-6 mx-auto mb-2" />
-                <p>No recent activities to display</p>
+                <p>No recent transactions to display</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {recent.map((activity, index) => {
-                  const isDescriptionLong = (activity.description?.length || 0) > 50;
-                  const isNotesLong = (activity.notes?.length || 0) > 50;
-                  const truncatedDescription = isDescriptionLong
-                    ? `${activity.description?.slice(0, 50)}...`
-                    : activity.description;
-                  const truncatedNotes = isNotesLong
-                    ? `${activity.notes?.slice(0, 50)}...`
-                    : activity.notes;
+                {recent.map((transaction, index) => {
+                  // Fetch full transaction for potential long fields (not in summary)
+                  const fullTransaction = transactions.find((t) => t.id === transaction.id);
+                  const isDetailsLong = fullTransaction
+                    ? (fullTransaction.details?.length || 0) > 50
+                    : false;
+                  const isDeliveryInstructionsLong = fullTransaction
+                    ? (fullTransaction.delivery_instructions?.length || 0) > 50
+                    : false;
+                  const truncatedDetails = isDetailsLong
+                    ? `${fullTransaction?.details?.slice(0, 50)}...`
+                    : fullTransaction?.details;
+                  const truncatedDeliveryInstructions = isDeliveryInstructionsLong
+                    ? `${fullTransaction?.delivery_instructions?.slice(0, 50)}...`
+                    : fullTransaction?.delivery_instructions;
 
                   return (
                     <div
-                      key={activity.id}
+                      key={transaction.id}
                       className="p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors min-h-[120px] max-h-[120px] flex items-start gap-3 overflow-hidden"
                     >
                       <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-background flex items-center justify-center text-sm font-semibold">
@@ -691,54 +752,38 @@ function ActivitySummaryView({ activities, formatDate, animalId }: ActivitySumma
                       <div className="flex-1 flex flex-col space-y-1 overflow-hidden">
                         <div className="flex justify-between items-center">
                           <span className="font-semibold text-foreground truncate">
-                            {activity.activity_type.replace('_', ' ').toUpperCase()}
+                            {transaction.transaction_type.charAt(0).toUpperCase() +
+                              transaction.transaction_type.slice(1)}
                           </span>
                           <span className="text-xs text-muted-foreground flex-shrink-0">
-                            {formatDate(activity.activity_date)}
+                            {formatDate(transaction.transaction_date)}
                           </span>
                         </div>
                         <div className="flex-1 flex flex-col space-y-1 overflow-hidden">
-                          <div className="flex-1 min-h-0">
-                            <p className="text-sm text-muted-foreground line-clamp-1">
-                              {truncatedDescription || 'No description provided.'}
-                            </p>
-                            {isDescriptionLong && (
-                              <Button
-                                variant="link"
-                                size="sm"
-                                className="h-auto p-0 text-primary text-xs"
-                                onClick={() =>
-                                  openModal(
-                                    activity.id,
-                                    'description',
-                                    activity.description || '',
-                                    activity.activity_type,
-                                    activity.activity_date
-                                  )
-                                }
-                              >
-                                Read More
-                              </Button>
-                            )}
-                          </div>
-                          {activity.notes && (
+                          <p className="text-sm text-muted-foreground line-clamp-1">
+                            Amount: {transaction.total_amount} {summary.currency}
+                          </p>
+                          <p className="text-sm text-muted-foreground line-clamp-1">
+                            Status: {transaction.transaction_status || 'N/A'}
+                          </p>
+                          {fullTransaction?.details && (
                             <div className="flex-1 min-h-0">
                               <p className="text-sm text-muted-foreground line-clamp-1">
-                                <span className="font-medium">Notes: </span>
-                                {truncatedNotes}
+                                <span className="font-medium">Details: </span>
+                                {truncatedDetails}
                               </p>
-                              {isNotesLong && (
+                              {isDetailsLong && (
                                 <Button
                                   variant="link"
                                   size="sm"
                                   className="h-auto p-0 text-primary text-xs"
                                   onClick={() =>
                                     openModal(
-                                      activity.id,
-                                      'notes',
-                                      activity.notes || '',
-                                      activity.activity_type,
-                                      activity.activity_date
+                                      transaction.id,
+                                      'details',
+                                      fullTransaction.details || '',
+                                      transaction.transaction_type,
+                                      transaction.transaction_date
                                     )
                                   }
                                 >
@@ -759,14 +804,14 @@ function ActivitySummaryView({ activities, formatDate, animalId }: ActivitySumma
       </div>
 
       {modalContent && (
-        <ActivityDialog
+        <TransactionDialog
           open={!!modalContent}
           onClose={closeModal}
-          activityId={modalContent.activityId}
+          transactionId={modalContent.transactionId}
           field={modalContent.field}
           content={modalContent.content}
-          activityType={modalContent.activityType}
-          activityDate={modalContent.activityDate}
+          transactionType={modalContent.transactionType}
+          transactionDate={modalContent.transactionDate}
           animalId={animalId}
         />
       )}

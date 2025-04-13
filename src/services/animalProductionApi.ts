@@ -92,6 +92,8 @@ export interface Production extends ProductionFormData {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  animal_type?: string; // Add this
+  breed?: string; //
 }
 
 export interface ProductionStatistics {
@@ -270,8 +272,8 @@ export const fetchProduction = async (animalId: string, productionId: string): P
     console.log('Production response:', data);
     return data.data || data;
   } catch (error) {
-    console.error(`Error fetching production ${productionId}:`, error);
-    throw error;
+    console.error(`Error fetching production ${productionId} for animal ${animalId}:`, error);
+    throw new Error(`Unable to fetch production: ${error.message}`);
   }
 };
 

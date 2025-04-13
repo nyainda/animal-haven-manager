@@ -3,10 +3,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { fetchAnimals } from '@/services/animalService';
 import { fetchProductionStatistics, ProductionStatistics } from '@/services/animalProductionApi';
-import { fetchActivities, Activity } from '@/services/ActivityApi'; // Import fetchActivities and Activity type
-import { Animal } from '@/types/AnimalTypes';
+import { fetchActivities, Activity } from '@/services/ActivityApi';
+import { Animal, HealthStatistics, ReproductiveStatistics, GrowthStatistics } from '@/types/AnimalTypes';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Home, CalendarIcon, ActivityIcon, Settings, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -26,20 +27,6 @@ interface CalendarEvent {
   title: string;
   date: Date;
   type: 'appointment' | 'event' | 'meeting' | 'production';
-}
-
-// Updated Activity interface to match ActivityApi
-interface Activity {
-  id: string;
-  animal_id: string;
-  activity_type: string;
-  activity_date: string;
-  description: string;
-  notes: string;
-  breeding_date?: string;
-  breeding_notes?: string;
-  created_at: string;
-  updated_at: string;
 }
 
 interface Notification {
@@ -69,15 +56,59 @@ const Dashboard: React.FC = () => {
   // Data states
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
-  const [activities, setActivities] = useState<Activity[]>([]); // Updated to use Activity type from ActivityApi
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [productionStats, setProductionStats] = useState<ProductionStatistics | null>(null);
   const [animalStats, setAnimalStats] = useState<AnimalStatsData | null>(null);
+  const [healthStats, setHealthStats] = useState<HealthStatistics | null>(null);
+  const [reproStats, setReproStats] = useState<ReproductiveStatistics | null>(null);
+  const [growthStats, setGrowthStats] = useState<GrowthStatistics | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [mobileNotifications, setMobileNotifications] = useState(false);
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [selectedAnimalId, setSelectedAnimalId] = useState<string | null>(null);
+
+  // Compute health stats
+  const computeHealthStats = (animals: Animal[]): HealthStatistics => {
+    const healthyAnimals = animals.filter(a => a.status === 'Healthy' && !a.is_deceased).length;
+    const animalsRequiringCheckup = animals.filter(
+      a => a.next_checkup_date && new Date(a.next_checkup_date) <= new Date()
+    ).length;
+
+    return {
+      vaccination_rate: animals.filter(a => a.vaccinations && a.vaccinations.length > 0).length / (animals.length || 1) * 100,
+      health_incidents: animals.filter(a => a.status === 'Sick').length,
+      animals_requiring_checkup: animalsRequiringCheckup,
+      healthy_animals: healthyAnimals,
+    };
+  };
+
+  // Compute reproductive stats (placeholder, requires breeding API)
+  const computeReproStats = (animals: Animal[]): ReproductiveStatistics => {
+    return {
+      breeding_success_rate: 0, // Requires breeding API
+      average_gestation: 0, // Requires gestation API
+      successful_births: animals.filter(a => a.multiple_birth).length, // Approximation
+      failed_births: 0, // Requires breeding API
+    };
+  };
+
+  // Compute growth stats
+  const computeGrowthStats = (animals: Animal[]): GrowthStatistics => {
+    const weightByAgeGroup = animals.reduce((acc, animal) => {
+      if (animal.birth_weight && animal.age !== undefined) {
+        const ageGroup = animal.age <= 1 ? '0-1 year' : animal.age <= 2 ? '1-2 years' : '2+ years';
+        acc[ageGroup] = (acc[ageGroup] || 0) + animal.birth_weight;
+      }
+      return acc;
+    }, {} as Record<string, number>);
+
+    return {
+      average_weight_gain: 0, // Requires weight history API
+      weight_by_age_group: weightByAgeGroup,
+    };
+  };
 
   // Load initial data (animals and activities)
   useEffect(() => {
@@ -115,6 +146,10 @@ const Dashboard: React.FC = () => {
             breedingStockCount,
           });
 
+          setHealthStats(computeHealthStats(animalList));
+          setReproStats(computeReproStats(animalList));
+          setGrowthStats(computeGrowthStats(animalList));
+
           setSelectedAnimalId(animalList[0].id);
           localStorage.setItem('dashboard_animals', JSON.stringify(animalList));
           localStorage.setItem('dashboard_animalStats', JSON.stringify({
@@ -135,6 +170,9 @@ const Dashboard: React.FC = () => {
             averageAge: 0,
             breedingStockCount: 0,
           });
+          setHealthStats(computeHealthStats([]));
+          setReproStats(computeReproStats([]));
+          setGrowthStats(computeGrowthStats([]));
         }
       } catch (error) {
         console.error('Failed to load initial data:', error);
@@ -145,6 +183,9 @@ const Dashboard: React.FC = () => {
           averageAge: 0,
           breedingStockCount: 0,
         });
+        setHealthStats(computeHealthStats([]));
+        setReproStats(computeReproStats([]));
+        setGrowthStats(computeGrowthStats([]));
         const cachedAnimals = localStorage.getItem('dashboard_animals');
         const cachedStats = localStorage.getItem('dashboard_animalStats');
         if (cachedAnimals) setAnimals(JSON.parse(cachedAnimals));
@@ -296,19 +337,40 @@ const Dashboard: React.FC = () => {
                   </div>
                 ) : (
                   <div className="space-y-6">
+                    {/* Animal Selection Dropdown */}
+                    <div className="mb-6">
+                      <Select
+                        value={selectedAnimalId || ''}
+                        onValueChange={setSelectedAnimalId}
+                      >
+                        <SelectTrigger className="w-full max-w-md">
+                          <SelectValue placeholder="Select an animal" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {animals.map(animal => (
+                            <SelectItem key={animal.id} value={animal.id}>
+                              {animal.name} ({animal.type})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <ActionCards setActiveTab={setActiveTab} selectedAnimalId={selectedAnimalId} />
                     <AnimalStats
                       animalStats={animalStats}
                       animals={animals}
                       productionStats={productionStats}
                       selectedAnimalId={selectedAnimalId}
+                      healthStats={healthStats}
+                      reproStats={reproStats}
+                      growthStats={growthStats}
                     />
                     <Charts animals={animals} productionStats={productionStats} />
                   </div>
                 )}
               </TabsContent>
 
-              <TabsContent value="activity" className="font-serif"> {/* Applied font-serif here */}
+              <TabsContent value="activity" className="font-serif">
                 <ActivityFeed
                   activities={activities}
                   notifications={notifications}
