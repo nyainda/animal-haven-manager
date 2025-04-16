@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { 
+import {
   Search, Plus, Download, Edit, Trash2, Eye, AlertCircle, Loader2,
   ChevronRight, Home, Filter, ArrowUpDown, PieChart,
   ChevronsLeft, ChevronsRight, Activity, Heart, FileText, PiggyBank, CheckSquare, Tag,
@@ -11,7 +11,7 @@ import { fetchAnimals, deleteAnimal, exportAnimalsToCSV } from '@/services/anima
 import { Animal } from '../types/AnimalTypes';
 import { useTheme } from '@/contexts/ThemeContext';
 
-const AnimalCard = ({ animal, onView, onEdit, onDelete }) => {
+const AnimalCard = ({ animal, onView, onEdit, onDelete }: { animal: Animal; onView: (id: string) => void; onEdit: (id: string) => void; onDelete: (animal: Animal) => void }) => {
   const { theme } = useTheme();
   const statusColors = {
     Active: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
@@ -31,7 +31,7 @@ const AnimalCard = ({ animal, onView, onEdit, onDelete }) => {
   };
 
   return (
-    <div className={`rounded-xl shadow-sm hover:shadow-md transition overflow-hidden border bg-background border-border`}>
+    <div className={`rounded-xl shadow-md hover:shadow-lg transition overflow-hidden border bg-background border-border`}>
       <div className="p-4">
         <div className="flex justify-between items-start mb-3">
           <span className="text-3xl">{typeIcons[animal.type] || '🐾'}</span>
@@ -61,30 +61,30 @@ const AnimalCard = ({ animal, onView, onEdit, onDelete }) => {
         </div>
       </div>
       <div className="border-t border-border p-2 flex justify-between bg-background">
-        <button 
+        <button
           onClick={() => onView(animal.id)}
-          className="pGN-2 rounded-md hover:bg-muted text-blue-600 dark:text-blue-400"
+          className="p-2 rounded-md hover:bg-muted text-blue-600 dark:text-blue-400 transition"
           aria-label="View details"
         >
           <Eye size={18} />
         </button>
-        <button 
+        <button
           onClick={() => onEdit(animal.id)}
-          className="p-2 rounded-md hover:bg-muted text-yellow-600 dark:text-yellow-400"
+          className="p-2 rounded-md hover:bg-muted text-yellow-600 dark:text-yellow-400 transition"
           aria-label="Edit animal"
         >
           <Edit size={18} />
         </button>
-        <button 
+        <button
           onClick={() => onDelete(animal)}
-          className="p-2 rounded-md hover:bg-muted text-red-600 dark:text-red-400"
+          className="p-2 rounded-md hover:bg-muted text-red-600 dark:text-red-400 transition"
           aria-label="Delete animal"
         >
           <Trash2 size={18} />
         </button>
       </div>
     </div>
-  );
+  )
 };
 
 const Animals: React.FC = () => {
@@ -123,9 +123,9 @@ const Animals: React.FC = () => {
   }, [loadAnimals]);
 
   const handleSort = (column: string) => {
-    setSortBy(column);
+    setSortBy(column.toLowerCase().replace(' ', '_'));
     setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
-  };
+  }
 
   const sortedAnimals = [...animals].sort((a, b) => {
     const comparison = sortBy === 'name' 
@@ -135,8 +135,8 @@ const Animals: React.FC = () => {
   });
 
   const filteredAnimals = sortedAnimals.filter(animal => {
-    const matchesSearch = animal.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          animal.tag_number?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = animal.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      animal.tag_number?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = animalTypeFilter === 'all' || animal.type === animalTypeFilter;
     const matchesStatus = statusFilter === 'all' || animal.status === statusFilter;
     return matchesSearch && matchesType && matchesStatus;
@@ -219,19 +219,19 @@ const Animals: React.FC = () => {
                 </div>
               </div>
               <div className="hidden lg:flex gap-3">
-                <button 
+                <button
                   onClick={() => setViewMode(viewMode === 'grid' ? 'table' : 'grid')}
                   className="flex items-center gap-2 px-3 py-2 bg-background border border-border text-foreground rounded-lg hover:bg-muted transition text-sm"
                 >
                   {viewMode === 'grid' ? (
                     <>
-                      <Clipboard size={16} /> Table View
+                      <Clipboard size={16} /><span>Table View</span>
                     </>
                   ) : (
                     <>
-                      <PieChart size={16} /> Grid View
+                      <PieChart size={16} /><span>Grid View</span>
                     </>
-                  )}
+                  )} 
                 </button>
                 <button 
                   onClick={exportAnimalsToCSV} 
@@ -239,7 +239,7 @@ const Animals: React.FC = () => {
                 >
                   <Download size={16} /> Export
                 </button>
-                <button 
+                <button
                   onClick={() => navigate('/animals/new')} 
                   className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition text-sm shadow-sm"
                 >
@@ -313,7 +313,7 @@ const Animals: React.FC = () => {
               <h2 className="font-medium flex items-center gap-2">
                 <Filter size={16} /> Filters
               </h2>
-              <button 
+              <button
                 onClick={resetFilters}
                 className="text-sm text-primary flex items-center gap-1 hover:underline"
               >
@@ -374,10 +374,10 @@ const Animals: React.FC = () => {
               <button
                 onClick={() => handleSort(sortBy)}
                 className="flex items-center gap-1 text-sm text-foreground hover:text-primary"
-              >
-                <ArrowUpDown size={14} /> 
+                >
+                <ArrowUpDown size={14} />
                 {sortDir === 'asc' ? 'Ascending' : 'Descending'}
-              </button>
+              </button> 
             </div>
           </div>
 
@@ -407,17 +407,17 @@ const Animals: React.FC = () => {
                   <h3 className="text-lg font-medium mt-2">No animals found</h3>
                   <p className="text-sm text-muted-foreground mb-4">
                     {searchTerm || animalTypeFilter !== 'all' || statusFilter !== 'all' ? 
-                      'Try adjusting your filters to find what you\'re looking for.' : 
-                      'Add your first animal to get started.'}
+                      'Try adjusting your filters to find what you\'re looking for.' :
+                      'Add your first animal to get started.'} 
                   </p>
                   {searchTerm || animalTypeFilter !== 'all' || statusFilter !== 'all' ? (
-                    <button 
+                    <button
                       onClick={resetFilters}
                       className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80 text-sm font-medium transition"
                     >
                       Clear Filters
                     </button>
-                  ) : (
+                  ) : ( 
                     <button 
                       onClick={() => navigate('/animals/new')}
                       className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium transition"
@@ -430,11 +430,11 @@ const Animals: React.FC = () => {
             ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {currentAnimals.map(animal => (
-                  <AnimalCard 
-                    key={animal.id} 
-                    animal={animal} 
+                  <AnimalCard
+                    key={animal.id}
+                    animal={animal}
                     onView={(id) => navigate(`/animals/${id}`)}
-                    onEdit={(id) => navigate(`/animals/${id}/edit`)}
+                    onEdit={(id) => navigate(`/animals/${id}/edit`)} 
                     onDelete={handleDeleteClick}
                   />
                 ))}
@@ -449,7 +449,7 @@ const Animals: React.FC = () => {
                           <th
                             key={idx}
                             className="p-4 text-left text-sm font-medium text-muted-foreground cursor-pointer hover:text-primary"
-                            onClick={() => header !== 'Actions' && handleSort(header.toLowerCase().replace(' ', '_'))}
+                            onClick={() => header !== 'Actions' && handleSort(header)}
                           >
                             <div className="flex items-center gap-1">
                               {header}
@@ -461,10 +461,10 @@ const Animals: React.FC = () => {
                     </thead>
                     <tbody>
                       {currentAnimals.map(animal => (
-                        <tr 
-                          key={animal.id} 
+                        <tr
+                          key={animal.id}
                           className={`border-t border-border transition-colors ${theme === 'dark' ? 'hover:bg-gray-700/50' : 'hover:bg-gray-50'}`}
-                        >
+                          >
                           <td className="p-4">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded bg-muted flex items-center justify-center text-lg">
@@ -485,18 +485,18 @@ const Animals: React.FC = () => {
                           <td className="p-4 text-sm">{animal.tag_number || '—'}</td>
                           <td className="p-4">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              animal.status === 'Active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 
-                              animal.status === 'For Sale' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                              animal.status === 'Sold' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
-                              animal.status === 'Deceased' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                              animal.status === 'Active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                              animal.status === 'For Sale' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : 
+                              animal.status === 'Sold' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' : 
+                              animal.status === 'Deceased' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' : 
                               'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
                             }`}>
                               {animal.status}
                             </span>
                           </td>
-                          <td className="p-4 text-sm">{animal.internal_id || '—'}</td>
+                          <td className="p-4 text-sm">{animal.internal_id || '—'}</td> 
                           <td className="p-4 text-sm capitalize">{animal.gender || 'N/A'}</td>
-                          <td className="p-4 text-sm">{animal.breed || 'N/A'}</td>
+                          <td className="p-4 text-sm">{animal.breed || 'N/A'}</td> 
                           <td className="p-4">
                             <div className="flex gap-2">
                               <button 
@@ -609,13 +609,13 @@ const Animals: React.FC = () => {
                   Are you sure you want to delete {animalToDelete?.name}?
                 </p>
                 <div className="flex justify-end gap-2">
-                  <button 
-                    onClick={() => setDeleteConfirmOpen(false)} 
+                  <button
+                    onClick={() => setDeleteConfirmOpen(false)}
                     className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition text-sm"
                   >
                     Cancel
                   </button>
-                  <button 
+                  <button
                     onClick={handleConfirmDelete} 
                     className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
                   >

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Toaster } from "@/components/ui/sonner"; // Use sonner only
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -35,6 +35,8 @@ import AnimalTasks from './pages/animal/AnimalTasks';
 import AnimalTaskForm from './pages/animal/AnimalTaskForm';
 import { HealthRecordForm } from "./pages/animal/HealthRecordForm";
 import {AnimalTransactions} from "./pages/animal/AnimalTransactions"; 
+import Sidebar from './components/dashboard/Sidebar';
+import { cn } from './lib/utils';
 import TransactionForm from "./pages/animal/TransactionForm"; 
 
 // Wrapper component for ActivityManagement
@@ -75,89 +77,124 @@ const TransactionFormWrapper = () => {
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Analytics />
-      <BrowserRouter>
-        <ThemeProvider>
-          <AuthProvider>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/verify-email" element={<VerifyEmail />} />
+const App = () => {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-              {/* Animal Routes */}
-              <Route path="/animals" element={<Animals />} />
-              <Route path="/animals/new" element={<AnimalForm />} />
-              <Route path="/animals/:id" element={<AnimalDetails />} />
-              <Route path="/animals/:id/edit" element={<AnimalForm />} />
+  useEffect(() => {
+    const handleResize = () => {
+      setIsSidebarOpen(window.innerWidth >= 768); // Adjust breakpoint as needed
+    };
 
-              <Route path="/animals/:id/tasks" element={<AnimalTasks />} />
-              <Route path="/animals/:id/tasks/new" element={<AnimalTaskForm />} />
-              <Route path="/animals/:id/tasks/:taskId/edit" element={<AnimalTaskForm />} />
+    handleResize(); // Check initial width
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Analytics />
+        <BrowserRouter>
+          <ThemeProvider>
+            <AuthProvider>
+              <div className="flex min-h-screen bg-gray-100 dark:bg-gray-900">
+                {/* Sidebar */}
+                {isSidebarOpen && <Sidebar />}
 
-              {/* Animal Activities */}
-              <Route path="/animals/:id/activities" element={<ActivityManagementWrapper />} />
-              <Route path="/animals/:animalId/activities/new" element={<ActivityForm />} />
-              <Route path="/animals/:animalId/activities/:activityId/edit" element={<ActivityForm />} />
+                {/* Main Content */}
+                <main
+                  className={cn(
+                    "flex-1 p-6 transition-all duration-300",
+                    isSidebarOpen ? "ml-64" : "ml-0",
+                  )}
+                >
+                  {/* Mobile Sidebar Toggle (Optional) */}
+                  <button
+                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                    className="md:hidden mb-4 p-2 bg-gray-200 dark:bg-gray-800 rounded-md hover:bg-gray-300 dark:hover:bg-gray-700"
+                  >
+                    {isSidebarOpen ? "Close" : "Open"} Menu
+                  </button>
 
-              {/* Animal Breedings */}
-              <Route path="/animals/:id/breedings" element={<AnimalBreedings />} />
-              <Route path="/animals/:id/breedings/new" element={<AnimalBreedings />} />
-              <Route path="/animals/:id/breedings/:breedingId" element={<AnimalBreedings />} />
-              <Route path="/animals/:id/breedings/:breedingId/edit" element={<AnimalBreedings />} />
+                  {/* Routes */}
+                  <Routes>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/register" element={<Register />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/profile" element={<Profile />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
+                    <Route path="/verify-email" element={<VerifyEmail />} />
 
-              {/* Animal Health */}
-              <Route path="/animals/:id/health" element={<AnimalHealth />} />
-              <Route path="/animals/:id/health/new" element={<HealthRecordFormWrapper />} />
-              <Route path="/animals/:id/health/:healthId" element={<AnimalHealth />} />
-              <Route path="/animals/:id/health/:healthId/edit" element={<HealthRecordFormWrapper />} />
+                    {/* Animal Routes */}
+                    <Route path="/animals" element={<Animals />} />
+                    <Route path="/animals/new" element={<AnimalForm />} />
+                    <Route path="/animals/:id" element={<AnimalDetails />} />
+                    <Route path="/animals/:id/edit" element={<AnimalForm />} />
 
-              {/* Animal Notes */}
-              <Route path="/animals/:id/notes" element={<AnimalNotes />} />
-              <Route path="/animals/:id/notes/new" element={<AnimalNoteForm />} />
-              <Route path="/animals/:id/notes/:noteId" element={<AnimalNotes />} />
-              <Route path="/animals/:id/notes/:noteId/edit" element={<AnimalNoteForm />} />
+                    <Route path="/animals/:id/tasks" element={<AnimalTasks />} />
+                    <Route path="/animals/:id/tasks/new" element={<AnimalTaskForm />} />
+                    <Route path="/animals/:id/tasks/:taskId/edit" element={<AnimalTaskForm />} />
 
-              {/* Animal Production */}
-              <Route path="/animals/:id/production" element={<AnimalProductions />} />
-              <Route path="/animals/:id/production/new" element={<AnimalProductionForm />} />
-              <Route path="/animals/:id/production/:productionId/edit" element={<AnimalProductionForm />} />
+                    {/* Animal Activities */}
+                    <Route path="/animals/:id/activities" element={<ActivityManagementWrapper />} />
+                    <Route path="/animals/:animalId/activities/new" element={<ActivityForm />} />
+                    <Route path="/animals/:animalId/activities/:activityId/edit" element={<ActivityForm />} />
 
-              {/* Animal Supplier Routes */}
-              <Route path="/animals/:id/suppliers" element={<AnimalSuppliers />} />
-              <Route path="/animals/:id/suppliers/new" element={<AnimalSupplierForm />} />
-              <Route path="/animals/:id/suppliers/:supplierId" element={<AnimalSuppliers />} />
-              <Route path="/animals/:id/suppliers/:supplierId/edit" element={<AnimalSupplierForm />} />
+                    {/* Animal Breedings */}
+                    <Route path="/animals/:id/breedings" element={<AnimalBreedings />} />
+                    <Route path="/animals/:id/breedings/new" element={<AnimalBreedings />} />
+                    <Route path="/animals/:id/breedings/:breedingId" element={<AnimalBreedings />} />
+                    <Route path="/animals/:id/breedings/:breedingId/edit" element={<AnimalBreedings />} />
 
-              {/* Animal Transaction Routes */}
-              <Route path="/animals/:id/transactions" element={<AnimalTransactionsWrapper />} />
-              <Route path="/animals/:id/transactions/new" element={<TransactionForm />} />
-              <Route path="/animals/:id/transactions/:transactionId/edit" element={<TransactionForm />} />
+                    {/* Animal Health */}
+                    <Route path="/animals/:id/health" element={<AnimalHealth />} />
+                    <Route path="/animals/:id/health/new" element={<HealthRecordFormWrapper />} />
+                    <Route path="/animals/:id/health/:healthId" element={<AnimalHealth />} />
+                    <Route path="/animals/:id/health/:healthId/edit" element={<HealthRecordFormWrapper />} />
 
-              {/* Form Routes */}
-              <Route path="/forms/note" element={<NoteForm />} />
-              <Route path="/forms/feeding" element={<FeedingForm />} />
-              <Route path="/forms/task" element={<TaskForm />} />
-              <Route path="/animals/:id/forms/note" element={<NoteForm />} />
-              <Route path="/animals/:id/forms/feeding" element={<FeedingForm />} />
-              <Route path="/animals/:id/forms/task" element={<TaskForm />} />
+                    {/* Animal Notes */}
+                    <Route path="/animals/:id/notes" element={<AnimalNotes />} />
+                    <Route path="/animals/:id/notes/new" element={<AnimalNoteForm />} />
+                    <Route path="/animals/:id/notes/:noteId" element={<AnimalNotes />} />
+                    <Route path="/animals/:id/notes/:noteId/edit" element={<AnimalNoteForm />} />
 
-              {/* Catch-all Route */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </AuthProvider>
-        </ThemeProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+                    {/* Animal Production */}
+                    <Route path="/animals/:id/production" element={<AnimalProductions />} />
+                    <Route path="/animals/:id/production/new" element={<AnimalProductionForm />} />
+                    <Route path="/animals/:id/production/:productionId/edit" element={<AnimalProductionForm />} />
+
+                    {/* Animal Supplier Routes */}
+                    <Route path="/animals/:id/suppliers" element={<AnimalSuppliers />} />
+                    <Route path="/animals/:id/suppliers/new" element={<AnimalSupplierForm />} />
+                    <Route path="/animals/:id/suppliers/:supplierId" element={<AnimalSuppliers />} />
+                    <Route path="/animals/:id/suppliers/:supplierId/edit" element={<AnimalSupplierForm />} />
+
+                    {/* Animal Transaction Routes */}
+                    <Route path="/animals/:id/transactions" element={<AnimalTransactionsWrapper />} />
+                    <Route path="/animals/:id/transactions/new" element={<TransactionForm />} />
+                    <Route path="/animals/:id/transactions/:transactionId/edit" element={<TransactionForm />} />
+
+                    {/* Form Routes */}
+                    <Route path="/forms/note" element={<NoteForm />} />
+                    <Route path="/forms/feeding" element={<FeedingForm />} />
+                    <Route path="/forms/task" element={<TaskForm />} />
+                    <Route path="/animals/:id/forms/note" element={<NoteForm />} />
+                    <Route path="/animals/:id/forms/feeding" element={<FeedingForm />} />
+                    <Route path="/animals/:id/forms/task" element={<TaskForm />} />
+
+                    {/* Catch-all Route */}
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </main>
+              </div>
+            </AuthProvider>
+          </ThemeProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
