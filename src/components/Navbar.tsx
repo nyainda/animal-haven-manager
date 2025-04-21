@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Moon, Sun, Menu, X, ChevronRight, LayoutDashboard, Home, Settings, LogOut, User } from 'lucide-react';
@@ -19,7 +19,6 @@ const Navbar: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
-  const mobileMenuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   
@@ -40,19 +39,6 @@ const Navbar: React.FC = () => {
   // Close mobile menu when route changes
   useEffect(() => {
     setIsMenuOpen(false);
-  }, [location.pathname]);
-
-  // Close mobile menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
-        setIsMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-
   }, [location.pathname]);
   
   const toggleMenu = () => {
@@ -225,7 +211,7 @@ const Navbar: React.FC = () => {
         <AnimatePresence>
           {isMenuOpen && (
             <motion.div
-              initial={{ opacity: 0, height: 0, y: -20 }}
+              initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.3 }}
@@ -249,7 +235,7 @@ const Navbar: React.FC = () => {
                       <MobileNavLink href="/logout" active={false}>Logout</MobileNavLink>
                     </>
                   )}
-                </div>              
+                </div>
               </div>
             </motion.div>
           )}
@@ -307,16 +293,14 @@ const MobileNavLink: React.FC<{ href: string; active: boolean; children: React.R
         onClick={handleClick}
         className={cn(
           "flex items-center justify-between py-3 px-4 my-1 rounded-lg text-base font-serif transition-all",
-          active
-            ? "bg-primary/10 text-primary"
+          active 
+            ? "bg-primary/10 text-primary" 
             : "text-foreground/80 hover:text-foreground hover:bg-muted"
         )}
       >
         <span>{children}</span>
         <ChevronRight className="h-4 w-4 opacity-70" />
       </a>
-
-
     </motion.div>
   );
 };

@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { fetchAnimals, fetchAnimalsById } from '@/services/animalService';
+import { fetchAnimals } from '@/services/animalService';
 import { fetchProductionStatistics, ProductionStatistics } from '@/services/animalProductionApi';
 import { fetchActivities, Activity } from '@/services/ActivityApi';
 import { Animal, HealthStatistics, ReproductiveStatistics, GrowthStatistics } from '@/types/AnimalTypes';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Home, CalendarIcon, ActivityIcon, Settings, Plus } from 'lucide-react';
-import { cn, formatDate } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { parseISO, differenceInYears } from 'date-fns';
 
@@ -72,14 +72,13 @@ const Dashboard: React.FC = () => {
   // Compute health stats
   const computeHealthStats = (animals: Animal[]): HealthStatistics => {
     const healthyAnimals = animals.filter(a => a.status === 'Healthy' && !a.is_deceased).length;
-    const animalsRequiringCheckup = animals.filter(a => a.next_checkup_date && new Date(a.next_checkup_date) <= new Date()).length;
-    const totalVaccinations = animals.reduce((sum, a) => sum + (a.vaccinations?.length || 0), 0);
+    const animalsRequiringCheckup = animals.filter(
+      a => a.next_checkup_date && new Date(a.next_checkup_date) <= new Date()
+    ).length;
 
     return {
-      vaccination_rate: animals.length > 0 ? (totalVaccinations / animals.length) * 100 : 0,
-      health_incidents: animals.filter(a => a.status === 'Sick').length, // Assuming 'Sick' status indicates a health incident
-
-
+      vaccination_rate: animals.filter(a => a.vaccinations && a.vaccinations.length > 0).length / (animals.length || 1) * 100,
+      health_incidents: animals.filter(a => a.status === 'Sick').length,
       animals_requiring_checkup: animalsRequiringCheckup,
       healthy_animals: healthyAnimals,
     };
@@ -119,7 +118,6 @@ const Dashboard: React.FC = () => {
       setDataLoading(true);
       try {
         const animalList = await fetchAnimals();
-
         setAnimals(animalList);
 
         if (animalList.length > 0) {
@@ -160,7 +158,6 @@ const Dashboard: React.FC = () => {
             averageAge,
             breedingStockCount,
           }));
-
 
           // Fetch activities for the first animal
           const initialActivities = await fetchActivities(animalList[0].id);
@@ -208,10 +205,6 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       if (!selectedAnimalId || !isAuthenticated || authLoading) {
-        if (!selectedAnimalId) {
-          setProductionStats(null);
-          setActivities([]);
-        }
         setProductionStats(null);
         setActivities([]);
         return;
@@ -236,7 +229,6 @@ const Dashboard: React.FC = () => {
         const cachedActivities = localStorage.getItem(`dashboard_activities_${selectedAnimalId}`);
         if (cachedStats) setProductionStats(JSON.parse(cachedStats));
         if (cachedActivities) setActivities(JSON.parse(cachedActivities));
-
       }
     };
 
@@ -270,7 +262,7 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="flex h-screen bg-background text-foreground">
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -287,8 +279,8 @@ const Dashboard: React.FC = () => {
           notifications={notifications}
         />
 
-        {/* Mobile Navigation */}
-        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50">
+        {/* Mobile Bottom Navigation */}
+        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border">
           <div className="grid grid-cols-4 gap-1 p-2">
             {[
               { tab: 'overview', icon: Home, label: 'Dashboard' },
@@ -312,13 +304,13 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        <main className="flex-1 p-4 md:p-6 overflow-y-auto pb-20 md:pb-6 ">
+        <main className="flex-1 p-4 md:p-6 overflow-y-auto pb-20 md:pb-6">
           {dataLoading && !initialLoadComplete ? (
             <div className="text-center p-6">
               <p className="text-muted-foreground dark:text-muted-foreground">Loading dashboard data...</p>
             </div>
           ) : (
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full overflow-y-auto">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="mb-4 md:hidden bg-muted p-1 rounded-lg">
                 <TabsTrigger value="overview" className="text-xs sm:text-sm font-sans">Overview</TabsTrigger>
                 <TabsTrigger value="activity" className="text-xs sm:text-sm font-sans">Activity</TabsTrigger>
@@ -335,13 +327,12 @@ const Dashboard: React.FC = () => {
                     <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-4 mt-2 max-w-md mx-auto">
                       It looks like you don’t have any animals yet. Add some animals to start tracking statistics and production data.
                     </p>
-                    <Button
+                    <Button 
                       onClick={() => navigate('/animals')}
                       className="font-serif bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground hover:bg-primary/90 dark:hover:bg-primary/80 h-10 sm:h-12.costom"
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Add Your First Animal
-
                     </Button>
                   </div>
                 ) : (
@@ -356,15 +347,11 @@ const Dashboard: React.FC = () => {
                           <SelectValue placeholder="Select an animal" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectGroup>
-                            <SelectLabel>Animals</SelectLabel>
-                            {animals.map(animal => (
-                              <SelectItem key={animal.id} value={animal.id}>
-                                {animal.name} ({animal.type})
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-
+                          {animals.map(animal => (
+                            <SelectItem key={animal.id} value={animal.id}>
+                              {animal.name} ({animal.type})
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -383,25 +370,12 @@ const Dashboard: React.FC = () => {
                 )}
               </TabsContent>
 
-              <TabsContent value="activity" className="font-serif ">
-
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Recent Activities</h3>
-                  <div className="grid gap-4">
-
-                    {activities.slice(0, 5).map((activity) => (
-                      <div key={activity.id} className="bg-card rounded-lg p-4 shadow-sm border">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm">{activity.description}</p>
-                          <p className="text-xs text-muted-foreground">{formatDate(activity.timestamp)}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                {!activities.length && <p className="text-muted-foreground">No activity yet.</p>}
-
-
+              <TabsContent value="activity" className="font-serif">
+                <ActivityFeed
+                  activities={activities}
+                  notifications={notifications}
+                  setNotifications={setNotifications}
+                />
                 <Button
                   onClick={() => navigate(`/animals/${selectedAnimalId}/activities`)}
                   className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 shadow-md"

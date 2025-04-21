@@ -4,14 +4,6 @@
 @tailwind components;
 @tailwind utilities;
 
-*,
-*::before,
-*::after {
-  transition:
-    background-color 0.3s ease,
-    color 0.3s ease;
-}
-
 @layer base {
   :root {
     --background: 0 0% 98%;
@@ -99,14 +91,14 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-background text-foreground font-serif antialiased;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-sans font-medium tracking-tight;
+    @apply font-serif font-medium tracking-tight;
   }
 }
-@layer utilities{.font-serif{font-family:'Merriweather',serif;}.font-sans{font-family:'Inter',sans-serif;}}
+
 @layer components {
   .glass {
     @apply bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl;
@@ -129,7 +121,7 @@
   }
 
   .animate-hover {
-    @apply transition duration-300 ease-in-out;
+    @apply transition-all duration-300 ease-in-out;
   }
   
   .btn-hover {
@@ -150,7 +142,7 @@
   }
   
   .form-input {
-    @apply w-full rounded-md border border-input bg-background px-3 py-2 transition duration-300 ease-in-out;
+    @apply w-full rounded-md border border-input bg-background px-3 py-2;
   }
 
   /* Special dropdown background fix */
@@ -190,7 +182,6 @@
 }
 
 .link-underline:hover:after {
-
   width: 100%;
   left: 0;
   right: auto;

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Heart, Dog, List, FileText, Clock, Activity, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -6,18 +6,7 @@ import Hero from '@/components/Hero';
 import FeatureCard from '@/components/FeatureCard';
 import Button from '@/components/Button';
 
-const TestimonialCard = React.lazy(() => import('./../components/TestimonialCard'));
-
-
 const Index = () => {
-  useEffect(() => {
-    // Preload TestimonialCard component
-    import('./../components/TestimonialCard').catch((error) => {
-      console.error('Failed to preload TestimonialCard:', error);
-    });
-  }, []);
-
-
   return (
     <div className="min-h-screen bg-background font-serif text-foreground">
       <Navbar />
@@ -26,23 +15,21 @@ const Index = () => {
       <Hero />
 
       {/* Features Section */}
-      <section id="features" className="py-24 bg-background transition-all duration-300">
-        <div className="container mx-auto px-4 transition-all duration-300">
-          <div className="text-center max-w-3xl mx-auto mb-20 animate-fade-in transition-all duration-300">
-            <div className="inline-block px-4 py-1 rounded-full bg-primary/10 text-primary font-medium mb-4 transition-all duration-300">
-              <span className="transition-all duration-300">
-                Features
-              </span>
-            </div>
-            <h2 className="text-3xl md:text-5xl font-bold mb-6 leading-tight transition-all duration-300">
-              <span className="transition-all duration-300">Everything you need to manage your animals</span>
+      <section id="features" className="py-24 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="text-center max-w-3xl mx-auto mb-20 animate-fade-in">
+            <span className="inline-block px-4 py-1 rounded-full bg-primary/10 text-primary font-medium mb-4">
+              Features
+            </span>
+            <h2 className="text-3xl md:text-5xl font-bold mb-6 leading-tight">
+              Everything you need to manage your animals
             </h2>
-            <p className="text-muted-foreground text-lg md:text-xl transition-all duration-300">
-              <span className="transition-all duration-300">Our comprehensive platform provides all the tools you need to track, monitor, and care for your animals in one place.</span>
+            <p className="text-muted-foreground text-lg md:text-xl">
+              Our comprehensive platform provides all the tools you need to track, monitor, and care for your animals in one place.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-all duration-300">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             <FeatureCard
               icon={Dog}
               title="Track Animals"
@@ -84,25 +71,21 @@ const Index = () => {
       </section>
 
       {/* Testimonials Section */}
-      <section id="testimonials" className="py-24 bg-background transition-all duration-300">
-        <div className="container mx-auto px-4 transition-all duration-300">
-          <div className="text-center max-w-3xl mx-auto mb-20 transition-all duration-300">
-            <div className="inline-block px-4 py-1 rounded-full bg-primary/10 text-primary font-medium mb-4 transition-all duration-300">
-              <span className="transition-all duration-300">
-                Testimonials
-              </span>
-            </div>
-            <h2 className="text-3xl md:text-5xl font-bold mb-6 leading-tight transition-all duration-300">
-              <span className="transition-all duration-300">
-                What our users say
-              </span>
+      <section id="testimonials" className="py-24 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="text-center max-w-3xl mx-auto mb-20">
+            <span className="inline-block px-4 py-1 rounded-full bg-primary/10 text-primary font-medium mb-4">
+              Testimonials
+            </span>
+            <h2 className="text-3xl md:text-5xl font-bold mb-6 leading-tight">
+              What our users say
             </h2>
-            <p className="text-muted-foreground text-lg md:text-xl transition-all duration-300">
-              <span className="transition-all duration-300">Join thousands of satisfied animal caretakers who have transformed their management process.</span>
+            <p className="text-muted-foreground text-lg md:text-xl">
+              Join thousands of satisfied animal caretakers who have transformed their management process.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 transition-all duration-300">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <TestimonialCard
               quote="I've been using Animal Manager for 6 months now, and it has completely transformed how I care for my sanctuary animals. The health tracking is invaluable!"
               author="Jane Cooper"
@@ -126,9 +109,9 @@ const Index = () => {
       </section>
 
       {/* Stats Section */}
-      <section className="py-20 bg-background transition-all duration-300">
-        <div className="container mx-auto px-4 transition-all duration-300">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 transition-all duration-300">
+      <section className="py-20 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
             <StatCard number="5,000+" label="Animals Tracked" />
             <StatCard number="1,200+" label="Happy Users" />
             <StatCard number="98%" label="Satisfaction Rate" />
@@ -138,23 +121,19 @@ const Index = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-24 bg-background transition-all duration-300">
-        <div className="container mx-auto px-4 transition-all duration-300">
-          <div className="max-w-4xl mx-auto text-center bg-card p-6 rounded-lg shadow-sm border border-border transition-all duration-300">
-            <h2 className="text-3xl md:text-5xl font-bold mb-8 leading-tight transition-all duration-300">
-              <span className="transition-all duration-300">
-                Ready to transform your animal management?
-              </span>
+      <section className="py-24 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto text-center bg-card p-6 rounded-lg shadow-sm border border-border">
+            <h2 className="text-3xl md:text-5xl font-bold mb-8 leading-tight">
+              Ready to transform your animal management?
             </h2>
-            <p className="text-xl text-muted-foreground mb-10 max-w-2xl mx-auto transition-all duration-300">
-              <span className="transition-all duration-300">
-                Join thousands of animal caretakers who trust our platform for their daily management needs.
-              </span>
+            <p className="text-xl text-muted-foreground mb-10 max-w-2xl mx-auto">
+              Join thousands of animal caretakers who trust our platform for their daily management needs.
             </p>
-            <div className="flex flex-col sm:flex-row justify-center gap-6 transition-all duration-300">
+            <div className="flex flex-col sm:flex-row justify-center gap-6">
               <Link to="/register">
-                <Button size="lg" className="px-8 py-3 text-lg flex items-center gap-2 group transition-all duration-300">
-                  <span className="transition-all duration-300">Get Started Today</span>
+                <Button size="lg" className="px-8 py-3 text-lg flex items-center gap-2 group">
+                  Get Started Today
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
@@ -169,18 +148,16 @@ const Index = () => {
       </section>
 
       {/* Footer */}
-      <footer className="py-16 bg-background transition-all duration-300">
-        <div className="container mx-auto px-4 transition-all duration-300">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12 transition-all duration-300">
-            <div className="transition-all duration-300">
-              <div className="text-2xl font-bold mb-6 text-foreground transition-all duration-300">
-                <span className="transition-all duration-300">Agro-insight</span>
-              </div>
-              <p className="text-muted-foreground mb-6 transition-all duration-300">
-                <span className="transition-all duration-300">Transforming animal management for farms, sanctuaries, and veterinary practices.</span>
+      <footer className="py-16 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+            <div>
+              <div className="text-2xl font-bold mb-6 text-foreground">Agro-insight</div>
+              <p className="text-muted-foreground mb-6">
+                Transforming animal management for farms, sanctuaries, and veterinary practices.
               </p>
-              <div className="flex space-x-4 transition-all duration-300">
-                <SocialIcon href="#" aria-label="Twitter" className="transition-all duration-300">
+              <div className="flex space-x-4">
+                <SocialIcon href="#" aria-label="Twitter">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
                     <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path>
                   </svg>
@@ -200,9 +177,9 @@ const Index = () => {
               </div>
             </div>
 
-            <div className="transition-all duration-300">
-              <h4 className="font-bold text-lg mb-6 text-foreground transition-all duration-300">Product</h4>
-              <ul className="space-y-4 transition-all duration-300">
+            <div>
+              <h4 className="font-bold text-lg mb-6 text-foreground">Product</h4>
+              <ul className="space-y-4">
                 <li><FooterLink href="#features">Features</FooterLink></li>
                 <li><FooterLink href="#pricing">Pricing</FooterLink></li>
                 <li><FooterLink href="#integrations">Integrations</FooterLink></li>
@@ -210,9 +187,9 @@ const Index = () => {
               </ul>
             </div>
 
-            <div className="transition-all duration-300">
-              <h4 className="font-bold text-lg mb-6 text-foreground transition-all duration-300">Resources</h4>
-              <ul className="space-y-4 transition-all duration-300">
+            <div>
+              <h4 className="font-bold text-lg mb-6 text-foreground">Resources</h4>
+              <ul className="space-y-4">
                 <li><FooterLink href="#blog">Blog</FooterLink></li>
                 <li><FooterLink href="#guides">User Guides</FooterLink></li>
                 <li><FooterLink href="#webinars">Webinars</FooterLink></li>
@@ -220,9 +197,9 @@ const Index = () => {
               </ul>
             </div>
 
-            <div className="transition-all duration-300">
-              <h4 className="font-bold text-lg mb-6 text-foreground transition-all duration-300">Company</h4>
-              <ul className="space-y-4 transition-all duration-300">
+            <div>
+              <h4 className="font-bold text-lg mb-6 text-foreground">Company</h4>
+              <ul className="space-y-4">
                 <li><FooterLink href="#about">About Us</FooterLink></li>
                 <li><FooterLink href="#testimonials">Testimonials</FooterLink></li>
                 <li><FooterLink href="#contact">Contact</FooterLink></li>
@@ -231,10 +208,10 @@ const Index = () => {
             </div>
           </div>
 
-          <div className="border-t border-border mt-8 pt-8 text-center text-sm text-muted-foreground transition-all duration-300">
+          <div className="border-t border-border mt-8 pt-8 text-center text-sm text-muted-foreground">
             <p>© {new Date().getFullYear()} Agro-insight. All rights reserved.</p>
             <p className="mt-4 flex justify-center space-x-6">
-              <Link to="#" className="hover:text-foreground transition-colors transition-all duration-300">Privacy Policy</Link>
+              <Link to="#" className="hover:text-foreground transition-colors">Privacy Policy</Link>
               <Link to="#" className="hover:text-foreground transition-colors">Terms of Service</Link>
               <Link to="#" className="hover:text-foreground transition-colors">Cookie Policy</Link>
             </p>
@@ -245,12 +222,40 @@ const Index = () => {
   );
 };
 
+// Testimonial Card Component
+const TestimonialCard = ({ quote, author, role, delay }) => {
+  return (
+    <div
+      className={`bg-card p-6 rounded-lg shadow-sm border border-border hover:shadow-lg transition-shadow duration-300 animate-fade-in animation-delay-${delay}`}
+    >
+      <svg
+        className="w-10 h-10 text-primary/20 mb-4"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M10 11h-4a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v6c0 2.667-1.333 4.333-4 5"></path>
+        <path d="M19 11h-4a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v6c0 2.667-1.333 4.333-4 5"></path>
+      </svg>
 
+      <p className="mb-4 text-muted-foreground text-lg italic">{quote}</p>
 
-
-
-
-
+      <div className="flex items-center">
+        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mr-3">
+          <span className="text-primary font-medium text-lg">{author.charAt(0)}</span>
+        </div>
+        <div>
+          <h4 className="font-medium text-foreground">{author}</h4>
+          <p className="text-muted-foreground text-sm">{role}</p>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // Stats Card Component
 const StatCard = ({ number, label }) => {
@@ -267,7 +272,7 @@ const FooterLink = ({ href, children }) => {
   return (
     <a
       href={href}
-      className="text-muted-foreground hover:text-foreground transition-colors duration-200 transition-all duration-300"
+      className="text-muted-foreground hover:text-foreground transition-colors duration-200"
     >
       {children}
     </a>
@@ -280,7 +285,7 @@ const SocialIcon = ({ href, 'aria-label': ariaLabel, children }) => {
     <a
       href={href}
       aria-label={ariaLabel}
-      className={`w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-primary hover:shadow-md transition-all duration-300 ${className}`}
+      className="w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-primary hover:shadow-md transition-all duration-300"
     >
       {children}
     </a>
