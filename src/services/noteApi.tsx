@@ -152,7 +152,7 @@ export const fetchNote = async (animalId: string, noteId: string): Promise<Note>
     console.log('[NOTE] Processed Note:', note);
     return note;
   } catch (error) {
-    console.error(`[NOTE] Error fetching note ${noteId} for animal ${animalId}:`, error);
+    console.error(`[NOTE] Error fetching note ${JSON.stringify(noteId)} for animal ${JSON.stringify(animalId)}:`, error);
     toast.error(`Failed to fetch note: ${error instanceof Error ? error.message : 'Unknown error'}`);
     throw error;
   }
