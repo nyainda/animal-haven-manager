@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { Calendar as CalendarIcon, ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -31,15 +31,16 @@ import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { toast } from 'sonner';
 import {
   Transaction,
   TransactionFormData,
   createTransaction,
   updateTransaction,
   fetchTransaction,
-} from '@/services/transactionApis'; 
+} from '@/services/transactionApis';
 
-// Validation schema
+// Validation schema matching the working payload
 const formSchema = z.object({
   transaction_type: z.string().min(1, 'Transaction type is required'),
   price: z.number().min(0, 'Price must be a positive number'),
@@ -47,19 +48,15 @@ const formSchema = z.object({
   currency: z.string().min(1, 'Currency is required'),
   transaction_date: z.string().min(1, 'Transaction date is required'),
   delivery_date: z.string().min(1, 'Delivery date is required'),
-  details: z.string().optional(),
+  details: z.string().nullable().optional(),
   payment_method: z.string().min(1, 'Payment method is required'),
-  payment_reference: z.string().optional(),
-  deposit_amount: z.number().min(0, 'Deposit amount must be a positive number').optional(),
-  payment_due_date: z.string().optional(),
-  transaction_status: z.string().optional(),
+  payment_reference: z.string().nullable().optional(),
+  deposit_amount: z.number().min(0, 'Deposit amount must be a positive number').nullable().optional(),
+  payment_due_date: z.string().nullable().optional(),
+  seller_id: z.number().min(1, 'Seller ID is required'),
+  buyer_id: z.number().min(1, 'Buyer ID is required'),
   seller_name: z.string().min(1, 'Seller name is required'),
   buyer_name: z.string().min(1, 'Buyer name is required'),
-  seller_company: z.string().optional(),
-  buyer_company: z.string().optional(),
-  invoice_number: z.string().optional(),
-  health_certificate_number: z.string().optional(),
-  delivery_instructions: z.string().optional(),
 });
 
 const transactionTypes = ['sale', 'purchase', 'lease', 'transfer'];
@@ -78,21 +75,17 @@ const TransactionForm: React.FC = () => {
       price: 0,
       tax_amount: 0,
       currency: 'USD',
-      transaction_date: format(new Date(), 'yyyy-MM-dd'),
-      delivery_date: format(new Date(), 'yyyy-MM-dd'),
-      details: '',
+      transaction_date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss'Z'"),
+      delivery_date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss'Z'"),
+      details: null,
       payment_method: '',
-      payment_reference: '',
-      deposit_amount: undefined,
-      payment_due_date: '',
-      transaction_status: '',
+      payment_reference: null,
+      deposit_amount: null,
+      payment_due_date: null,
+      seller_id: undefined,
+      buyer_id: undefined,
       seller_name: '',
       buyer_name: '',
-      seller_company: '',
-      buyer_company: '',
-      invoice_number: '',
-      health_certificate_number: '',
-      delivery_instructions: '',
     },
     mode: 'onChange',
   });
@@ -101,32 +94,28 @@ const TransactionForm: React.FC = () => {
     if (transactionId && animalId) {
       const loadTransaction = async () => {
         try {
+          console.log('[TransactionForm] Loading transaction:', { animalId, transactionId });
           const transaction = await fetchTransaction(animalId, transactionId);
           form.reset({
-            transaction_type: transaction.transaction_type,
-            price: transaction.price,
-            tax_amount: transaction.tax_amount,
-            currency: transaction.currency,
-            transaction_date: transaction.transaction_date.split('T')[0],
-            delivery_date: transaction.delivery_date.split('T')[0],
-            details: transaction.details || '',
-            payment_method: transaction.payment_method,
-            payment_reference: transaction.payment_reference || '',
-            deposit_amount: transaction.deposit_amount || undefined,
-            payment_due_date: transaction.payment_due_date
-              ? transaction.payment_due_date.split('T')[0]
-              : '',
-            transaction_status: transaction.transaction_status || '',
+            transaction_type: transaction.transaction_type || '',
+            price: transaction.price || 0,
+            tax_amount: transaction.tax_amount || 0,
+            currency: transaction.currency || 'USD',
+            transaction_date: transaction.transaction_date || '',
+            delivery_date: transaction.delivery_date || '',
+            details: transaction.details || null,
+            payment_method: transaction.payment_method || '',
+            payment_reference: transaction.payment_reference || null,
+            deposit_amount: transaction.deposit_amount || null,
+            payment_due_date: transaction.payment_due_date || null,
+            seller_id: transaction.seller_id || undefined,
+            buyer_id: transaction.buyer_id || undefined,
             seller_name: transaction.seller_name || '',
             buyer_name: transaction.buyer_name || '',
-            seller_company: transaction.seller_company || '',
-            buyer_company: transaction.buyer_company || '',
-            invoice_number: transaction.invoice_number || '',
-            health_certificate_number: transaction.health_certificate_number || '',
-            delivery_instructions: transaction.delivery_instructions || '',
           });
         } catch (error) {
-          console.error('Failed to load transaction:', error);
+          console.error('[TransactionForm] Failed to load transaction:', error);
+          toast.error('Failed to load transaction data');
         }
       };
       loadTransaction();
@@ -137,14 +126,22 @@ const TransactionForm: React.FC = () => {
     try {
       setIsSubmitting(true);
       if (!animalId) throw new Error('Animal ID is required');
+
+      console.log('[TransactionForm] Submitting transaction data:', JSON.stringify(data, null, 2));
+
+      let result;
       if (transactionId) {
-        await updateTransaction(animalId, transactionId, data);
+        result = await updateTransaction(animalId, transactionId, data);
       } else {
-        await createTransaction(animalId, data);
+        result = await createTransaction(animalId, data);
       }
+
+      toast.success(transactionId ? 'Transaction updated successfully' : 'Transaction created successfully');
       navigate(`/animals/${animalId}/transactions`);
-    } catch (error) {
-      console.error('Failed to save transaction:', error);
+    } catch (error: any) {
+      console.error('[TransactionForm] Failed to save transaction:', error);
+      const errorMessage = error.message || 'Unknown error';
+      toast.error(`Failed to save transaction: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -177,7 +174,7 @@ const TransactionForm: React.FC = () => {
           </CardHeader>
           <CardContent className="p-6">
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
+              <div className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}
@@ -187,7 +184,7 @@ const TransactionForm: React.FC = () => {
                         <FormLabel className="text-foreground">Transaction Type</FormLabel>
                         <Select
                           onValueChange={field.onChange}
-                          defaultValue={field.value}
+                          value={field.value}
                         >
                           <FormControl>
                             <SelectTrigger className="bg-background border-border text-foreground focus:ring-primary">
@@ -215,7 +212,7 @@ const TransactionForm: React.FC = () => {
                         <FormLabel className="text-foreground">Currency</FormLabel>
                         <Select
                           onValueChange={field.onChange}
-                          defaultValue={field.value}
+                          value={field.value}
                         >
                           <FormControl>
                             <SelectTrigger className="bg-background border-border text-foreground focus:ring-primary">
@@ -250,7 +247,7 @@ const TransactionForm: React.FC = () => {
                             placeholder="Enter price"
                             className="bg-background border-border text-foreground focus:ring-primary"
                             {...field}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                             value={field.value || ''}
                           />
                         </FormControl>
@@ -272,7 +269,7 @@ const TransactionForm: React.FC = () => {
                             placeholder="Enter tax amount"
                             className="bg-background border-border text-foreground focus:ring-primary"
                             {...field}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                             value={field.value || ''}
                           />
                         </FormControl>
@@ -300,7 +297,7 @@ const TransactionForm: React.FC = () => {
                                 )}
                               >
                                 {field.value ? (
-                                  format(new Date(field.value), 'PPP')
+                                  format(parseISO(field.value), 'PPP HH:mm:ss')
                                 ) : (
                                   <span>Pick a date</span>
                                 )}
@@ -311,9 +308,9 @@ const TransactionForm: React.FC = () => {
                           <PopoverContent className="w-auto p-0" align="start">
                             <Calendar
                               mode="single"
-                              selected={field.value ? new Date(field.value) : undefined}
+                              selected={field.value ? parseISO(field.value) : undefined}
                               onSelect={(date) =>
-                                field.onChange(date ? format(date, 'yyyy-MM-dd') : '')
+                                field.onChange(date ? format(date, "yyyy-MM-dd'T'HH:mm:ss'Z'") : '')
                               }
                               initialFocus
                             />
@@ -341,7 +338,7 @@ const TransactionForm: React.FC = () => {
                                 )}
                               >
                                 {field.value ? (
-                                  format(new Date(field.value), 'PPP')
+                                  format(parseISO(field.value), 'PPP HH:mm:ss')
                                 ) : (
                                   <span>Pick a date</span>
                                 )}
@@ -352,9 +349,9 @@ const TransactionForm: React.FC = () => {
                           <PopoverContent className="w-auto p-0" align="start">
                             <Calendar
                               mode="single"
-                              selected={field.value ? new Date(field.value) : undefined}
+                              selected={field.value ? parseISO(field.value) : undefined}
                               onSelect={(date) =>
-                                field.onChange(date ? format(date, 'yyyy-MM-dd') : '')
+                                field.onChange(date ? format(date, "yyyy-MM-dd'T'HH:mm:ss'Z'") : '')
                               }
                               initialFocus
                             />
@@ -374,7 +371,7 @@ const TransactionForm: React.FC = () => {
                       <FormLabel className="text-foreground">Payment Method</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        defaultValue={field.value}
+                        value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger className="bg-background border-border text-foreground focus:ring-primary">
@@ -411,8 +408,8 @@ const TransactionForm: React.FC = () => {
                             placeholder="Enter deposit amount"
                             className="bg-background border-border text-foreground focus:ring-primary"
                             {...field}
-                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
-                            value={field.value || ''}
+                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                            value={field.value ?? ''}
                           />
                         </FormControl>
                         <FormMessage />
@@ -437,7 +434,7 @@ const TransactionForm: React.FC = () => {
                                 )}
                               >
                                 {field.value ? (
-                                  format(new Date(field.value), 'PPP')
+                                  format(parseISO(field.value), 'PPP HH:mm:ss')
                                 ) : (
                                   <span>Pick a date</span>
                                 )}
@@ -448,14 +445,58 @@ const TransactionForm: React.FC = () => {
                           <PopoverContent className="w-auto p-0" align="start">
                             <Calendar
                               mode="single"
-                              selected={field.value ? new Date(field.value) : undefined}
+                              selected={field.value ? parseISO(field.value) : undefined}
                               onSelect={(date) =>
-                                field.onChange(date ? format(date, 'yyyy-MM-dd') : '')
+                                field.onChange(date ? format(date, "yyyy-MM-dd'T'HH:mm:ss'Z'") : null)
                               }
                               initialFocus
                             />
                           </PopoverContent>
                         </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="seller_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-foreground">Seller ID</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Enter seller ID"
+                            className="bg-background border-border text-foreground focus:ring-primary"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
+                            value={field.value ?? ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="buyer_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-foreground">Buyer ID</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Enter buyer ID"
+                            className="bg-background border-border text-foreground focus:ring-primary"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
+                            value={field.value ?? ''}
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -500,46 +541,6 @@ const TransactionForm: React.FC = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="seller_company"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-foreground">Seller Company (Optional)</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Enter seller company"
-                            className="bg-background border-border text-foreground focus:ring-primary"
-                            {...field}
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="buyer_company"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-foreground">Buyer Company (Optional)</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Enter buyer company"
-                            className="bg-background border-border text-foreground focus:ring-primary"
-                            {...field}
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
                 <FormField
                   control={form.control}
                   name="details"
@@ -551,7 +552,8 @@ const TransactionForm: React.FC = () => {
                           placeholder="Enter transaction details"
                           className="bg-background border-border text-foreground focus:ring-primary min-h-[100px]"
                           {...field}
-                          value={field.value || ''}
+                          value={field.value ?? ''}
+                          onChange={(e) => field.onChange(e.target.value || null)}
                         />
                       </FormControl>
                       <FormMessage />
@@ -570,64 +572,8 @@ const TransactionForm: React.FC = () => {
                           placeholder="Enter payment reference"
                           className="bg-background border-border text-foreground focus:ring-primary"
                           {...field}
-                          value={field.value || ''}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="invoice_number"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-foreground">Invoice Number (Optional)</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter invoice number"
-                          className="bg-background border-border text-foreground focus:ring-primary"
-                          {...field}
-                          value={field.value || ''}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="health_certificate_number"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-foreground">Health Certificate Number (Optional)</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter health certificate number"
-                          className="bg-background border-border text-foreground focus:ring-primary"
-                          {...field}
-                          value={field.value || ''}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="delivery_instructions"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-foreground">Delivery Instructions (Optional)</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Enter delivery instructions"
-                          className="bg-background border-border text-foreground focus:ring-primary min-h-[100px]"
-                          {...field}
-                          value={field.value || ''}
+                          value={field.value ?? ''}
+                          onChange={(e) => field.onChange(e.target.value || null)}
                         />
                       </FormControl>
                       <FormMessage />
@@ -645,7 +591,7 @@ const TransactionForm: React.FC = () => {
                     Cancel
                   </Button>
                   <Button
-                    type="submit"
+                    onClick={form.handleSubmit(handleFormSubmit)}
                     disabled={isSubmitting}
                     className="bg-primary text-primary-foreground hover:bg-primary/90"
                   >
@@ -656,7 +602,7 @@ const TransactionForm: React.FC = () => {
                       : 'Create Transaction'}
                   </Button>
                 </div>
-              </form>
+              </div>
             </Form>
           </CardContent>
         </Card>

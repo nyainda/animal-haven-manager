@@ -1,76 +1,68 @@
 import React from 'react';
-import { Toaster } from "@/components/ui/sonner"; // Use sonner only
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useParams } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
-import Profile from "./pages/Profile";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import VerifyEmail from "./pages/VerifyEmail";
-import { Analytics } from "@vercel/analytics/react";
-import Animals from "./pages/Animals";
-import AnimalForm from "./components/AnimalForm";
-import { ActivityForm } from './pages/animal/ActivityForm';
-import AnimalDetails from "./pages/AnimalDetails";
-import { AuthProvider } from "./contexts/AuthContext";
-import { ThemeProvider } from "./contexts/ThemeContext";
-import { ActivityManagement } from "./pages/animal/AnimalActivities";
-import AnimalBreedings from "./pages/animal/AnimalBreedings";
-import AnimalHealth from "./pages/animal/AnimalHealth";
-import AnimalNotes from "./pages/animal/AnimalNotes";
-import AnimalNoteForm from "./pages/animal/AnimalNoteForm";
-import AnimalProductions from "./pages/animal/AnimalProductions";
-import AnimalProductionForm from "./pages/animal/AnimalProductionForm";
-import AnimalSuppliers from "./pages/animal/AnimalSuppliers";
-import AnimalSupplierForm from "./pages/animal/AnimalSupplierForm";
-import NoteForm from "./components/forms/NoteForm";
-import FeedingForm from "./components/forms/FeedingForm";
-import TaskForm from "./components/forms/TaskForm";
-import AnimalTasks from './pages/animal/AnimalTasks';
-import AnimalTaskForm from './pages/animal/AnimalTaskForm';
-import { HealthRecordForm } from "./pages/animal/HealthRecordForm";
-import {AnimalTransactions} from "./pages/animal/AnimalTransactions"; 
-import TransactionForm from "./pages/animal/TransactionForm"; 
+import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { Analytics } from '@vercel/analytics/react';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import Index from '@/pages/Index';
+import NotFound from '@/pages/NotFound';
+import Login from '@/pages/Login';
+import Register from '@/pages/Register';
+import Dashboard from '@/pages/Dashboard';
+import Profile from '@/pages/Profile';
+import ForgotPassword from '@/pages/ForgotPassword';
+import ResetPassword from '@/pages/ResetPassword';
+import VerifyEmail from '@/pages/VerifyEmail';
+import Animals from '@/pages/Animals';
+import AnimalForm from '@/components/AnimalForm';
+import AnimalDetails from '@/pages/AnimalDetails';
+import AnimalTasks from '@/pages/animal/AnimalTasks';
+import AnimalTaskForm from '@/pages/animal/AnimalTaskForm';
+import { ActivityForm } from '@/pages/animal/ActivityForm';
+import { ActivityManagement } from '@/pages/animal/AnimalActivities';
+import AnimalBreedings from '@/pages/animal/AnimalBreedings';
+import AnimalHealth from '@/pages/animal/AnimalHealth';
+import AnimalNotes from '@/pages/animal/AnimalNotes';
+import AnimalNoteForm from '@/pages/animal/AnimalNoteForm';
+import AnimalProductions from '@/pages/animal/AnimalProductions';
+import AnimalProductionForm from '@/pages/animal/AnimalProductionForm';
+import AnimalSuppliers from '@/pages/animal/AnimalSuppliers';
+import AnimalSupplierForm from '@/pages/animal/AnimalSupplierForm';
+import { AnimalTransactions } from '@/pages/animal/AnimalTransactions';
+import TransactionForm from '@/pages/animal/TransactionForm';
+import NoteForm from '@/components/forms/NoteForm';
+import FeedingForm from '@/components/forms/FeedingForm';
+import TaskForm from '@/components/forms/TaskForm';
+import { HealthRecordForm } from '@/pages/animal/HealthRecordForm';
 
 // Wrapper component for ActivityManagement
 const ActivityManagementWrapper = () => {
   const { id } = useParams<{ id: string }>();
-  if (!id) {
-    return <div>Error: Animal ID not found</div>;
-  }
+  if (!id) return <div>Error: Animal ID not found</div>;
   return <ActivityManagement animalId={id} />;
 };
 
 // Wrapper component for HealthRecordForm
 const HealthRecordFormWrapper = () => {
   const { id } = useParams<{ id: string }>();
-  if (!id) {
-    return <div>Error: Animal ID not found</div>;
-  }
+  if (!id) return <div>Error: Animal ID not found</div>;
   return <HealthRecordForm animalId={id} />;
 };
 
 // Wrapper component for AnimalTransactions
 const AnimalTransactionsWrapper = () => {
   const { id } = useParams<{ id: string }>();
-  if (!id) {
-    return <div>Error: Animal ID not found</div>;
-  }
+  if (!id) return <div>Error: Animal ID not found</div>;
   return <AnimalTransactions animalId={id} />;
 };
 
 // Wrapper component for TransactionForm
 const TransactionFormWrapper = () => {
-  const { id, transactionId } = useParams<{ id: string; transactionId?: string }>();
-  if (!id) {
-    return <div>Error: Animal ID not found</div>;
-  }
- //return <TransactionForm animalId={id} transactionId={transactionId} />;
+  const { id } = useParams<{ id: string }>();
+  if (!id) return <div>Error: Animal ID not found</div>;
+  return <TransactionForm />;
 };
 
 const queryClient = new QueryClient();
@@ -139,8 +131,8 @@ const App = () => (
 
               {/* Animal Transaction Routes */}
               <Route path="/animals/:id/transactions" element={<AnimalTransactionsWrapper />} />
-              <Route path="/animals/:id/transactions/new" element={<TransactionForm />} />
-              <Route path="/animals/:id/transactions/:transactionId/edit" element={<TransactionForm />} />
+              <Route path="/animals/:id/transactions/new" element={<TransactionFormWrapper />} />
+              <Route path="/animals/:id/transactions/:transactionId/edit" element={<TransactionFormWrapper />} />
 
               {/* Form Routes */}
               <Route path="/forms/note" element={<NoteForm />} />
