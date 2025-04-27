@@ -1,15 +1,16 @@
 import { toast } from 'sonner';
+import { apiConfig } from '@/config/api';
 
-// Define the Note type based on your JSON structure
+// Note and NoteFormData interfaces
 export interface Note {
   notes_id: string;
   content: string;
   category: string;
   keywords: string[];
-  file_path: string;
+  file_path?: string;
   add_to_calendar: boolean;
-  priority: string;
-  status: string;
+  priority: 'low' | 'medium' | 'high';
+  status: 'pending' | 'completed' | 'archived';
   due_date: string;
   created_at: string;
   updated_at: string;
@@ -17,40 +18,96 @@ export interface Note {
   user_id: string;
 }
 
-// Define the form data type for creating/updating notes
 export interface NoteFormData {
   content: string;
   category: string;
   keywords: string[];
   file_path?: string;
   add_to_calendar: boolean;
-  status: string;
-  priority: string;
+  priority: 'low' | 'medium' | 'high';
+  status: 'pending' | 'completed' | 'archived';
   due_date: string;
 }
 
-// Base API URL
-// const API_URL = 'http://127.0.0.1:8000/api/animals';
-// const CSRF_URL = 'http://127.0.0.1:8000/sanctum/csrf-cookie';
+// Custom error class for field-specific errors
+class ApiValidationError extends Error {
+  public errors: Record<string, string>;
 
-const API_URL = 'https://animal-management-system-backend-master-fugzaz.laravel.cloud/api/animals';
-const CSRF_URL = 'https://animal-management-system-backend-master-fugzaz.laravel.cloud/sanctum/csrf-cookie';
-
-// Helper to fetch CSRF token
-const fetchCsrfToken = async () => {
-  try {
-    const response = await fetch(CSRF_URL, {
-      method: 'GET',
-      credentials: 'include',
-    });
-    if (!response.ok) throw new Error(`Failed to fetch CSRF token: ${response.status}`);
-    console.log('[NOTE] CSRF token fetched successfully');
-  } catch (error) {
-    console.warn('[NOTE] CSRF fetch failed, proceeding anyway:', error);
+  constructor(message: string, errors: Record<string, string>) {
+    super(message);
+    this.errors = errors;
+    this.name = 'ApiValidationError';
   }
+}
+
+// Base API URL and CSRF cache
+const API_URL = apiConfig.API_URL;
+const CSRF_URL = apiConfig.CSRF_URL;
+let csrfTokenPromise: Promise<void> | null = null;
+
+// Normalization functions
+const normalizeDate = (date: string): string => {
+  return new Date(date).toISOString().split('T')[0];
 };
 
-// Helper to get authentication headers
+const normalizeNoteFormData = (data: NoteFormData): NoteFormData => {
+  const normalized: NoteFormData = {
+    content: data.content.trim(),
+    category: data.category.trim(),
+    keywords: Array.isArray(data.keywords) ? data.keywords.map(k => k.trim()).filter(k => k) : [],
+    add_to_calendar: Boolean(data.add_to_calendar),
+    priority: ['low', 'medium', 'high'].includes(data.priority) ? data.priority : 'medium',
+    status: ['pending', 'completed', 'archived'].includes(data.status) ? data.status : 'pending',
+    due_date: normalizeDate(data.due_date),
+  };
+
+  if (data.file_path) normalized.file_path = data.file_path.trim();
+
+  return normalized;
+};
+
+const normalizeNoteResponse = (data: any): Note => {
+  if (!data || !data.notes_id) throw new Error('Invalid note data received');
+
+  return {
+    notes_id: String(data.notes_id),
+    content: String(data.content || ''),
+    category: String(data.category || ''),
+    keywords: Array.isArray(data.keywords) ? data.keywords.map(String) : [],
+    file_path: data.file_path ? String(data.file_path) : undefined,
+    add_to_calendar: Boolean(data.add_to_calendar),
+    priority: ['low', 'medium', 'high'].includes(data.priority) ? data.priority : 'medium',
+    status: ['pending', 'completed', 'archived'].includes(data.status) ? data.status : 'pending',
+    due_date: normalizeDate(data.due_date || new Date().toISOString()),
+    created_at: new Date(data.created_at || new Date()).toISOString(),
+    updated_at: new Date(data.updated_at || new Date()).toISOString(),
+    animal_id: String(data.animal_id || ''),
+    user_id: String(data.user_id || ''),
+  };
+};
+
+// Fetch CSRF token
+const fetchCsrfToken = async () => {
+  if (!csrfTokenPromise) {
+    csrfTokenPromise = (async () => {
+      try {
+        const response = await fetch(CSRF_URL, {
+          method: 'GET',
+          credentials: 'include',
+        });
+        if (!response.ok) throw new Error(`Failed to fetch CSRF token: ${response.status}`);
+        console.log('[NOTE] CSRF token fetched successfully');
+      } catch (error) {
+        console.warn('[NOTE] CSRF fetch failed, proceeding anyway:', error);
+      } finally {
+        setTimeout(() => (csrfTokenPromise = null), 1000);
+      }
+    })();
+  }
+  return csrfTokenPromise;
+};
+
+// Get authentication headers
 const getAuthHeaders = (): Record<string, string> => {
   const token = localStorage.getItem('auth_token');
   const xsrfToken = document.cookie
@@ -70,62 +127,73 @@ const getAuthHeaders = (): Record<string, string> => {
 export const createNote = async (animalId: string, noteData: NoteFormData): Promise<Note> => {
   await fetchCsrfToken();
   try {
-    const url = `${API_URL}/${animalId}/notes`; 
+    const normalizedData = normalizeNoteFormData(noteData);
+    const url = `${API_URL}/${animalId}/notes`;
     const response = await fetch(url, {
       method: 'POST',
       headers: getAuthHeaders(),
       credentials: 'include',
-      body: JSON.stringify(noteData),
+      body: JSON.stringify(normalizedData),
     });
 
-    console.log('[NOTE] Create Note Status:', response.status);
     const rawData = await response.json();
-    console.log('[NOTE] Raw Create Note Response:', rawData);
-
     if (!response.ok) {
-      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
-      throw new Error(errorMessage);
+      if (rawData.errors && typeof rawData.errors === 'object') {
+        throw new ApiValidationError(rawData.message || `API error: ${response.status}`, rawData.errors);
+      }
+      throw new Error(rawData.message || `API error: ${response.status}`);
     }
 
-    const newNote = rawData.data || rawData;
+    const newNote = normalizeNoteResponse(rawData.data || rawData);
     toast.success(rawData.message || 'Note created successfully');
-    console.log('[NOTE] Created Note:', newNote);
     return newNote;
   } catch (error) {
-    console.error('[NOTE] Error creating note:', error);
-    toast.error(`Failed to create note: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (error instanceof ApiValidationError) {
+      toast.error(error.message);
+      throw error;
+    }
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    toast.error(`Failed to create note: ${message}`);
     throw error;
   }
 };
 
-// Fetch all notes for an animal
-export const fetchNotes = async (animalId: string): Promise<Note[]> => {
+// Fetch all notes for an animal with pagination
+export const fetchNotes = async (
+  animalId: string,
+  options: { page?: number; perPage?: number; fields?: string[] } = {}
+): Promise<Note[]> => {
   await fetchCsrfToken();
   try {
-    const url = `${API_URL}/${animalId}/notes`;
+    const { page = 1, perPage = 10, fields } = options;
+    const params = new URLSearchParams({
+      page: page.toString(),
+      per_page: perPage.toString(),
+      ...(fields ? { fields: fields.join(',') } : {}),
+    });
+    const url = `${API_URL}/${animalId}/notes?${params}`;
     const response = await fetch(url, {
       headers: getAuthHeaders(),
       credentials: 'include',
     });
 
-    console.log('[NOTE] Fetch Notes Status:', response.status);
     const rawData = await response.json();
-    console.log('[NOTE] Raw Fetch Notes Response:', rawData);
-
     if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
+      if (rawData.errors && typeof rawData.errors === 'object') {
+        throw new ApiValidationError(rawData.message || `API error: ${response.status}`, rawData.errors);
+      }
+      throw new Error(rawData.message || `API error: ${response.status}`);
     }
 
-    // Handle different API response formats
-    const notes = Array.isArray(rawData.data) ? rawData.data : 
-                  rawData.data && Array.isArray(rawData.data.data) ? rawData.data.data : 
-                  Array.isArray(rawData) ? rawData : [];
-                  
-    console.log('[NOTE] Processed Notes:', notes);
-    return notes;
+    const notes = Array.isArray(rawData.data) ? rawData.data : Array.isArray(rawData) ? rawData : [];
+    return notes.map(normalizeNoteResponse);
   } catch (error) {
-    console.error(`[NOTE] Error fetching notes for animal ${animalId}:`, error);
-    toast.error(`Failed to fetch notes: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (error instanceof ApiValidationError) {
+      toast.error(error.message);
+      throw error;
+    }
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    toast.error(`Failed to fetch notes: ${message}`);
     throw error;
   }
 };
@@ -134,58 +202,75 @@ export const fetchNotes = async (animalId: string): Promise<Note[]> => {
 export const fetchNote = async (animalId: string, noteId: string): Promise<Note> => {
   await fetchCsrfToken();
   try {
+    if (!noteId || noteId === 'undefined') {
+      throw new Error('Invalid note ID provided');
+    }
+
     const url = `${API_URL}/${animalId}/notes/${noteId}`;
     const response = await fetch(url, {
       headers: getAuthHeaders(),
       credentials: 'include',
     });
 
-    console.log('[NOTE] Fetch Note Status:', response.status);
-    const rawData = await response.json();
-    console.log('[NOTE] Raw Fetch Note Response:', rawData);
-
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    if (response.status === 404) {
+      throw new Error(`Note with ID ${noteId} not found`);
     }
 
-    const note = rawData.data || rawData;
-    console.log('[NOTE] Processed Note:', note);
-    return note;
+    const rawData = await response.json();
+    if (!response.ok) {
+      if (rawData.errors && typeof rawData.errors === 'object') {
+        throw new ApiValidationError(rawData.message || `API error: ${response.status}`, rawData.errors);
+      }
+      throw new Error(rawData.message || `API error: ${response.status}`);
+    }
+
+    return normalizeNoteResponse(rawData.data || rawData);
   } catch (error) {
-    console.error(`[NOTE] Error fetching note ${noteId} for animal ${animalId}:`, error);
-    toast.error(`Failed to fetch note: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (error instanceof ApiValidationError) {
+      toast.error(error.message);
+      throw error;
+    }
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    toast.error(`Failed to fetch note: ${message}`);
     throw error;
   }
 };
 
 // Update a note
-export const updateNote = async (animalId: string, noteId: string, noteData: Partial<NoteFormData>): Promise<Note> => {
+export const updateNote = async (
+  animalId: string,
+  noteId: string,
+  noteData: Partial<NoteFormData>
+): Promise<Note> => {
   await fetchCsrfToken();
   try {
+    const normalizedData = normalizeNoteFormData(noteData as NoteFormData);
     const url = `${API_URL}/${animalId}/notes/${noteId}`;
     const response = await fetch(url, {
       method: 'PUT',
       headers: getAuthHeaders(),
       credentials: 'include',
-      body: JSON.stringify(noteData),
+      body: JSON.stringify(normalizedData),
     });
 
-    console.log('[NOTE] Update Note Status:', response.status);
     const rawData = await response.json();
-    console.log('[NOTE] Raw Update Note Response:', rawData);
-
     if (!response.ok) {
-      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
-      throw new Error(errorMessage);
+      if (rawData.errors && typeof rawData.errors === 'object') {
+        throw new ApiValidationError(rawData.message || `API error: ${response.status}`, rawData.errors);
+      }
+      throw new Error(rawData.message || `API error: ${response.status}`);
     }
 
-    const updatedNote = rawData.data || rawData;
+    const updatedNote = normalizeNoteResponse(rawData.data || rawData);
     toast.success(rawData.message || 'Note updated successfully');
-    console.log('[NOTE] Updated Note:', updatedNote);
     return updatedNote;
   } catch (error) {
-    console.error(`[NOTE] Error updating note ${noteId} for animal ${animalId}:`, error);
-    toast.error(`Failed to update note: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (error instanceof ApiValidationError) {
+      toast.error(error.message);
+      throw error;
+    }
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    toast.error(`Failed to update note: ${message}`);
     throw error;
   }
 };
@@ -201,19 +286,22 @@ export const deleteNote = async (animalId: string, noteId: string): Promise<void
       credentials: 'include',
     });
 
-    console.log('[NOTE] Delete Note Status:', response.status);
     const rawData = await response.json();
-    console.log('[NOTE] Raw Delete Note Response:', rawData);
-
     if (!response.ok) {
-      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
-      throw new Error(errorMessage);
+      if (rawData.errors && typeof rawData.errors === 'object') {
+        throw new ApiValidationError(rawData.message || `API error: ${response.status}`, rawData.errors);
+      }
+      throw new Error(rawData.message || `API error: ${response.status}`);
     }
 
     toast.success(rawData.message || 'Note deleted successfully');
   } catch (error) {
-    console.error(`[NOTE] Error deleting note ${noteId} for animal ${animalId}:`, error);
-    toast.error(`Failed to delete note: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (error instanceof ApiValidationError) {
+      toast.error(error.message);
+      throw error;
+    }
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    toast.error(`Failed to delete note: ${message}`);
     throw error;
   }
 };

@@ -1,6 +1,7 @@
 import { toast } from 'sonner';
+import { apiConfig } from '@/config/api';
 
-// Define the Task type based on your JSON structure
+// Task and TaskFormData interfaces (unchanged)
 export interface Task {
   task_id: string;
   title: string;
@@ -23,7 +24,6 @@ export interface Task {
   animal_id: string;
 }
 
-// Define the form data type for creating/updating tasks
 export interface TaskFormData {
   title: string;
   task_type: string;
@@ -42,25 +42,100 @@ export interface TaskFormData {
   end_repeat_date?: string;
 }
 
-// Base API URL
-const API_URL = 'https://animal-management-system-backend-master-fugzaz.laravel.cloud/api/animals';
-const CSRF_URL = 'https://animal-management-system-backend-master-fugzaz.laravel.cloud/sanctum/csrf-cookie';
+// Custom error class to include field-specific errors
+class ApiValidationError extends Error {
+  public errors: Record<string, string>;
 
-// Helper to fetch CSRF token
-const fetchCsrfToken = async () => {
-  try {
-    const response = await fetch(CSRF_URL, {
-      method: 'GET',
-      credentials: 'include',
-    });
-    if (!response.ok) throw new Error(`Failed to fetch CSRF token: ${response.status}`);
-    console.log('[TASK] CSRF token fetched successfully');
-  } catch (error) {
-    console.warn('[TASK] CSRF fetch failed, proceeding anyway:', error);
+  constructor(message: string, errors: Record<string, string>) {
+    super(message);
+    this.errors = errors;
+    this.name = 'ApiValidationError';
   }
+}
+
+// Base API URL and CSRF cache (unchanged)
+const API_URL = apiConfig.API_URL;
+const CSRF_URL = apiConfig.CSRF_URL;
+let csrfTokenPromise: Promise<void> | null = null;
+
+// Normalization functions (unchanged from previous response)
+const normalizeDateTime = (date: string, time: string): { date: string; time: string } => {
+  const normalizedDate = new Date(date).toISOString().split('T')[0];
+  const normalizedTime = time.match(/^\d{2}:\d{2}$/) ? time : new Date(`1970-01-01T${time}`).toTimeString().slice(0, 5);
+  return { date: normalizedDate, time: normalizedTime };
 };
 
-// Helper to get authentication headers
+const normalizeTaskFormData = (data: TaskFormData): TaskFormData => {
+  const normalized: TaskFormData = {
+    title: data.title.trim(),
+    task_type: data.task_type.trim(),
+    start_date: normalizeDateTime(data.start_date, data.start_time).date,
+    start_time: normalizeDateTime(data.start_date, data.start_time).time,
+    end_date: normalizeDateTime(data.end_date, data.end_time).date,
+    end_time: normalizeDateTime(data.end_date, data.end_time).time,
+    duration: Math.max(0, Math.round(data.duration)),
+    priority: ['low', 'medium', 'high'].includes(data.priority) ? data.priority : 'medium',
+    status: ['pending', 'completed', 'archived'].includes(data.status) ? data.status : 'pending',
+  };
+
+  if (data.description) normalized.description = data.description.trim();
+  if (data.health_notes) normalized.health_notes = data.health_notes.trim();
+  if (data.location) normalized.location = data.location.trim();
+  if (data.repeats) normalized.repeats = ['daily', 'weekly', 'monthly'].includes(data.repeats) ? data.repeats : undefined;
+  if (data.repeat_frequency) normalized.repeat_frequency = Math.max(1, Math.round(data.repeat_frequency));
+  if (data.end_repeat_date) normalized.end_repeat_date = normalizeDateTime(data.end_repeat_date, '00:00').date;
+
+  return normalized;
+};
+
+const normalizeTaskResponse = (data: any): Task => {
+  if (!data || !data.task_id) throw new Error('Invalid task data received');
+
+  return {
+    task_id: String(data.task_id),
+    title: String(data.title || ''),
+    task_type: String(data.task_type || ''),
+    start_date: normalizeDateTime(data.start_date || new Date().toISOString(), data.start_time || '00:00').date,
+    start_time: normalizeDateTime(data.start_date || new Date().toISOString(), data.start_time || '00:00').time,
+    end_date: normalizeDateTime(data.end_date || new Date().toISOString(), data.end_time || '00:00').date,
+    end_time: normalizeDateTime(data.end_date || new Date().toISOString(), data.end_time || '00:00').time,
+    duration: Number(data.duration || 0),
+    description: data.description ? String(data.description) : undefined,
+    health_notes: data.health_notes ? String(data.health_notes) : undefined,
+    location: data.location ? String(data.location) : undefined,
+    priority: ['low', 'medium', 'high'].includes(data.priority) ? data.priority : 'medium',
+    status: ['pending', 'completed', 'archived'].includes(data.status) ? data.status : 'pending',
+    repeats: ['daily', 'weekly', 'monthly'].includes(data.repeats) ? data.repeats : undefined,
+    repeat_frequency: data.repeat_frequency ? Number(data.repeat_frequency) : undefined,
+    end_repeat_date: data.end_repeat_date ? normalizeDateTime(data.end_repeat_date, '00:00').date : undefined,
+    created_at: new Date(data.created_at || new Date()).toISOString(),
+    updated_at: new Date(data.updated_at || new Date()).toISOString(),
+    animal_id: String(data.animal_id || ''),
+  };
+};
+
+// Fetch CSRF token (unchanged)
+const fetchCsrfToken = async () => {
+  if (!csrfTokenPromise) {
+    csrfTokenPromise = (async () => {
+      try {
+        const response = await fetch(CSRF_URL, {
+          method: 'GET',
+          credentials: 'include',
+        });
+        if (!response.ok) throw new Error(`Failed to fetch CSRF token: ${response.status}`);
+        console.log('[TASK] CSRF token fetched successfully');
+      } catch (error) {
+        console.warn('[TASK] CSRF fetch failed, proceeding anyway:', error);
+      } finally {
+        setTimeout(() => (csrfTokenPromise = null), 1000);
+      }
+    })();
+  }
+  return csrfTokenPromise;
+};
+
+// Get authentication headers 
 const getAuthHeaders = (): Record<string, string> => {
   const token = localStorage.getItem('auth_token');
   const xsrfToken = document.cookie
@@ -80,30 +155,34 @@ const getAuthHeaders = (): Record<string, string> => {
 export const createTask = async (animalId: string, taskData: TaskFormData): Promise<Task> => {
   await fetchCsrfToken();
   try {
+    const normalizedData = normalizeTaskFormData(taskData);
     const url = `${API_URL}/${animalId}/tasks`;
     const response = await fetch(url, {
       method: 'POST',
       headers: getAuthHeaders(),
       credentials: 'include',
-      body: JSON.stringify(taskData),
+      body: JSON.stringify(normalizedData),
     });
 
-    console.log('[TASK] Create Task Status:', response.status);
     const rawData = await response.json();
-    console.log('[TASK] Raw Create Task Response:', rawData);
-
     if (!response.ok) {
-      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
-      throw new Error(errorMessage);
+      
+      if (rawData.errors && typeof rawData.errors === 'object') {
+        throw new ApiValidationError(rawData.message || `API error: ${response.status}`, rawData.errors);
+      }
+      throw new Error(rawData.message || `API error: ${response.status}`);
     }
 
-    const newTask = rawData.data || rawData;
-    toast.success(rawData.message || 'Task created successfully');
-    console.log('[TASK] Created Task:', newTask);
+    const newTask = normalizeTaskResponse(rawData.data || rawData);
+    toast.success(rawData.message ||  'Task created successfully');
     return newTask;
   } catch (error) {
-    console.error('[TASK] Error creating task:', error);
-    toast.error(`Failed to create task: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (error instanceof ApiValidationError) {
+      toast.error(error.message); 
+      throw error; 
+    }
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    toast.error(`Failed to create task: ${message}`);
     throw error;
   }
 };
@@ -119,75 +198,62 @@ export const fetchTasks = async (animalId: string): Promise<Task[]> => {
       credentials: 'include',
     });
 
-    console.log('[TASK] Fetch Tasks Status:', response.status);
     const rawData = await response.json();
-    console.log('[TASK] Raw Fetch Tasks Response:', rawData);
-
     if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
+      if (rawData.errors && typeof rawData.errors === 'object') {
+        throw new ApiValidationError(rawData.message || `API error: ${response.status}`, rawData.errors);
+      }
+      throw new Error(rawData.message || `API error: ${response.status}`);
     }
 
-    const tasks = Array.isArray(rawData.data) ? rawData.data : 
-                  rawData.data && Array.isArray(rawData.data.data) ? rawData.data.data : 
-                  Array.isArray(rawData) ? rawData : [];
-                  
-    console.log('[TASK] Processed Tasks:', tasks);
-    return tasks;
+    const tasks = Array.isArray(rawData.data) ? rawData.data : Array.isArray(rawData) ? rawData : [];
+    return tasks.map(normalizeTaskResponse);
   } catch (error) {
-    console.error(`[TASK] Error fetching tasks for animal ${animalId}:`, error);
-    toast.error(`Failed to fetch tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (error instanceof ApiValidationError) {
+      toast.error(error.message);
+      throw error;
+    }
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    toast.error(`Failed to fetch tasks: ${message}`);
     throw error;
   }
 };
 
 // Fetch a single task
-// Fetch a single task
 export const fetchTask = async (animalId: string, taskId: string): Promise<Task> => {
   await fetchCsrfToken();
   try {
-    // Ensure taskId is valid before making the request
     if (!taskId || taskId === 'undefined') {
       throw new Error('Invalid task ID provided');
     }
-    
-    
+
     const url = `${API_URL}/${animalId}/tasks/${taskId}`;
-    console.log(`[TASK] Fetching task with URL: ${url}`);
-    
     const response = await fetch(url, {
       method: 'GET',
       headers: getAuthHeaders(),
       credentials: 'include',
     });
 
-    console.log('[TASK] Fetch Task Status:', response.status);
-    
-    // Handle 404 specifically to provide a clearer error message
     if (response.status === 404) {
       throw new Error(`Task with ID ${taskId} not found`);
     }
-    
+
     const rawData = await response.json();
-    console.log('[TASK] Raw Fetch Task Response:', rawData);
-
     if (!response.ok) {
-      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
-      throw new Error(errorMessage);
+      if (rawData.errors && typeof rawData.errors === 'object') {
+        throw new ApiValidationError(rawData.message || `API error: ${response.status}`, rawData.errors);
+      }
+      throw new Error(rawData.message || `API error: ${response.status}`);
     }
 
-    // Check if the data structure matches what we expect
-    const task = rawData.data || rawData;
-    
-    // Validate that we actually got a task object
-    if (!task || !task.task_id) {
-      throw new Error('Invalid task data received from server');
-    }
-    
-    console.log('[TASK] Processed Task:', task);
-    return task;
+    return normalizeTaskResponse(rawData.data || rawData);
   } catch (error) {
-    console.error(`[TASK] Error fetching task ${taskId} for animal ${animalId}:`, error);
-    toast.error(`Failed to fetch task: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (error instanceof ApiValidationError) {
+      toast.error(error.message);
+      throw error;
+    }
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    toast.error(`Failed to fetch task: ${message}`);
     throw error;
   }
 };
@@ -196,30 +262,33 @@ export const fetchTask = async (animalId: string, taskId: string): Promise<Task>
 export const updateTask = async (animalId: string, taskId: string, taskData: Partial<TaskFormData>): Promise<Task> => {
   await fetchCsrfToken();
   try {
+    const normalizedData = normalizeTaskFormData(taskData as TaskFormData); 
     const url = `${API_URL}/${animalId}/tasks/${taskId}`;
     const response = await fetch(url, {
-      method: 'PUT', // Ensure this matches your Laravel route (PUT or PATCH)
+      method: 'PUT',
       headers: getAuthHeaders(),
       credentials: 'include',
-      body: JSON.stringify(taskData),
+      body: JSON.stringify(normalizedData),
     });
 
-    console.log('[TASK] Update Task Status:', response.status);
     const rawData = await response.json();
-    console.log('[TASK] Raw Update Task Response:', rawData);
-
     if (!response.ok) {
-      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
-      throw new Error(errorMessage);
+      if (rawData.errors && typeof rawData.errors === 'object') {
+        throw new ApiValidationError(rawData.message || `API error: ${response.status}`, rawData.errors);
+      }
+      throw new Error(rawData.message || `API error: ${response.status}`);
     }
 
-    const updatedTask = rawData.data || rawData;
+    const updatedTask = normalizeTaskResponse(rawData.data || rawData);
     toast.success(rawData.message || 'Task updated successfully');
-    console.log('[TASK] Updated Task:', updatedTask);
     return updatedTask;
   } catch (error) {
-    console.error(`[TASK] Error updating task ${taskId} for animal ${animalId}:`, error);
-    toast.error(`Failed to update task: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (error instanceof ApiValidationError) {
+      toast.error(error.message);
+      throw error;
+    }
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    toast.error(`Failed to update task: ${message}`);
     throw error;
   }
 };
@@ -235,19 +304,22 @@ export const deleteTask = async (animalId: string, taskId: string): Promise<void
       credentials: 'include',
     });
 
-    console.log('[TASK] Delete Task Status:', response.status);
     const rawData = await response.json();
-    console.log('[TASK] Raw Delete Task Response:', rawData);
-
     if (!response.ok) {
-      const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
-      throw new Error(errorMessage);
+      if (rawData.errors && typeof rawData.errors === 'object') {
+        throw new ApiValidationError(rawData.message || `API error: ${response.status}`, rawData.errors);
+      }
+      throw new Error(rawData.message || `API error: ${response.status}`);
     }
 
     toast.success(rawData.message || 'Task deleted successfully');
   } catch (error) {
-    console.error(`[TASK] Error deleting task ${taskId} for animal ${animalId}:`, error);
-    toast.error(`Failed to delete task: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (error instanceof ApiValidationError) {
+      toast.error(error.message);
+      throw error;
+    }
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    toast.error(`Failed to delete task: ${message}`);
     throw error;
   }
 };

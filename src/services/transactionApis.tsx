@@ -1,4 +1,5 @@
 import { toast } from 'sonner';
+import { apiConfig } from '@/config/api';
 
 // Define the Transaction interface
 export interface Transaction {
@@ -26,7 +27,7 @@ export interface Transaction {
   animal_id: string;
 }
 
-// Define the form data type matching the working payload
+// Define the form data type
 export interface TransactionFormData {
   transaction_type: string;
   price: number;
@@ -45,7 +46,7 @@ export interface TransactionFormData {
   buyer_name?: string;
 }
 
-// Define the transaction summary interface (unchanged)
+// Define the transaction summary interface
 export interface TransactionSummary {
   overview: {
     total_transactions: number;
@@ -79,9 +80,9 @@ export interface TransactionSummary {
   last_updated: string;
 }
 
-// Base API URL
-const API_URL = 'https://animal-management-system-backend-master-fugzaz.laravel.cloud/api/animals';
-const CSRF_URL = 'https://animal-management-system-backend-master-fugzaz.laravel.cloud/sanctum/csrf-cookie';
+// Use environment variables from config
+const API_URL = apiConfig.API_URL;
+const CSRF_URL = apiConfig.CSRF_URL;
 
 // Fetch CSRF token
 const fetchCsrfToken = async () => {

@@ -1,7 +1,8 @@
 import { toast } from 'sonner';
+import { apiConfig } from '@/config/api';
 
-const API_URL = 'https://animal-management-system-backend-master-fugzaz.laravel.cloud/api/animals';
-const CSRF_URL = 'https://animal-management-system-backend-master-fugzaz.laravel.cloud/sanctum/csrf-cookie';
+const API_URL = apiConfig.API_URL;
+const CSRF_URL = apiConfig.CSRF_URL;
 
 export interface ProductCategory {
   id?: string;

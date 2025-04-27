@@ -30,6 +30,8 @@ export interface Animal {
   birth_photos: string | null;
   physical_traits: string[];
   keywords: string[];
+  created_at?: string; // Optional property for creation timestamp
+  updated_at?: string; // Optional property for update timestamp
 }
 
 // HealthStatistics.ts
