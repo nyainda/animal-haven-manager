@@ -84,6 +84,9 @@ export interface Production extends ProductionFormData {
   id: string;
   yield_id?: string; // Added yield_id to the interface
   animal_id: string;
+  unit?: string;
+  weight?: string;
+  quality?: string;
   user_id: string;
   product_category_id?: string;
   product_grade_id?: string;

@@ -1,17 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, FC } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { fetchAnimals } from '@/services/animalService';
+import { fetchAnimals, createAnimal } from '@/services/animalService';
 import { fetchProductionStatistics, ProductionStatistics } from '@/services/animalProductionApi';
-import { fetchActivities, Activity } from '@/services/ActivityApi';
+import { fetchActivities, createActivity, Activity, ActivityFormData } from '@/services/ActivityApi';
+import { createNote, Note, NoteFormData } from '@/services/noteApi';
+import { createTask, Task, TaskFormData } from '@/services/taskApi';
 import { Animal, HealthStatistics, ReproductiveStatistics, GrowthStatistics } from '@/types/AnimalTypes';
+import { CalendarEvent, Notification, AnimalStatsData, DashboardActivity } from '../types/DashboardTypes';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Home, CalendarIcon, ActivityIcon, Settings, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { parseISO, differenceInYears } from 'date-fns';
+import { parseISO, differenceInYears, addDays } from 'date-fns';
 
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
@@ -22,28 +25,16 @@ import ActivityFeed from '@/components/dashboard/ActivityFeed';
 import CalendarView from '@/components/dashboard/CalendarView';
 import SettingsPanel from '@/components/dashboard/SettingsPanel';
 
-interface CalendarEvent {
-  id: string;
-  title: string;
-  date: Date;
-  type: 'appointment' | 'event' | 'meeting' | 'production';
+// Define AnimalFormData based on createAnimal requirements
+interface AnimalFormData {
+  name: string;
+  type: string;
+  birth_date: string;
+  is_breeding_stock: boolean;
+  [key: string]: any; 
 }
 
-interface Notification {
-  id: string;
-  content: string;
-  time: string;
-  read: boolean;
-}
-
-interface AnimalStatsData {
-  totalAnimals: number;
-  mostCommonType: string;
-  averageAge: number;
-  breedingStockCount: number;
-}
-
-const Dashboard: React.FC = () => {
+const Dashboard: FC = () => {
   const { user, logout, isAuthenticated, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
@@ -52,11 +43,9 @@ const Dashboard: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
-
-  // Data states
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const [activities, setActivities] = useState<DashboardActivity[]>([]);
   const [productionStats, setProductionStats] = useState<ProductionStatistics | null>(null);
   const [animalStats, setAnimalStats] = useState<AnimalStatsData | null>(null);
   const [healthStats, setHealthStats] = useState<HealthStatistics | null>(null);
@@ -84,13 +73,13 @@ const Dashboard: React.FC = () => {
     };
   };
 
-  // Compute reproductive stats (placeholder, requires breeding API)
+  // Compute reproductive stats
   const computeReproStats = (animals: Animal[]): ReproductiveStatistics => {
     return {
-      breeding_success_rate: 0, // Requires breeding API
-      average_gestation: 0, // Requires gestation API
-      successful_births: animals.filter(a => a.multiple_birth).length, // Approximation
-      failed_births: 0, // Requires breeding API
+      breeding_success_rate: 0,
+      average_gestation: 0,
+      successful_births: animals.filter(a => a.multiple_birth).length,
+      failed_births: 0,
     };
   };
 
@@ -105,12 +94,190 @@ const Dashboard: React.FC = () => {
     }, {} as Record<string, number>);
 
     return {
-      average_weight_gain: 0, // Requires weight history API
+      average_weight_gain: 0,
       weight_by_age_group: weightByAgeGroup,
     };
   };
 
-  // Load initial data (animals and activities)
+  // Handle activity creation
+  const handleActivityCreated = async (animalId: string, activityData: ActivityFormData) => {
+    try {
+      const newActivity = await createActivity(animalId, activityData);
+      const dashboardActivity: DashboardActivity = {
+        id: newActivity.id,
+        type: 'activity',
+        description: `Activity: ${newActivity.description}`,
+        timestamp: newActivity.created_at,
+        animalId: newActivity.animal_id,
+        activityType: newActivity.activity_type,
+        status: 'pending',
+      };
+      
+      setActivities(prev => [dashboardActivity, ...prev]);
+      
+      if (newActivity.activity_date) {
+        setCalendarEvents(prev => [
+          ...prev,
+          {
+            id: newActivity.id,
+            title: `Activity: ${newActivity.description.substring(0, 20)}...`,
+            date: new Date(newActivity.activity_date),
+            type: 'activity',
+            animalId: newActivity.animal_id,
+            activityType: newActivity.activity_type,
+            status: 'pending',
+          },
+        ]);
+      }
+      
+      setNotifications(prev => [
+        {
+          id: `activity-${newActivity.id}`,
+          content: `New activity created for ${animals.find(a => a.id === newActivity.animal_id)?.name || 'animal'}: ${newActivity.activity_type}`,
+          time: new Date().toISOString(),
+          read: false,
+        },
+        ...prev,
+      ]);
+    } catch (error) {
+      console.error('Failed to create activity:', error);
+      toast.error('Failed to create activity');
+    }
+  };
+
+  // Handle note creation
+  const handleNoteCreated = async (animalId: string, noteData: NoteFormData) => {
+    try {
+      const newNote = await createNote(animalId, noteData);
+      const newActivity: DashboardActivity = {
+        id: newNote.notes_id,
+        type: 'note',
+        description: `Note added: ${newNote.content}`,
+        timestamp: newNote.created_at,
+        animalId: newNote.animal_id,
+        category: newNote.category,
+        priority: newNote.priority,
+        status: newNote.status,
+      };
+      setActivities(prev => [newActivity, ...prev]);
+      if (newNote.add_to_calendar) {
+        setCalendarEvents(prev => [
+          ...prev,
+          {
+            id: newNote.notes_id,
+            title: `Note: ${newNote.content.substring(0, 20)}...`,
+            date: new Date(newNote.due_date),
+            type: 'note',
+            animalId: newNote.animal_id,
+            priority: newNote.priority,
+            status: newNote.status,
+          },
+        ]);
+      }
+      setNotifications(prev => [
+        {
+          id: `note-${newNote.notes_id}`,
+          content: `New note added for ${animals.find(a => a.id === newNote.animal_id)?.name || 'animal'}`,
+          time: new Date().toISOString(),
+          read: false,
+        },
+        ...prev,
+      ]);
+    } catch (error) {
+      console.error('Failed to create note:', error);
+      toast.error('Failed to create note');
+    }
+  };
+
+  // Handle task creation
+  const handleTaskCreated = async (animalId: string, taskData: TaskFormData) => {
+    try {
+      const newTask = await createTask(animalId, taskData);
+      const newActivity: DashboardActivity = {
+        id: newTask.task_id,
+        type: 'task',
+        description: `Task created: ${newTask.title}`,
+        timestamp: newTask.created_at,
+        animalId: newTask.animal_id,
+        taskType: newTask.task_type,
+        priority: newTask.priority,
+        status: newTask.status,
+      };
+      setActivities(prev => [newActivity, ...prev]);
+      setCalendarEvents(prev => [
+        ...prev,
+        {
+          id: newTask.task_id,
+          title: `Task: ${newTask.title.substring(0, 20)}...`,
+          date: new Date(newTask.start_date),
+          time: newTask.start_time,
+          type: 'task',
+          animalId: newTask.animal_id,
+          priority: newTask.priority,
+          status: newTask.status,
+          taskType: newTask.task_type,
+        },
+      ]);
+      setNotifications(prev => [
+        {
+          id: `task-${newTask.task_id}`,
+          content: `New task created for ${animals.find(a => a.id === newTask.animal_id)?.name || 'animal'}`,
+          time: new Date().toISOString(),
+          read: false,
+        },
+        ...prev,
+      ]);
+    } catch (error) {
+      console.error('Failed to create task:', error);
+      toast.error('Failed to create task');
+    }
+  };
+
+  // Handle animal creation with notification
+  const handleCreateAnimal = async (animalData: AnimalFormData) => {
+    try {
+      const newAnimal = await createAnimal(animalData);
+      setAnimals(prev => [...prev, newAnimal]);
+      setNotifications(prev => [
+        {
+          id: `animal-${newAnimal.id}`,
+          content: `New animal added: ${newAnimal.name} (${newAnimal.type})`,
+          time: new Date().toISOString(),
+          read: false,
+        },
+        ...prev,
+      ]);
+      toast.success('Animal created successfully');
+      const updatedAnimals = [...animals, newAnimal];
+      setAnimalStats({
+        totalAnimals: updatedAnimals.length,
+        mostCommonType: Object.entries(
+          updatedAnimals.reduce((acc: Record<string, number>, animal) => {
+            acc[animal.type] = (acc[animal.type] || 0) + 1;
+            return acc;
+          }, {})
+        ).reduce((a, b) => (b[1] > a[1] ? b : a), ['N/A', 0])[0],
+        averageAge:
+updatedAnimals.reduce((sum, animal) => {
+  if (animal.age) return sum + animal.age;
+  if (animal.birth_date) {
+    const birthDate = parseISO(animal.birth_date);
+    return sum + differenceInYears(new Date(), birthDate);
+  }
+  return sum;
+}, 0) / (updatedAnimals.length || 1),
+        breedingStockCount: updatedAnimals.filter(animal => animal.is_breeding_stock).length,
+      });
+      setHealthStats(computeHealthStats(updatedAnimals));
+      setReproStats(computeReproStats(updatedAnimals));
+      setGrowthStats(computeGrowthStats(updatedAnimals));
+    } catch (error) {
+      console.error('Failed to create animal:', error);
+      toast.error('Failed to create animal');
+    }
+  };
+
+  // Load initial data
   useEffect(() => {
     const loadInitialData = async () => {
       if (!isAuthenticated || authLoading) return;
@@ -119,6 +286,35 @@ const Dashboard: React.FC = () => {
       try {
         const animalList = await fetchAnimals();
         setAnimals(animalList);
+
+        const events: CalendarEvent[] = animalList.flatMap((animal) =>
+          animal.next_checkup_date
+            ? [
+                {
+                  id: `${animal.id}-checkup`,
+                  title: `${animal.name} Checkup`,
+                  date: new Date(animal.next_checkup_date),
+                  type: 'appointment',
+                  animalId: animal.id,
+                },
+              ]
+            : []
+        );
+        events.push(
+          {
+            id: 'mock-1',
+            title: 'Team Meeting',
+            date: addDays(new Date(), 2),
+            type: 'meeting',
+          },
+          {
+            id: 'mock-2',
+            title: 'Production Review',
+            date: addDays(new Date(), 3),
+            type: 'production',
+          }
+        );
+        setCalendarEvents(events);
 
         if (animalList.length > 0) {
           const typeCounts = animalList.reduce((acc: Record<string, number>, animal) => {
@@ -159,9 +355,16 @@ const Dashboard: React.FC = () => {
             breedingStockCount,
           }));
 
-          // Fetch activities for the first animal
           const initialActivities = await fetchActivities(animalList[0].id);
-          setActivities(initialActivities);
+          setActivities(initialActivities.map(activity => ({
+            id: activity.id,
+            type: 'activity',
+            description: `Activity: ${activity.description}`,
+            timestamp: activity.created_at,
+            animalId: activity.animal_id,
+            activityType: activity.activity_type,
+            status: 'pending',
+          })));
           localStorage.setItem(`dashboard_activities_${animalList[0].id}`, JSON.stringify(initialActivities));
         } else {
           setAnimalStats({
@@ -201,7 +404,7 @@ const Dashboard: React.FC = () => {
     loadInitialData();
   }, [isAuthenticated, authLoading]);
 
-  // Fetch production stats and activities when selectedAnimalId changes
+  // Fetch production stats and activities
   useEffect(() => {
     const fetchData = async () => {
       if (!selectedAnimalId || !isAuthenticated || authLoading) {
@@ -211,14 +414,20 @@ const Dashboard: React.FC = () => {
       }
 
       try {
-        // Fetch production stats
         const stats = await fetchProductionStatistics(selectedAnimalId);
         setProductionStats(stats);
         localStorage.setItem(`productionStats_${selectedAnimalId}`, JSON.stringify(stats));
 
-        // Fetch activities
         const animalActivities = await fetchActivities(selectedAnimalId);
-        setActivities(animalActivities);
+        setActivities(animalActivities.map(activity => ({
+          id: activity.id,
+          type: 'activity',
+          description: `Activity: ${activity.description}`,
+          timestamp: activity.created_at,
+          animalId: activity.animal_id,
+          activityType: activity.activity_type,
+          status: 'pending',
+        })));
         localStorage.setItem(`dashboard_activities_${selectedAnimalId}`, JSON.stringify(animalActivities));
       } catch (error: any) {
         console.error(`Failed to fetch data for animal ${selectedAnimalId}:`, error);
@@ -244,6 +453,20 @@ const Dashboard: React.FC = () => {
       toast.error('Failed to logout');
     }
   };
+
+  // Map DashboardActivity to Activity for ActivityFeed
+  const mapToActivity = (dashboardActivity: DashboardActivity): Activity => ({
+    id: dashboardActivity.id,
+    animal_id: dashboardActivity.animalId || '',
+    activity_type: dashboardActivity.activityType || 'custom',
+    activity_date: dashboardActivity.timestamp,
+    description: dashboardActivity.description,
+    created_at: dashboardActivity.timestamp,
+    updated_at: dashboardActivity.timestamp,
+    notes: dashboardActivity.category, // Optional: map category to notes
+    breeding_date: undefined, // Adjust based on your needs
+    breeding_notes: undefined, // Adjust based on your needs
+  });
 
   // Authentication guard
   if (authLoading) {
@@ -279,7 +502,6 @@ const Dashboard: React.FC = () => {
           notifications={notifications}
         />
 
-        {/* Mobile Bottom Navigation */}
         <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border">
           <div className="grid grid-cols-4 gap-1 p-2">
             {[
@@ -324,12 +546,19 @@ const Dashboard: React.FC = () => {
                     <h2 className="text-xl font-serif font-semibold text-foreground dark:text-foreground sm:text-2xl">
                       Welcome to Your Dashboard!
                     </h2>
-                    <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-4 mt-2 max-w-md mx-auto">
+                    <p className="text-sm font-sans text-muted-foreground dark:text-muted-foreground mb-4 mt-2 max-w-md mx-auto">
                       It looks like you don’t have any animals yet. Add some animals to start tracking statistics and production data.
                     </p>
                     <Button 
-                      onClick={() => navigate('/animals')}
-                      className="font-serif bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground hover:bg-primary/90 dark:hover:bg-primary/80 h-10 sm:h-12.costom"
+                      onClick={() => {
+                        handleCreateAnimal({
+                          name: 'New Animal',
+                          type: 'Cow',
+                          birth_date: new Date().toISOString(),
+                          is_breeding_stock: false,
+                        });
+                      }}
+                      className="font-sans bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground hover:bg-primary/90 dark:hover:bg-primary/80 h-10 sm:h-12"
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Add Your First Animal
@@ -337,7 +566,6 @@ const Dashboard: React.FC = () => {
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    {/* Animal Selection Dropdown */}
                     <div className="mb-6">
                       <Select
                         value={selectedAnimalId || ''}
@@ -370,9 +598,9 @@ const Dashboard: React.FC = () => {
                 )}
               </TabsContent>
 
-              <TabsContent value="activity" className="font-serif">
+              <TabsContent value="activity" className="font-sans">
                 <ActivityFeed
-                  activities={activities}
+                  activities={activities.map(mapToActivity)}
                   notifications={notifications}
                   setNotifications={setNotifications}
                 />
@@ -392,6 +620,10 @@ const Dashboard: React.FC = () => {
                   setCurrentMonth={setCurrentMonth}
                   selectedDate={selectedDate}
                   setSelectedDate={setSelectedDate}
+                  animals={animals}
+                  onNoteCreated={handleNoteCreated}
+                  onTaskCreated={handleTaskCreated}
+                  onActivityCreated={handleActivityCreated}
                 />
               </TabsContent>
 
@@ -412,3 +644,10 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
+function beforeEach(callback: () => void): void {
+  try {
+    callback();
+  } catch (error) {
+    console.error('Error in beforeEach:', error);
+  }
+}

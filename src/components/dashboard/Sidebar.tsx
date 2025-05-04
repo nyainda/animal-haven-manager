@@ -24,7 +24,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const menuItems = [
     { tab: 'overview', icon: Home, label: 'Dashboard' },
     { path: '/animals', icon: Dog, label: 'Animals' },
-    { path: '/forms/transaction', icon: DollarSign, label: 'Finance' },
+   // { path: '/activity', icon: DollarSign, label: 'Finance' },
     { tab: 'calendar', icon: Calendar, label: 'Calendar' },
     { tab: 'activity', icon: Activity, label: 'Activity' },
     { tab: 'settings', icon: Settings, label: 'Settings' },
