@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader2, Calendar, AlertCircle } from 'lucide-react';
@@ -56,9 +57,9 @@ const AnimalNoteForm: React.FC = () => {
           keywords: note.keywords || [],
           add_to_calendar: note.add_to_calendar || false,
           // Fix: Map 'Active' to 'pending' if it comes from the API
-          status: (note.status === 'Active' ? 'pending' : note.status) || 'pending',
+          status: note.status === 'Active' ? 'pending' : note.status || 'pending',
           // Fix: Map 'Normal' to 'medium' if it comes from the API
-          priority: (note.priority === 'Normal' ? 'medium' : note.priority) || 'low',
+          priority: note.priority === 'Normal' ? 'medium' : note.priority || 'low',
           due_date: note.due_date || format(new Date(), 'yyyy-MM-dd'),
           file_path: note.file_path || undefined,
         });

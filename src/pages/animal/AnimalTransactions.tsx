@@ -566,6 +566,8 @@ function TransactionSummaryView({
     transactionDate: string;
   } | null>(null);
 
+  const navigate = useNavigate();
+
   const openModal = (
     transactionId: string,
     field: 'details' | 'delivery_instructions',
@@ -608,7 +610,64 @@ function TransactionSummaryView({
   const recent = summary.recent_transactions.slice(0, 5);
 
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-
+  
+  // Move the function declaration inside to reference recent
+  const renderRecentTransactions = () => (
+    <div className="space-y-3">
+      {recent.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground">
+          <AlertCircle className="w-6 h-6 mx-auto mb-2" />
+          <p>No recent transactions to display</p>
+        </div>
+      ) : (
+        recent.map((transaction, index) => {
+          // This transaction from 'recent' doesn't have the full properties
+          // Don't try to access 'delivery_instructions' from the transaction in 'recent'
+          
+          return (
+            <div
+              key={transaction.id}
+              className="p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors min-h-[120px] max-h-[120px] flex items-start gap-3 overflow-hidden"
+            >
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-background flex items-center justify-center text-sm font-semibold">
+                {index + 1}
+              </div>
+              <div className="flex-1 flex flex-col space-y-1 overflow-hidden">
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-foreground truncate">
+                    {transaction.transaction_type.charAt(0).toUpperCase() +
+                      transaction.transaction_type.slice(1)}
+                  </span>
+                  <span className="text-xs text-muted-foreground flex-shrink-0">
+                    {formatDate(transaction.transaction_date)}
+                  </span>
+                </div>
+                <div className="flex-1 flex flex-col space-y-1 overflow-hidden">
+                  <p className="text-sm text-muted-foreground line-clamp-1">
+                    Amount: {transaction.total_amount} {summary.currency}
+                  </p>
+                  <p className="text-sm text-muted-foreground line-clamp-1">
+                    Status: {transaction.transaction_status || 'N/A'}
+                  </p>
+                  {/* Only show details if they exist */}
+                  {transaction.details && (
+                    <p className="text-sm text-muted-foreground line-clamp-1">
+                      <span className="font-medium">Details: </span>
+                      {transaction.details.length > 50 ? 
+                        `${transaction.details.slice(0, 50)}...` : transaction.details}
+                    </p>
+                  )}
+                  {/* No reference to delivery_instructions here since it might not exist in the summary objects */}
+                </div>
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+  
+  // Then return the component with the updated function call
   return (
     <div className="space-y-6">
       {/* Overview Card */}
@@ -723,87 +782,7 @@ function TransactionSummaryView({
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-grow p-4 pt-0 overflow-y-auto">
-            {recent.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <AlertCircle className="w-6 h-6 mx-auto mb-2" />
-                <p>No recent transactions to display</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {recent.map((transaction, index) => {
-                  // Fetch full transaction for potential long fields (not in summary)
-                  const fullTransaction = transactions.find((t) => t.id === transaction.id);
-                  const isDetailsLong = fullTransaction
-                    ? (fullTransaction.details?.length || 0) > 50
-                    : false;
-                  const isDeliveryInstructionsLong = fullTransaction
-                    ? ((fullTransaction as TransactionWithInstructions).delivery_instructions?.length || 0) > 50
-                    : false;
-                  const truncatedDetails = isDetailsLong
-                    ? `${fullTransaction?.details?.slice(0, 50)}...`
-                    : fullTransaction?.details;
-                  const truncatedDeliveryInstructions = isDeliveryInstructionsLong
-                    ? `${(fullTransaction as TransactionWithInstructions).delivery_instructions?.slice(0, 50)}...`
-                    : (fullTransaction as TransactionWithInstructions).delivery_instructions;
-
-                  return (
-                    <div
-                      key={transaction.id}
-                      className="p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors min-h-[120px] max-h-[120px] flex items-start gap-3 overflow-hidden"
-                    >
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-background flex items-center justify-center text-sm font-semibold">
-                        {index + 1}
-                      </div>
-                      <div className="flex-1 flex flex-col space-y-1 overflow-hidden">
-                        <div className="flex justify-between items-center">
-                          <span className="font-semibold text-foreground truncate">
-                            {transaction.transaction_type.charAt(0).toUpperCase() +
-                              transaction.transaction_type.slice(1)}
-                          </span>
-                          <span className="text-xs text-muted-foreground flex-shrink-0">
-                            {formatDate(transaction.transaction_date)}
-                          </span>
-                        </div>
-                        <div className="flex-1 flex flex-col space-y-1 overflow-hidden">
-                          <p className="text-sm text-muted-foreground line-clamp-1">
-                            Amount: {transaction.total_amount} {summary.currency}
-                          </p>
-                          <p className="text-sm text-muted-foreground line-clamp-1">
-                            Status: {transaction.transaction_status || 'N/A'}
-                          </p>
-                          {fullTransaction?.details && (
-                            <div className="flex-1 min-h-0">
-                              <p className="text-sm text-muted-foreground line-clamp-1">
-                                <span className="font-medium">Details: </span>
-                                {truncatedDetails}
-                              </p>
-                              {isDetailsLong && (
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="h-auto p-0 text-primary text-xs"
-                                  onClick={() =>
-                                    openModal(
-                                      transaction.id,
-                                      'details',
-                                      fullTransaction.details || '',
-                                      transaction.transaction_type,
-                                      transaction.transaction_date
-                                    )
-                                  }
-                                >
-                                  Read More
-                                </Button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            {renderRecentTransactions()}
           </CardContent>
         </Card>
       </div>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -216,7 +217,7 @@ const Animals: React.FC = () => {
                     </DropdownMenu>
                   </div>
                   <CardDescription className="text-sm text-muted-foreground">
-                    Type: {animal.animal_type}
+                    Type: {animal.type}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-4 pt-2 pb-3 flex-grow">

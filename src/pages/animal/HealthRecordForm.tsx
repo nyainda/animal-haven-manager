@@ -159,6 +159,8 @@ export const HealthRecordForm: React.FC<HealthRecordFormProps> = ({ animalId, on
   // State for the Medical History date picker
   const [medicalHistoryDate, setMedicalHistoryDate] = useState<Date | undefined>(undefined); 
   const [medicalHistoryNote, setMedicalHistoryNote] = useState('');
+  
+  // Define inputValues here to fix the error
   const [inputValues, setInputValues] = useState({
     regular_medication: '',
     exercise_requirements: '',
