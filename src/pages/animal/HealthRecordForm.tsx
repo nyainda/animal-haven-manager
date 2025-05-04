@@ -86,8 +86,7 @@ interface ArrayInputSectionProps {
 const ArrayInputSection: React.FC<ArrayInputSectionProps> = ({
   field, label, formData, inputValues, handleInputChange, handleAdd, handleRemove
 }) => (
-    // ... (keep the previous ArrayInputSection component code here) ...
-    <div className="space-y-2">
+  <div className="space-y-2">
     <Label htmlFor={field} className="text-sm font-medium">{label}</Label>
     <div className="flex gap-2">
       <Input

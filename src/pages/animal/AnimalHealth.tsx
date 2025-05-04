@@ -7,7 +7,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { fetchAnimal } from '@/services/animalService';
-import { fetchHealthRecords, deleteHealthRecord, Health } from '@/services/healthservice';
+import { fetchHealthRecords, deleteHealthRecord } from '@/services/healthservice';
 import { Animal } from '@/types/AnimalTypes';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -23,7 +23,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // --- Health Interface ---
-interface Health {
+interface HealthRecord {
   Health_id: number;
   health_status: string;
   vaccination_status?: string;
@@ -38,7 +38,7 @@ interface Health {
 
 // --- HealthCard Sub-Component ---
 interface HealthCardProps {
-  health: Health;
+  health: HealthRecord;
   animalId: string;
   onEdit: () => void;
   onDelete: () => void;
@@ -355,10 +355,10 @@ const AnimalHealth: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [animal, setAnimal] = useState<Animal | null>(null);
-  const [healthRecords, setHealthRecords] = useState<Health[]>([]);
+  const [healthRecords, setHealthRecords] = useState<HealthRecord[]>([]);
   const [isFetching, setIsFetching] = useState<boolean>(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
-  const [healthToDelete, setHealthToDelete] = useState<Health | null>(null);
+  const [healthToDelete, setHealthToDelete] = useState<HealthRecord | null>(null);
   const [contentDialogOpen, setContentDialogOpen] = useState<boolean>(false);
   const [selectedContent, setSelectedContent] = useState<string>('');
   const [selectedTitle, setSelectedTitle] = useState<string>('');
@@ -378,7 +378,11 @@ const AnimalHealth: React.FC = () => {
           fetchHealthRecords(id),
         ]);
         setAnimal(animalData);
-        setHealthRecords(healthData);
+        // Convert Health_id from string to number if needed
+        setHealthRecords(healthData.map(record => ({
+          ...record,
+          Health_id: typeof record.Health_id === 'string' ? parseInt(record.Health_id, 10) : record.Health_id
+        })));
       } catch (error) {
         console.error('Error loading data:', error);
         toast.error('Failed to load animal health data');
@@ -390,7 +394,7 @@ const AnimalHealth: React.FC = () => {
     loadData();
   }, [id, navigate]);
 
-  const handleDeleteClick = (health: Health) => {
+  const handleDeleteClick = (health: HealthRecord) => {
     setHealthToDelete(health);
     setDeleteDialogOpen(true);
   };
@@ -399,7 +403,7 @@ const AnimalHealth: React.FC = () => {
     if (!healthToDelete || !id) return;
 
     try {
-      await deleteHealthRecord(id, healthToDelete.Health_id);
+      await deleteHealthRecord(id, healthToDelete.Health_id.toString());
       setHealthRecords((prev) => prev.filter((h) => h.Health_id !== healthToDelete.Health_id));
       toast.success('Health record deleted successfully');
     } catch (error) {

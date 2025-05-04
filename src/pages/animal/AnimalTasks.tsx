@@ -304,7 +304,7 @@ const AnimalTasks: React.FC = () => {
         setDeleteConfirmOpen(false);
 
         try {
-            await deleteTask(id, taskToDelete.task_id);
+            await deleteTask(id, parseInt(taskToDelete.task_id, 10));
             toast.success(`Task "${taskToDelete.title}" deleted.`);
             setTaskToDelete(null);
         } catch (error) {

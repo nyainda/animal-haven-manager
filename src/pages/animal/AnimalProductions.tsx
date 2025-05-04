@@ -593,7 +593,7 @@ const AnimalProductions: React.FC = () => {
                                             {animal?.name}'s Production
                                         </h1>
                                         <p className="text-sm text-muted-foreground">
-                                            Type: {animal?.animal_type || 'N/A'} | Breed: {animal?.breed || 'N/A'} | Location: {productions[0]?.storage_location?.location_code || 'N/A'}
+                                            Type: {animal?.species || 'N/A'} | Breed: {animal?.breed || 'N/A'} | Location: {productions[0]?.storage_location?.location_code || 'N/A'}
                                         </p>
                                     </>
                                 )}

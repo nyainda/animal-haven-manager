@@ -35,8 +35,8 @@ const AnimalNoteForm: React.FC = () => {
     category: 'General',
     keywords: [],
     add_to_calendar: false,
-    status: 'Active',
-    priority: 'Normal',
+    status: 'pending', // Changed from 'Active' to 'pending'
+    priority: 'low', // Changed from 'Normal' to 'low'
     due_date: format(new Date(), 'yyyy-MM-dd'),
   });
   const [keywordInput, setKeywordInput] = useState('');
@@ -241,7 +241,7 @@ const AnimalNoteForm: React.FC = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="low">Low</SelectItem>
-                    
+                    <SelectItem value="medium">Medium</SelectItem>
                     <SelectItem value="high">High</SelectItem>
                   </SelectContent>
                 </Select>

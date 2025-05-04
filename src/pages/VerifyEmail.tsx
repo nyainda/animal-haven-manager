@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '../contexts/AuthContext';
 import confetti from 'canvas-confetti';
+import { toast } from 'react-toastify';
 
 const VerifyEmail: React.FC = () => {
   const [isVerifying, setIsVerifying] = useState(false);
@@ -83,7 +84,9 @@ const VerifyEmail: React.FC = () => {
         }, 5000);
       }
     } catch (err) {
-      setError('Failed to resend verification email. Please try again.');
+      toast.error('Verification failed', {
+        description: 'Please check your verification link and try again.'
+      });
     } finally {
       setIsResending(false);
     }

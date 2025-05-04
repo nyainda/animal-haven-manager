@@ -128,6 +128,11 @@ function TransactionDialog({
   );
 }
 
+// Update the Transaction interface to include delivery_instructions
+interface TransactionWithInstructions extends Transaction {
+  delivery_instructions?: string;
+}
+
 export function AnimalTransactions({ animalId }: AnimalTransactionsProps) {
   const navigate = useNavigate();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -409,13 +414,13 @@ function TransactionListView({
         {transactions.map((transaction) => {
           const isDetailsLong = (transaction.details?.length || 0) > 50;
           const isDeliveryInstructionsLong =
-            (transaction.delivery_instructions?.length || 0) > 50;
+            (transaction as TransactionWithInstructions).delivery_instructions?.length || 0 > 50;
           const truncatedDetails = isDetailsLong
             ? `${transaction.details?.slice(0, 50)}...`
             : transaction.details;
           const truncatedDeliveryInstructions = isDeliveryInstructionsLong
-            ? `${transaction.delivery_instructions?.slice(0, 50)}...`
-            : transaction.delivery_instructions;
+            ? `${(transaction as TransactionWithInstructions).delivery_instructions?.slice(0, 50)}...`
+            : (transaction as TransactionWithInstructions).delivery_instructions;
 
           return (
             <Card
@@ -491,7 +496,7 @@ function TransactionListView({
                     )}
                   </div>
                 )}
-                {transaction.delivery_instructions && (
+                {(transaction as TransactionWithInstructions).delivery_instructions && (
                   <div className="flex-1 min-h-0">
                     <p className="text-sm font-medium text-foreground">Delivery Instructions</p>
                     <p className="text-sm text-muted-foreground line-clamp-2">
@@ -506,7 +511,7 @@ function TransactionListView({
                           openModal(
                             transaction.id,
                             'delivery_instructions',
-                            transaction.delivery_instructions || '',
+                            (transaction as TransactionWithInstructions).delivery_instructions || '',
                             transaction.transaction_type,
                             transaction.transaction_date
                           )
@@ -732,14 +737,14 @@ function TransactionSummaryView({
                     ? (fullTransaction.details?.length || 0) > 50
                     : false;
                   const isDeliveryInstructionsLong = fullTransaction
-                    ? (fullTransaction.delivery_instructions?.length || 0) > 50
+                    ? ((fullTransaction as TransactionWithInstructions).delivery_instructions?.length || 0) > 50
                     : false;
                   const truncatedDetails = isDetailsLong
                     ? `${fullTransaction?.details?.slice(0, 50)}...`
                     : fullTransaction?.details;
                   const truncatedDeliveryInstructions = isDeliveryInstructionsLong
-                    ? `${fullTransaction?.delivery_instructions?.slice(0, 50)}...`
-                    : fullTransaction?.delivery_instructions;
+                    ? `${(fullTransaction as TransactionWithInstructions).delivery_instructions?.slice(0, 50)}...`
+                    : (fullTransaction as TransactionWithInstructions).delivery_instructions;
 
                   return (
                     <div

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { 
@@ -341,11 +340,10 @@ const Charts: React.FC<ChartsProps> = ({ animals, productionStats }) => {
                         data={breedDistribution}
                       >
                         <RadialBar
-                          minAngle={15}
                           background
                           clockWise
                           dataKey="value"
-                          label={{ position: 'insideStart', fill: '#666', fontSize: 12 }}
+                          label={{ position: 'insideStart', fill: '#fff', fontSize: 12 }}
                         />
                         <Tooltip 
                           formatter={(value: number) => [`${value} animals`, '']}
