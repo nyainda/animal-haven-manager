@@ -46,7 +46,7 @@ const VerifyEmail: React.FC = () => {
       setError('');
       
       try {
-        await verifyEmail(token);
+        await verifyEmail(token, null);
         setIsVerified(true);
         
         setTimeout(() => {

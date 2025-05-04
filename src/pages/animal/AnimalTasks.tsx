@@ -111,7 +111,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, animalId, onEdit, onDelete })
 
     const handleEditClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (task.task_id) onEdit(task.task_id);
+        if (task.task_id) onEdit(parseInt(task.task_id.toString()));
     };
 
     const handleDeleteClick = (e: React.MouseEvent) => {
@@ -304,7 +304,7 @@ const AnimalTasks: React.FC = () => {
         setDeleteConfirmOpen(false);
 
         try {
-            await deleteTask(id, parseInt(taskToDelete.task_id, 10));
+            await deleteTask(id, taskToDelete.task_id.toString());
             toast.success(`Task "${taskToDelete.title}" deleted.`);
             setTaskToDelete(null);
         } catch (error) {

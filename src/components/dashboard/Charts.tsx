@@ -341,9 +341,8 @@ const Charts: React.FC<ChartsProps> = ({ animals, productionStats }) => {
                       >
                         <RadialBar
                           background
-                          clockWise
                           dataKey="value"
-                          label={{ position: 'insideStart', fill: '#fff', fontSize: 12 }}
+                          label={{ position: "insideStart", fill: "#fff", fontSize: 12 }}
                         />
                         <Tooltip 
                           formatter={(value: number) => [`${value} animals`, '']}

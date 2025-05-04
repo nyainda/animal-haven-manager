@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -28,7 +27,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Animal, fetchAnimals, deleteAnimal } from '@/services/animalService';
+import { fetchAnimals, deleteAnimal } from '@/services/animalService';
+import { Animal } from '@/types/AnimalTypes';
 
 const Animals: React.FC = () => {
   const [animals, setAnimals] = useState<Animal[]>([]);
