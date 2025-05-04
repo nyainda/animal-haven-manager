@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -9,7 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Edit, Trash2, Search, LayoutDashboard, Cow } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, LayoutDashboard, Beef } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -154,7 +155,7 @@ const Animals: React.FC = () => {
           <Card className="border-dashed border-border shadow-sm p-8 text-center">
             <CardContent className="pt-6">
               <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
-                <Cow className="h-6 w-6 text-muted-foreground" />
+                <Beef className="h-6 w-6 text-muted-foreground" />
               </div>
               <h3 className="text-xl font-semibold text-foreground mb-3">
                 No Animals Found
@@ -266,7 +267,7 @@ const Animals: React.FC = () => {
             </DialogClose>
             <Button
               type="button"
-              variant="primary"
+              variant="default"
               onClick={handleConfirmDelete}
             >
               Delete
