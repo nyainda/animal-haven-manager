@@ -1,0 +1,56 @@
+# CodeRabbit configuration file
+
+# Basic configuration
+reviews:
+  # Request review for all PRs
+  request_review: true
+  
+  # Automatically approve PRs that don't have any issues
+  auto_approve: false
+  
+  # Automatically merge PRs that don't have any issues
+  # (Be careful with this setting!)
+  auto_merge: false
+
+  # Whether to include code snippets explaining the issues
+  include_code_snippets: true
+  
+  # Maximum lines of code to review
+  max_lines: 500
+
+  # Review comments settings
+  review_comments:
+    # Add a summary comment to PR
+    enable_summary_comment: true
+    # Add inline comments to specific lines
+    enable_inline_comments: true
+    # Summarize PR changes
+    summarize_pull_request: true
+
+# Configure what Code Rabbit should check
+checks:
+  # Analyze code for bugs or issues
+  bug_detection: true
+  
+  # Analyze code quality issues
+  code_quality: true
+  
+  # Suggest security improvements
+  security: true
+  
+  # Look for performance issues
+  performance: true
+  
+  # Review documentation and comments
+  documentation: true
+  
+  # Suggest code style improvements
+  style: true
+
+# Exclude specific files or directories
+exclude_patterns:
+  - "*.md"
+  - "LICENSE"
+  - "node_modules/**"
+  - "dist/**"
+  - "build/**"
