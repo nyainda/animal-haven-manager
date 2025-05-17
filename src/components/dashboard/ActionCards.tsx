@@ -13,15 +13,22 @@ interface ActionCardsProps {
 
 const ActionCards: React.FC<ActionCardsProps> = ({ setActiveTab, selectedAnimalId }) => {
   const navigate = useNavigate();
+interface QuickAction {
+  label: string;
+  href: string;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  description: string;
+  onClick?: () => void;
+}
 
-  // Quick Actions definition using { label, href, icon } structure
-  const quickActions = [
-    { 
-      label: 'Add New Animal', 
-      href: '/animals/new', 
-      icon: Plus, 
-      description: 'Create a new animal record' 
-    },
+const quickActions: QuickAction[] = [
+   { 
+     label: 'Add New Animal', 
+     href: '/animals/new', 
+     icon: Plus, 
+     description: 'Create a new animal record' 
+   },
+   // …
     { 
       label: 'View Animals', 
       href: '/animals', 

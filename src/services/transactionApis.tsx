@@ -22,12 +22,86 @@ export interface Transaction {
   buyer_id?: number;
   seller_name?: string;
   buyer_name?: string;
+  
+  // Additional seller fields
+  seller_company?: string | null;
+  seller_tax_id?: string | null;
+  seller_contact?: string | null;
+  seller_email?: string | null;
+  seller_phone?: string | null;
+  seller_address?: string | null;
+  seller_city?: string | null;
+  seller_state?: string | null;
+  seller_country?: string | null;
+  seller_postal_code?: string | null;
+  seller_identification?: string | null;
+  seller_license_number?: string | null;
+  
+  // Additional buyer fields
+  buyer_company?: string | null;
+  buyer_tax_id?: string | null;
+  buyer_contact?: string | null;
+  buyer_email?: string | null;
+  buyer_phone?: string | null;
+  buyer_address?: string | null;
+  buyer_city?: string | null;
+  buyer_state?: string | null;
+  buyer_country?: string | null;
+  buyer_postal_code?: string | null;
+  buyer_identification?: string | null;
+  buyer_license_number?: string | null;
+  
+  // Additional transaction metadata
+  invoice_number?: string | null;
+  contract_number?: string | null;
+  terms_accepted?: boolean | null;
+  terms_accepted_at?: string | null;
+  
+  // Animal-specific information
+  animal_id: string;
+  health_certificate_number?: string | null;
+  transport_license_number?: string | null;
+  
+  // Documentation and legal fields
+  attached_documents?: Array<{
+    id: string;
+    name: string;
+    url: string;
+    type: string;
+    size: number;
+    uploaded_at: string;
+  }> | null;
+  
+  // Location information
+  location_of_sale?: string | null;
+  
+  // Terms and conditions
+  terms_and_conditions?: string | null;
+  special_conditions?: string | null;
+  delivery_instructions?: string | null;
+  
+  // Insurance information
+  insurance_policy_number?: string | null;
+  insurance_amount?: number | null;
+  
+  // Financial tracking
+  payment_history?: Array<{
+    id: string;
+    amount: number;
+    payment_date: string;
+    payment_method: string;
+    payment_reference?: string | null;
+    notes?: string | null;
+  }> | null;
+  
+  // Audit fields
   created_at: string;
   updated_at: string;
-  animal_id: string;
+  created_by?: string | null;
+  updated_by?: string | null;
 }
 
-// Define the form data type
+// Enhanced TransactionFormData with the new fields
 export interface TransactionFormData {
   transaction_type: string;
   price: number;
@@ -44,6 +118,64 @@ export interface TransactionFormData {
   buyer_id?: number;
   seller_name?: string;
   buyer_name?: string;
+  
+  // Additional seller fields
+  seller_company?: string | null;
+  seller_tax_id?: string | null;
+  seller_contact?: string | null;
+  seller_email?: string | null;
+  seller_phone?: string | null;
+  seller_address?: string | null;
+  seller_city?: string | null;
+  seller_state?: string | null;
+  seller_country?: string | null;
+  seller_postal_code?: string | null;
+  seller_identification?: string | null;
+  seller_license_number?: string | null;
+  
+  // Additional buyer fields
+  buyer_company?: string | null;
+  buyer_tax_id?: string | null;
+  buyer_contact?: string | null;
+  buyer_email?: string | null;
+  buyer_phone?: string | null;
+  buyer_address?: string | null;
+  buyer_city?: string | null;
+  buyer_state?: string | null;
+  buyer_country?: string | null;
+  buyer_postal_code?: string | null;
+  buyer_identification?: string | null;
+  buyer_license_number?: string | null;
+  
+  // Additional transaction metadata
+  invoice_number?: string | null;
+  contract_number?: string | null;
+  terms_accepted?: boolean | null;
+  
+  // Animal-specific information
+  health_certificate_number?: string | null;
+  transport_license_number?: string | null;
+  
+  // Documentation and legal fields
+  attached_documents?: Array<{
+    id?: string;
+    name: string;
+    file?: File; // For file uploads
+    url?: string;
+    type?: string;
+  }> | null;
+  
+  // Location information
+  location_of_sale?: string | null;
+  
+  // Terms and conditions
+  terms_and_conditions?: string | null;
+  special_conditions?: string | null;
+  delivery_instructions?: string | null;
+  
+  // Insurance information
+  insurance_policy_number?: string | null;
+  insurance_amount?: number | null;
 }
 
 // Define the transaction summary interface
