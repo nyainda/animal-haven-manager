@@ -49,8 +49,8 @@ checks:
 
 # Exclude specific files or directories
 exclude_patterns:
-  - "*.md"
-  - "LICENSE"
-  - "node_modules/**"
-  - "dist/**"
-  - "build/**"
+   - "*.md"
+  - LICENSE
+   - "node_modules/**"
+   - "dist/**"
+   - "build/**"
