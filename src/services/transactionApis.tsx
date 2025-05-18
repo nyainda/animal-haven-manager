@@ -216,6 +216,30 @@ export interface TransactionSummary {
 const API_URL = apiConfig.API_URL;
 const CSRF_URL = apiConfig.CSRF_URL;
 
+// Create a logger function that safely handles input parameters
+const safeLog = (action: string, message: string, animalIdParam?: string, transactionIdParam?: string, data?: any) => {
+  // Create a safe copy of IDs using only alphanumeric characters
+  const safeAnimalId = animalIdParam ? 
+    animalIdParam.toString().replace(/[^a-zA-Z0-9-]/g, '') : 'undefined';
+  const safeTransactionId = transactionIdParam ? 
+    transactionIdParam.toString().replace(/[^a-zA-Z0-9-]/g, '') : 'undefined';
+  
+  const logPrefix = '[TRANSACTION]';
+  
+  // Create a safe message
+  const safeMessage = `${logPrefix} ${action}: ${message}` + 
+    (animalIdParam ? ` (Animal ID: ${safeAnimalId}` : '') +
+    (transactionIdParam ? `, Transaction ID: ${safeTransactionId})` : 
+      animalIdParam ? ')' : '');
+  
+  // Log with appropriate method based on message type
+  if (action.startsWith('Error')) {
+    console.error(safeMessage, data);
+  } else {
+    console.log(safeMessage, data);
+  }
+};
+
 // Fetch CSRF token
 const fetchCsrfToken = async () => {
   try {
@@ -224,9 +248,9 @@ const fetchCsrfToken = async () => {
       credentials: 'include',
     });
     if (!response.ok) throw new Error(`Failed to fetch CSRF token: ${response.status}`);
-    console.log('[TRANSACTION] CSRF token fetched successfully');
+    safeLog('Info', 'CSRF token fetched successfully');
   } catch (error) {
-    console.warn('[TRANSACTION] CSRF fetch failed:', error);
+    safeLog('Warning', 'CSRF fetch failed', undefined, undefined, error);
     throw error;
   }
 };
@@ -245,6 +269,12 @@ const getAuthHeaders = (): Record<string, string> => {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(xsrfToken ? { 'X-XSRF-TOKEN': decodeURIComponent(xsrfToken) } : {}),
   };
+};
+
+// Validate IDs
+const validateIds = (animalId?: string, transactionId?: string): void => {
+  if (!animalId) throw new Error('Invalid animal ID');
+  if (transactionId === 'undefined') throw new Error('Invalid transaction ID');
 };
 
 // Normalize payload data
@@ -273,29 +303,29 @@ const normalizePayload = (data: TransactionFormData): TransactionFormData => {
 export const fetchTransactions = async (animalId: string): Promise<Transaction[]> => {
   await fetchCsrfToken();
   try {
-    if (!animalId) throw new Error('Invalid animal ID');
+    validateIds(animalId);
 
-    const url = `${API_URL}/${animalId}/transactions`;
+    const url = `${API_URL}/${encodeURIComponent(animalId)}/transactions`;
     const response = await fetch(url, {
       method: 'GET',
       headers: getAuthHeaders(),
       credentials: 'include',
     });
 
-    console.log('[TRANSACTION] Fetch Transactions Status:', response.status, response.statusText);
+    safeLog('Info', `Fetch Transactions Status: ${response.status} ${response.statusText}`, animalId);
 
     const rawText = await response.text();
-    console.log('[TRANSACTION] Raw Fetch Transactions Response Text:', rawText);
+    safeLog('Info', 'Raw Fetch Transactions Response Text received', animalId);
 
     let rawData;
     try {
       rawData = JSON.parse(rawText);
     } catch (jsonError) {
-      console.error('[TRANSACTION] JSON parse error:', jsonError);
+      safeLog('Error', 'JSON parse error', animalId, undefined, jsonError);
       throw new Error('Failed to parse server response');
     }
 
-    console.log('[TRANSACTION] Raw Fetch Transactions Response:', rawData);
+    safeLog('Info', 'Raw Fetch Transactions Response received', animalId, undefined, rawData);
 
     if (!response.ok) {
       const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
@@ -306,10 +336,10 @@ export const fetchTransactions = async (animalId: string): Promise<Transaction[]
                         rawData.data && Array.isArray(rawData.data.data) ? rawData.data.data :
                         Array.isArray(rawData) ? rawData : [];
 
-    console.log('[TRANSACTION] Processed Transactions:', transactions);
+    safeLog('Info', 'Processed Transactions', animalId, undefined, transactions);
     return transactions;
   } catch (error) {
-    console.error(`[TRANSACTION] Error fetching transactions for animal ${animalId}:`, error);
+    safeLog('Error', 'Error fetching transactions', animalId, undefined, error);
     toast.error(`Failed to fetch transactions: ${error instanceof Error ? error.message : 'Unknown error'}`);
     throw error;
   }
@@ -319,12 +349,12 @@ export const fetchTransactions = async (animalId: string): Promise<Transaction[]
 export const createTransaction = async (animalId: string, transactionData: TransactionFormData): Promise<Transaction> => {
   await fetchCsrfToken();
   try {
-    if (!animalId) throw new Error('Invalid animal ID');
+    validateIds(animalId);
 
     const normalizedData = normalizePayload(transactionData);
-    console.log('[TRANSACTION] Normalized transaction data:', normalizedData);
+    safeLog('Info', 'Normalized transaction data', animalId, undefined, normalizedData);
 
-    const url = `${API_URL}/${animalId}/transactions`;
+    const url = `${API_URL}/${encodeURIComponent(animalId)}/transactions`;
     const headers = getAuthHeaders();
 
     const response = await fetch(url, {
@@ -334,20 +364,20 @@ export const createTransaction = async (animalId: string, transactionData: Trans
       body: JSON.stringify(normalizedData),
     });
 
-    console.log('[TRANSACTION] Create Transaction Status:', response.status, response.statusText);
+    safeLog('Info', `Create Transaction Status: ${response.status} ${response.statusText}`, animalId);
 
     const rawText = await response.text();
-    console.log('[TRANSACTION] Raw Create Transaction Response Text:', rawText);
+    safeLog('Info', 'Raw Create Transaction Response Text received', animalId);
 
     let rawData;
     try {
       rawData = JSON.parse(rawText);
     } catch (jsonError) {
-      console.error('[TRANSACTION] JSON parse error:', jsonError);
+      safeLog('Error', 'JSON parse error', animalId, undefined, jsonError);
       throw new Error('Failed to parse server response');
     }
 
-    console.log('[TRANSACTION] Raw Create Transaction Response:', rawData);
+    safeLog('Info', 'Raw Create Transaction Response received', animalId, undefined, rawData);
 
     if (!response.ok) {
       const errorMessage = rawData.message || rawData.errors || `API error: ${response.status} ${response.statusText}`;
@@ -355,10 +385,10 @@ export const createTransaction = async (animalId: string, transactionData: Trans
     }
 
     const newTransaction = rawData.data || rawData;
-    console.log('[TRANSACTION] Created Transaction:', newTransaction);
+    safeLog('Info', 'Created Transaction', animalId, undefined, newTransaction);
     return newTransaction;
   } catch (error) {
-    console.error('[TRANSACTION] Error creating transaction:', error);
+    safeLog('Error', 'Error creating transaction', animalId, undefined, error);
     throw error;
   }
 };
@@ -367,29 +397,29 @@ export const createTransaction = async (animalId: string, transactionData: Trans
 export const fetchTransactionSummary = async (animalId: string): Promise<TransactionSummary> => {
   await fetchCsrfToken();
   try {
-    if (!animalId) throw new Error('Invalid animal ID');
+    validateIds(animalId);
 
-    const url = `${API_URL}/${animalId}/transactions/summary`;
+    const url = `${API_URL}/${encodeURIComponent(animalId)}/transactions/summary`;
     const response = await fetch(url, {
       method: 'GET',
       headers: getAuthHeaders(),
       credentials: 'include',
     });
 
-    console.log('[TRANSACTION] Fetch Transaction Summary Status:', response.status, response.statusText);
+    safeLog('Info', `Fetch Transaction Summary Status: ${response.status} ${response.statusText}`, animalId);
 
     const rawText = await response.text();
-    console.log('[TRANSACTION] Raw Fetch Transaction Summary Response Text:', rawText);
+    safeLog('Info', 'Raw Fetch Transaction Summary Response Text received', animalId);
 
     let rawData;
     try {
       rawData = JSON.parse(rawText);
     } catch (jsonError) {
-      console.error('[TRANSACTION] JSON parse error:', jsonError);
+      safeLog('Error', 'JSON parse error', animalId, undefined, jsonError);
       throw new Error('Failed to parse server response');
     }
 
-    console.log('[TRANSACTION] Raw Fetch Transaction Summary Response:', rawData);
+    safeLog('Info', 'Raw Fetch Transaction Summary Response received', animalId, undefined, rawData);
 
     if (!response.ok) {
       const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
@@ -397,10 +427,10 @@ export const fetchTransactionSummary = async (animalId: string): Promise<Transac
     }
 
     const summary = rawData.data || rawData;
-    console.log('[TRANSACTION] Processed Transaction Summary:', summary);
+    safeLog('Info', 'Processed Transaction Summary', animalId, undefined, summary);
     return summary;
   } catch (error) {
-    console.error(`[TRANSACTION] Error fetching transaction summary for animal ${animalId}:`, error);
+    safeLog('Error', 'Error fetching transaction summary', animalId, undefined, error);
     toast.error(`Failed to fetch transaction summary: ${error instanceof Error ? error.message : 'Unknown error'}`);
     throw error;
   }
@@ -410,11 +440,10 @@ export const fetchTransactionSummary = async (animalId: string): Promise<Transac
 export const fetchTransaction = async (animalId: string, transactionId: string): Promise<Transaction> => {
   await fetchCsrfToken();
   try {
-    if (!animalId) throw new Error('Invalid animal ID');
-    if (!transactionId || transactionId === 'undefined') throw new Error('Invalid transaction ID');
+    validateIds(animalId, transactionId);
 
-    const url = `${API_URL}/${animalId}/transactions/${transactionId}`;
-    console.log(`[TRANSACTION] Fetching transaction with URL: ${url}`);
+    const url = `${API_URL}/${encodeURIComponent(animalId)}/transactions/${encodeURIComponent(transactionId)}`;
+    safeLog('Info', `Fetching transaction with URL: ${url}`, animalId, transactionId);
 
     const response = await fetch(url, {
       method: 'GET',
@@ -422,24 +451,24 @@ export const fetchTransaction = async (animalId: string, transactionId: string):
       credentials: 'include',
     });
 
-    console.log('[TRANSACTION] Fetch Transaction Status:', response.status, response.statusText);
+    safeLog('Info', `Fetch Transaction Status: ${response.status} ${response.statusText}`, animalId, transactionId);
 
     if (response.status === 404) {
-      throw new Error(`Transaction with ID ${transactionId} not found`);
+      throw new Error(`Transaction not found`);
     }
 
     const rawText = await response.text();
-    console.log('[TRANSACTION] Raw Fetch Transaction Response Text:', rawText);
+    safeLog('Info', 'Raw Fetch Transaction Response Text received', animalId, transactionId);
 
     let rawData;
     try {
       rawData = JSON.parse(rawText);
     } catch (jsonError) {
-      console.error('[TRANSACTION] JSON parse error:', jsonError);
+      safeLog('Error', 'JSON parse error', animalId, transactionId, jsonError);
       throw new Error('Failed to parse server response');
     }
 
-    console.log('[TRANSACTION] Raw Fetch Transaction Response:', rawData);
+    safeLog('Info', 'Raw Fetch Transaction Response received', animalId, transactionId, rawData);
 
     if (!response.ok) {
       const errorMessage = rawData.message || `API error: ${response.status} ${response.statusText}`;
@@ -451,10 +480,10 @@ export const fetchTransaction = async (animalId: string, transactionId: string):
       throw new Error('Invalid transaction data received from server');
     }
 
-    console.log('[TRANSACTION] Processed Transaction:', transaction);
+    safeLog('Info', 'Processed Transaction', animalId, transactionId, transaction);
     return transaction;
   } catch (error) {
-    console.error(`[TRANSACTION] Error fetching transaction ${transactionId} for animal ${animalId}:`, error);
+    safeLog('Error', 'Error fetching transaction', animalId, transactionId, error);
     throw error;
   }
 };
@@ -467,13 +496,12 @@ export const updateTransaction = async (
 ): Promise<Transaction> => {
   await fetchCsrfToken();
   try {
-    if (!animalId) throw new Error('Invalid animal ID');
-    if (!transactionId || transactionId === 'undefined') throw new Error('Invalid transaction ID');
+    validateIds(animalId, transactionId);
 
     const normalizedData = normalizePayload(transactionData as TransactionFormData);
-    console.log('[TRANSACTION] Normalized transaction data for update:', normalizedData);
+    safeLog('Info', 'Normalized transaction data for update', animalId, transactionId, normalizedData);
 
-    const url = `${API_URL}/${animalId}/transactions/${transactionId}`;
+    const url = `${API_URL}/${encodeURIComponent(animalId)}/transactions/${encodeURIComponent(transactionId)}`;
     const response = await fetch(url, {
       method: 'PATCH',
       headers: getAuthHeaders(),
@@ -481,20 +509,20 @@ export const updateTransaction = async (
       body: JSON.stringify(normalizedData),
     });
 
-    console.log('[TRANSACTION] Update Transaction Status:', response.status, response.statusText);
+    safeLog('Info', `Update Transaction Status: ${response.status} ${response.statusText}`, animalId, transactionId);
 
     const rawText = await response.text();
-    console.log('[TRANSACTION] Raw Update Transaction Response Text:', rawText);
+    safeLog('Info', 'Raw Update Transaction Response Text received', animalId, transactionId);
 
     let rawData;
     try {
       rawData = JSON.parse(rawText);
     } catch (jsonError) {
-      console.error('[TRANSACTION] JSON parse error:', jsonError);
+      safeLog('Error', 'JSON parse error', animalId, transactionId, jsonError);
       throw new Error('Failed to parse server response');
     }
 
-    console.log('[TRANSACTION] Raw Update Transaction Response:', rawData);
+    safeLog('Info', 'Raw Update Transaction Response received', animalId, transactionId, rawData);
 
     if (!response.ok) {
       const errorMessage = rawData.message || rawData.errors || `API error: ${response.status} ${response.statusText}`;
@@ -502,10 +530,10 @@ export const updateTransaction = async (
     }
 
     const updatedTransaction = rawData.data || rawData;
-    console.log('[TRANSACTION] Updated Transaction:', updatedTransaction);
+    safeLog('Info', 'Updated Transaction', animalId, transactionId, updatedTransaction);
     return updatedTransaction;
   } catch (error) {
-    console.error(`[TRANSACTION] Error updating transaction ${transactionId} for animal ${animalId}:`, error);
+    safeLog('Error', 'Error updating transaction', animalId, transactionId, error);
     throw error;
   }
 };
@@ -514,39 +542,38 @@ export const updateTransaction = async (
 export const deleteTransaction = async (animalId: string, transactionId: string): Promise<void> => {
   await fetchCsrfToken();
   try {
-    if (!animalId) throw new Error('Invalid animal ID');
-    if (!transactionId || transactionId === 'undefined') throw new Error('Invalid transaction ID');
+    validateIds(animalId, transactionId);
 
-    const url = `${API_URL}/${animalId}/transactions/${transactionId}`;
+    const url = `${API_URL}/${encodeURIComponent(animalId)}/transactions/${encodeURIComponent(transactionId)}`;
     const response = await fetch(url, {
       method: 'DELETE',
       headers: getAuthHeaders(),
       credentials: 'include',
     });
 
-    console.log('[TRANSACTION] Delete Transaction Status:', response.status, response.statusText);
+    safeLog('Info', `Delete Transaction Status: ${response.status} ${response.statusText}`, animalId, transactionId);
 
     const rawText = await response.text();
-    console.log('[TRANSACTION] Raw Delete Transaction Response Text:', rawText);
+    safeLog('Info', 'Raw Delete Transaction Response Text received', animalId, transactionId);
 
     let rawData = {};
     if (rawText) {
       try {
         rawData = JSON.parse(rawText);
       } catch (jsonError) {
-        console.error('[TRANSACTION] JSON parse error:', jsonError);
+        safeLog('Error', 'JSON parse error', animalId, transactionId, jsonError);
         throw new Error('Failed to parse server response');
       }
     }
 
-    console.log('[TRANSACTION] Raw Delete Transaction Response:', rawData);
+    safeLog('Info', 'Raw Delete Transaction Response received', animalId, transactionId, rawData);
 
     if (!response.ok) {
       const errorMessage = (rawData as any).message || `API error: ${response.status} ${response.statusText}`;
       throw new Error(errorMessage);
     }
   } catch (error) {
-    console.error(`[TRANSACTION] Error deleting transaction ${transactionId} for animal ${animalId}:`, error);
+    safeLog('Error', 'Error deleting transaction', animalId, transactionId, error);
     toast.error(`Failed to delete transaction: ${error instanceof Error ? error.message : 'Unknown error'}`);
     throw error;
   }
