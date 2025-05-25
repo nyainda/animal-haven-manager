@@ -110,8 +110,8 @@ const formSchema = z.object({
   insurance_amount: z.number().nullable().optional(),
 });
 
-const transactionTypes = ['sale', 'purchase', 'lease', 'trade', 'transfer', 'other'];
-const transactionStatusOptions = ['pending', 'completedksom', 'cancelled', 'in_progress'];
+const transactionTypes = ['sale', 'purchase', 'lease', 'transfer', 'other'];
+const transactionStatusOptions = ['pending', 'completed', 'cancelled', 'in_progress'];
 const paymentMethods = ['credit_card', 'bank_transfer', 'cash', 'check', 'paypal', 'other'];
 const currencies = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CNY'];
 
