@@ -83,7 +83,7 @@ export default function MonthlyTrendsChart({ monthlyTrends, currency }: MonthlyT
                 />
                 <Legend />
                 <Area
-                  type="monotone"
+                  type="monotone" // This prop creates the smooth, wave-like curve
                   dataKey="total_amount"
                   name="Amount"
                   stroke="#8884d8"
@@ -91,7 +91,7 @@ export default function MonthlyTrendsChart({ monthlyTrends, currency }: MonthlyT
                   fill="url(#colorAmount)"
                 />
                 <Area
-                  type="monotone"
+                  type="monotone" // This prop also creates a smooth curve for this data series
                   dataKey="transaction_count"
                   name="Count"
                   stroke="#82ca9d"
