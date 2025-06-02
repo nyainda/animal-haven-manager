@@ -118,7 +118,7 @@ export interface TransactionFormData {
   buyer_id?: number;
   seller_name?: string;
   buyer_name?: string;
-  
+  animal_id?: string;
   // Additional seller fields
   seller_company?: string | null;
   seller_tax_id?: string | null;
