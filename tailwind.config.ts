@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 
+=======
+>>>>>>> new-origin/main
 import type { Config } from "tailwindcss";
 
 export default {
@@ -19,11 +22,14 @@ export default {
 			}
 		},
 		extend: {
+<<<<<<< HEAD
 			fontFamily: {
 				sans: ['Inter', 'sans-serif'],
 				serif: ['Merriweather', 'Georgia', 'serif'],
 				display: ['SF Pro Display', 'Inter', 'sans-serif'],
 			},
+=======
+>>>>>>> new-origin/main
 			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
@@ -76,6 +82,7 @@ export default {
 			},
 			keyframes: {
 				'accordion-down': {
+<<<<<<< HEAD
 					from: { height: '0' },
 					to: { height: 'var(--radix-accordion-content-height)' }
 				},
@@ -132,6 +139,27 @@ export default {
         'float': 'float 3s ease-in-out infinite',
         'pulse-gentle': 'pulse-gentle 3s ease-in-out infinite',
         'spin-slow': 'spin-slow 20s linear infinite'
+=======
+					from: {
+						height: '0'
+					},
+					to: {
+						height: 'var(--radix-accordion-content-height)'
+					}
+				},
+				'accordion-up': {
+					from: {
+						height: 'var(--radix-accordion-content-height)'
+					},
+					to: {
+						height: '0'
+					}
+				}
+			},
+			animation: {
+				'accordion-down': 'accordion-down 0.2s ease-out',
+				'accordion-up': 'accordion-up 0.2s ease-out'
+>>>>>>> new-origin/main
 			}
 		}
 	},

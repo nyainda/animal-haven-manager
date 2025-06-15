@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import React from 'react';
 import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -64,6 +65,15 @@ const TransactionFormWrapper = () => {
   if (!id) return <div>Error: Animal ID not found</div>;
   return <TransactionForm />;
 };
+=======
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Index from "./pages/Index";
+import NotFound from "./pages/NotFound";
+>>>>>>> new-origin/main
 
 const queryClient = new QueryClient();
 
@@ -71,6 +81,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
+<<<<<<< HEAD
       <Analytics />
       <BrowserRouter>
         <ThemeProvider>
@@ -147,9 +158,22 @@ const App = () => (
             </Routes>
           </AuthProvider>
         </ThemeProvider>
+=======
+      <Sonner />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Index />} />
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+>>>>>>> new-origin/main
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
 );
 
+<<<<<<< HEAD
 export default App;
+=======
+export default App;
+>>>>>>> new-origin/main

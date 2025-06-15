@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import React from 'react';
 import { Heart, Dog, List, FileText, Clock, Activity, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -252,11 +253,22 @@ const TestimonialCard = ({ quote, author, role, delay }) => {
           <h4 className="font-medium text-foreground">{author}</h4>
           <p className="text-muted-foreground text-sm">{role}</p>
         </div>
+=======
+// Update this page (the content is just a fallback if you fail to update the page)
+
+const Index = () => {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
+        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+>>>>>>> new-origin/main
       </div>
     </div>
   );
 };
 
+<<<<<<< HEAD
 // Stats Card Component
 const StatCard = ({ number, label }) => {
   return (
@@ -293,3 +305,6 @@ const SocialIcon = ({ href, 'aria-label': ariaLabel, children }) => {
 };
 
 export default Index;
+=======
+export default Index;
+>>>>>>> new-origin/main

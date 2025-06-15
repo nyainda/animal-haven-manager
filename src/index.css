@@ -1,12 +1,23 @@
+<<<<<<< HEAD
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@300;400;700&display=swap');
+=======
+>>>>>>> new-origin/main
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+<<<<<<< HEAD
 @layer base {
   :root {
     --background: 0 0% 98%;
+=======
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. */
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+>>>>>>> new-origin/main
     --foreground: 222.2 84% 4.9%;
 
     --card: 0 0% 100%;
@@ -15,7 +26,11 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
+<<<<<<< HEAD
     --primary: 220 40% 50%;
+=======
+    --primary: 222.2 47.4% 11.2%;
+>>>>>>> new-origin/main
     --primary-foreground: 210 40% 98%;
 
     --secondary: 210 40% 96.1%;
@@ -37,12 +52,28 @@
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
+<<<<<<< HEAD
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
     --sidebar-primary-foreground: 0 0% 98%;
     --sidebar-accent: 240 4.8% 95.9%;
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
+=======
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+>>>>>>> new-origin/main
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
@@ -91,6 +122,7 @@
   }
 
   body {
+<<<<<<< HEAD
     @apply bg-background text-foreground font-serif antialiased;
   }
 
@@ -201,3 +233,8 @@
 [role="listbox"] {
   @apply !bg-background;
 }
+=======
+    @apply bg-background text-foreground;
+  }
+}
+>>>>>>> new-origin/main
